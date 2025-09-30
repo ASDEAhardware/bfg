@@ -1,0 +1,73 @@
+"use client";
+
+import * as React from "react";
+import { Moon, Sun, Monitor } from "lucide-react";
+import { useTheme } from "next-themes";
+
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useSaveTheme } from "@/hooks/useSaveTheme";
+
+export function ModeToggle() {
+    const { theme, setTheme } = useTheme(); //theme = ttma corrente, setTheme = funzione per cambiare tema
+    const { mutate: saveTheme } = useSaveTheme(); //hook per salvare la preferenza del tema del DB
+
+    // Logica del cambio tema
+    const handleThemeChange = (newTheme: "light" | "dark" | "system") => { // Quando un utente clicca su una delle opzioni fornite
+        setTheme(newTheme); // Viene aggiornato il tema lato client
+        saveTheme(newTheme); // Viene chiamato l'hook che esegue una chiamata API per aggiornare il tema nel Database
+    };
+
+    // Gestisce lo stato non montato per evitare mismatch SSR/CSR
+    // (next-themes gestisce questo internamente, ma un controllo non fa male)
+    // in modo tale che il tema venga determinato solo dopo che il componente è stato montato
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => setMounted(true), []);
+
+    if (!mounted) {
+        return (
+            <Button variant="outline" size="icon" disabled>
+                <Monitor className="h-[1.2rem] w-[1.2rem]" />
+            </Button>
+        );
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                    {theme === "light" && <Sun className="h-[1.2rem] w-[1.2rem]" />}
+                    {theme === "dark" && <Moon className="h-[1.2rem] w-[1.2rem]" />}
+                    {theme === "system" && <Monitor className="h-[1.2rem] w-[1.2rem]" />}
+                    <span className="sr-only">Toggle theme</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                    onClick={() => handleThemeChange("light")}
+                    className={theme === "light" ? "bg-accent text-accent-foreground" : ""}
+                >
+                    Light
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onClick={() => handleThemeChange("dark")}
+                    className={theme === "dark" ? "bg-accent text-accent-foreground" : ""}
+                >
+                    Dark
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onClick={() => handleThemeChange("system")}
+                    className={theme === "system" ? "bg-accent text-accent-foreground" : ""}
+                >
+                    System
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
