@@ -129,10 +129,15 @@ export async function middleware(request: NextRequest) {
         if (!payload && refreshToken) {
             console.log("Access token scaduto, tento il refresh...");
             try {
-                const refreshResponse = await axios.post(`${djangoApiUrl}/api/v1/user/token/refresh/`, {
-                    refresh: refreshToken,
-                });
-
+                const refreshResponse = await axios.post(`${djangoApiUrl}/api/v1/user/token/refresh/`,
+                    {}, // Il corpo della richiesta ora è vuoto
+                    {
+                        headers: {
+                            // Inoltriamo il cookie di refresh al backend
+                            'Cookie': `refresh_token=${refreshToken}`
+                        }
+                    }
+                );
                 const newTokens = refreshResponse.data;
                 const response = NextResponse.next();
                 response.cookies.set('access_token', newTokens.access, {
