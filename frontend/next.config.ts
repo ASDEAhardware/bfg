@@ -8,12 +8,14 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // Forza polling in ambienti con problemi di HMR
-  webpackDevMiddleware: (config: any) => {
-    config.watchOptions = {
-      poll: 1000,
-      aggregateTimeout: 300,
-    };
+  // Configurazione webpack per polling in ambienti con problemi di HMR
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
     return config;
   },
 };

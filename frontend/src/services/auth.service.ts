@@ -1,15 +1,6 @@
 import { api } from '@/lib/axios';
 import { LoginCredentials, ConfirmResetPayload, ChangePasswordPayload } from '@/types';
-
-// Definiamo l'interfaccia User qui per coerenza, anche se presente in authStore.
-// In un refactoring futuro, potrebbe essere spostata in un file di tipi dedicato.
-interface User {
-    pk: number;
-    username: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-}
+import { User } from '@/types/user';
 
 /**
  * Esegue il login dell'utente.

@@ -1,14 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-interface User {
-    pk: number;
-    username: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-    // Aggiungi altri campi utente se presenti
-}
+import { User } from '@/types/user';
 
 interface AuthState {
     isAuthenticated: boolean;
