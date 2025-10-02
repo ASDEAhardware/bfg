@@ -12,6 +12,7 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar"
+import AppFooter from "@/components/app-footer"
 
 
 
@@ -44,8 +45,9 @@ export default async function Layout({
                 </header>
                 <ConditionalTabBar />
                 <TabContent>
-                    {children}
+                    <main className="flex flex-1 flex-col p-4 lg:p-6">{children}</main>
                 </TabContent>
+                <AppFooter />
             </SidebarInset>
         </SidebarProvider>
     )
