@@ -130,25 +130,6 @@ function ProfileSection() {
     const [previewImage, setPreviewImage] = useState<string | undefined>(undefined);
     // `previeImage` terrà traccia dell'URL dell'immagine da mostrare all'utente, questo stato è fondamentale per mostrare un'anteprima dell'immagine e recuperare il suo url in Base64 dalla memoria client side, prima di uploadarla sul server
 
-    // 2. SINCRONIZZAZIONE DELLO STATO CON I DATI DELLA QUERY
-    // `useEffect` si assicura che lo stato `previewImage` sia sempre sincronizzato con i dati data forniti dalla query 
-    useEffect(() => {
-        if (data?.profile_image) {
-            setPreviewImage(data.profile_image);
-        }
-    }, [data]);
-
-    if (isError) {
-        return (
-            <div className="flex flex-col items-center h-40 justify-center">
-                <span className="text-red-500 mb-2">
-                    Errore nel caricamento dei dati utente.
-                </span>
-                <Button onClick={() => window.location.reload()}>Riprova</Button>
-            </div>
-        );
-    }
-
     // CHIAMATA API PER CARICARE LA FOTO SUL SERVER
     const mutation = useMutation({
         mutationFn: async (file: File) => {
@@ -175,9 +156,30 @@ function ProfileSection() {
                 toast.error("Qualcosa è andato storto. Riprova più tardi.");
             }
             // Ripristina l'anteprima dell'immagine solo in caso di errore
-            setPreviewImage(data?.profile_picture);
+            setPreviewImage(data?.profile_image);
         },
     });
+
+    // `previeImage` terrà traccia dell'URL dell'immagine da mostrare all'utente, questo stato è fondamentale per mostrare un'anteprima dell'immagine e recuperare il suo url in Base64 dalla memoria client side, prima di uploadarla sul server
+
+    // 2. SINCRONIZZAZIONE DELLO STATO CON I DATI DELLA QUERY
+    // `useEffect` si assicura che lo stato `previewImage` sia sempre sincronizzato con i dati data forniti dalla query 
+    useEffect(() => {
+        if (data?.profile_image) {
+            setPreviewImage(data.profile_image);
+        }
+    }, [data]);
+
+    if (isError) {
+        return (
+            <div className="flex flex-col items-center h-40 justify-center">
+                <span className="text-red-500 mb-2">
+                    Errore nel caricamento dei dati utente.
+                </span>
+                <Button onClick={() => window.location.reload()}>Riprova</Button>
+            </div>
+        );
+    }
 
 
     // Funzione ceh prende il file che l'utente ha selezionato, verifica che non sia più grande di 2MB, se lo è mostra un toast di errore
@@ -215,7 +217,7 @@ function ProfileSection() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Profilo</h1>
-                <p className="text-muted-foreground">Gestisci le informazioni del tuo profilo e le preferenze dell'account.</p>
+                <p className="text-muted-foreground">Gestisci le informazioni del tuo profilo e le preferenze dell&apos;account.</p>
             </div>
 
             <Card className="border border-border">
@@ -234,7 +236,7 @@ function ProfileSection() {
                                     src={previewImage || "/user-profile-illustration.png"}
                                     alt="Foto profilo"
                                 />
-                                <AvatarFallback className="text-lg">{data.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                <AvatarFallback className="text-lg">{data?.username.slice(0, 2).toUpperCase()}</AvatarFallback>
                             </Avatar>
                         )}
 
@@ -443,13 +445,13 @@ function AppearanceSection() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Aspetto</h1>
-                <p className="text-muted-foreground">Personalizza l'aspetto dell'interfaccia.</p>
+                <p className="text-muted-foreground">Personalizza l&apos;aspetto dell&apos;interfaccia.</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
                     <CardTitle>Tema</CardTitle>
-                    <CardDescription>Scegli come vuoi che appaia l'interfaccia.</CardDescription>
+                    <CardDescription>Scegli come vuoi che appaia l&apos;interfaccia.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">Sezione in sviluppo...</p>

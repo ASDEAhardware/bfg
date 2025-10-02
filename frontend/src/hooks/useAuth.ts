@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useTheme } from "next-themes";
 import { useEffect } from "react";
+import { User } from "@/types/user";
 
 export const useUserInfo = () => {
   const setUser = useAuthStore((state) => state.setUser);
@@ -31,10 +32,10 @@ export const useLogin = () => {
 
   return useMutation({
     mutationFn: authService.login, // <-- Usa la funzione del service
-    onSuccess: (user_data) => {
+    onSuccess: (user_data: User) => {
       // La funzione di servizio ora restituisce direttamente user_data
-      if (user_data && (user_data as any).theme) {
-        setTheme((user_data as any).theme);
+      if (user_data && user_data.theme) {
+        setTheme(user_data.theme);
       }
       setUser(user_data);
       router.push("/dashboard"); // router.push() causa un client-side navgation (soft navgation)

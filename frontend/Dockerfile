@@ -13,5 +13,5 @@ RUN npm install
 COPY . .
 
 # Build dell'app in modalità produzione
-RUN npm run build
+# RUN npm run build
 
