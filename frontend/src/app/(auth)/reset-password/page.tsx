@@ -50,11 +50,11 @@ export default function ResetPasswordPage() {
                                 />
                             </div>
                             <Button type="submit" className="w-full" disabled={mutation.isPending}>
-                                {mutation.isPending ? 'Invio in corso...' : 'Invia link di reset'}
+                                {mutation.isPending ? "Invio in corso..." : "Invia link di reset"}
                             </Button>
                             {mutation.isError && (
                                 <p className="text-sm text-red-500">
-                                    Si è verificato un errore. Verifica l'indirizzo email.
+                                    Si è verificato un errore. Verifica l&apos;indirizzo email.
                                 </p>
                             )}
                         </form>
