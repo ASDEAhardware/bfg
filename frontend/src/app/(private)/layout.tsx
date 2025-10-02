@@ -1,6 +1,10 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { ModeToggle } from "@/components/theme-switch"
-import Breadcrumb from "@/components/Breadcrumb"
+import { TabModeToggle } from "@/components/TabModeToggle"
+import { TabBar } from "@/components/TabBar"
+import { TabContent } from "@/components/TabContent"
+import { TabNavigationHandler } from "@/components/TabNavigationHandler"
+import TabAwareBreadcrumb from "@/components/TabAwareBreadcrumb"
 import { Separator } from "@/components/ui/separator"
 import {
     SidebarInset,
@@ -22,6 +26,7 @@ export default async function Layout({
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
+                <TabNavigationHandler />
                 <header className="flex h-12 shrink-0 items-center gap-2 border-b sticky top-0 z-10 bg-sidebar">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
@@ -29,13 +34,17 @@ export default async function Layout({
                             orientation="vertical"
                             className="mr-2 data-[orientation=vertical]:h-4"
                         />
-                        <Breadcrumb />
+                        <TabAwareBreadcrumb />
                     </div>
                     <div className="ml-auto flex items-end gap-2 pr-4">
+                        <TabModeToggle />
                         <ModeToggle />
                     </div>
                 </header>
-                <main className="flex flex-1 flex-col p-4 lg:p-6">{children}</main>
+                <TabBar />
+                <TabContent>
+                    <main className="flex flex-1 flex-col p-4 lg:p-6">{children}</main>
+                </TabContent>
                 <AppFooter />
             </SidebarInset>
         </SidebarProvider>
