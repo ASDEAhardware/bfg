@@ -1,0 +1,255 @@
+"use client"
+import React, { useState } from 'react'
+import { Plus, X, GripHorizontal, GripVertical, Unlink } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useGridStore, GridSection as GridSectionType } from '@/store/gridStore'
+import { useTabStore } from '@/store/tabStore'
+import { cn } from '@/lib/utils'
+import { TabContentRenderer } from '@/components/TabContentRenderer'
+import { PageSelector } from '@/components/PageSelector'
+
+interface GridSectionProps {
+  section: GridSectionType
+  isActive: boolean
+  canSplitHorizontal: boolean
+  canSplitVertical: boolean
+  canRemove: boolean
+}
+
+export function GridSection({
+  section,
+  isActive,
+  canSplitHorizontal,
+  canSplitVertical,
+  canRemove
+}: GridSectionProps) {
+  const {
+    splitSection,
+    removeSection,
+    assignTabToSection,
+    assignVirtualPageToSection,
+    clearSectionTab,
+    setActiveSection,
+    closeSection,
+    getVirtualPage
+  } = useGridStore()
+  const { tabs, isTabModeEnabled, openTabInBackground, activeTabId, setActiveTab } = useTabStore()
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  // Handle both real tabs and virtual grid tabs
+  const assignedTab = section.tabId ?
+    tabs.find(tab => tab.id === section.tabId) ||
+    getVirtualPage(section.tabId) ||
+    (section.tabId.startsWith('grid-page-') ? createVirtualTab(section.tabId) : null)
+    : null
+
+  // Create virtual tab for grid sections
+  function createVirtualTab(tabId: string): any {
+    const availablePageMap: { [key: string]: { url: string, title: string } } = {
+      'grid-page-dashboard': { url: '/dashboard', title: 'Dashboard' },
+      'grid-page-settings': { url: '/settings', title: 'Impostazioni' },
+    }
+
+    // Extract the page type from tabId
+    const pageType = tabId.split('-').slice(0, 3).join('-')
+    const pageInfo = availablePageMap[pageType]
+
+    if (pageInfo) {
+      return {
+        id: tabId,
+        title: pageInfo.title,
+        url: pageInfo.url,
+        isActive: false
+      }
+    }
+    return null
+  }
+
+  const handleSectionClick = () => {
+    setActiveSection(section.id)
+  }
+
+  const handleSplitHorizontal = () => {
+    if (canSplitHorizontal) {
+      splitSection(section.id, 'horizontal')
+    }
+  }
+
+  const handleSplitVertical = () => {
+    if (canSplitVertical) {
+      splitSection(section.id, 'vertical')
+    }
+  }
+
+  const handleRemove = () => {
+    if (canRemove) {
+      removeSection(section.id)
+    }
+  }
+
+  const handleTabSelect = (tabId: string) => {
+    assignTabToSection(section.id, tabId)
+  }
+
+  const handleDirectPageAssign = (url: string, title: string) => {
+    if (isTabModeEnabled) {
+      // When tab mode is enabled, create tab in background without activating it
+      const tabId = openTabInBackground(url, title)
+      if (tabId) {
+        assignTabToSection(section.id, tabId)
+
+        // If we're currently on the grid tab, keep it active
+        if (activeTabId === 'grid-tab') {
+          setActiveTab('grid-tab')
+        }
+      }
+    } else {
+      // When tab mode is disabled, use the virtual page system
+      assignVirtualPageToSection(section.id, url, title)
+    }
+  }
+
+
+  const handleClearTab = () => {
+    clearSectionTab(section.id)
+  }
+
+  const handleDetachTab = () => {
+    clearSectionTab(section.id)
+  }
+
+  const handleCloseSection = () => {
+    if (canRemove) {
+      closeSection(section.id)
+    }
+  }
+
+  // Gestione drag and drop
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = () => {
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const tabId = e.dataTransfer.getData('text/plain')
+    if (tabId && tabId !== 'grid-tab') {
+      assignTabToSection(section.id, tabId)
+    }
+  }
+
+
+  return (
+    <div
+      className={cn(
+        "relative bg-background h-full w-full flex flex-col p-2",
+        isActive && "ring-1 ring-primary/20",
+        isDragOver && "bg-primary/5"
+      )}
+      onClick={handleSectionClick}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Header con controlli */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1">
+          <span className={cn(
+            "text-xs",
+            assignedTab ? "font-medium" : "text-muted-foreground/60 font-normal italic"
+          )}>
+            {assignedTab ? (assignedTab.customTitle || assignedTab.title) : "Nessuna pagina assegnata"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {/* Split verticale */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={handleSplitVertical}
+            disabled={!canSplitVertical}
+            title="Dividi verticalmente"
+          >
+            <GripVertical className="h-3 w-3" />
+          </Button>
+
+          {/* Split orizzontale */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={handleSplitHorizontal}
+            disabled={!canSplitHorizontal}
+            title="Dividi orizzontalmente"
+          >
+            <GripHorizontal className="h-3 w-3" />
+          </Button>
+
+          {/* Pulsante intelligente: Attach/Detach/Close */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-6 w-6",
+              assignedTab ? "hover:bg-destructive hover:text-destructive-foreground" : ""
+            )}
+            onClick={() => {
+              if (assignedTab) {
+                // Se c'è una tab assegnata, detach (diventa X per chiudere)
+                handleDetachTab()
+              } else if (canRemove) {
+                // Se non c'è tab e può essere rimossa, chiudi sezione
+                handleCloseSection()
+              }
+              // Se non c'è tab e non può essere rimossa, non fare nulla (stato base)
+            }}
+            title={
+              assignedTab
+                ? "Scollega pagina dalla sezione"
+                : canRemove
+                  ? "Chiudi sezione"
+                  : "Sezione principale"
+            }
+            disabled={!assignedTab && !canRemove}
+          >
+            {assignedTab ? (
+              <Unlink className="h-3 w-3" />
+            ) : canRemove ? (
+              <X className="h-3 w-3" />
+            ) : (
+              <Plus className="h-3 w-3 opacity-30" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Contenuto della sezione */}
+      <div className="flex-1 flex flex-col">
+        {assignedTab ? (
+          <div className="flex-1 min-h-0">
+            <TabContentRenderer tab={assignedTab} />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <PageSelector onPageSelect={handleDirectPageAssign} />
+
+            {isTabModeEnabled && (
+              <div className="text-xs text-center text-muted-foreground/70 mt-4">
+                oppure trascina una scheda qui
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

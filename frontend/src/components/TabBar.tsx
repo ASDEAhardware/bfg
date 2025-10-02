@@ -1,8 +1,9 @@
 "use client"
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Edit3, Check, GripVertical, MoreHorizontal } from 'lucide-react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { X, Edit3, Check, MoreHorizontal, Grid3X3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTabStore } from '@/store/tabStore'
+import { useGridStore } from '@/store/gridStore'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import {
@@ -13,20 +14,33 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 export function TabBar() {
-  const { tabs, activeTabId, setActiveTab, closeTab, renameTab, reorderTabs } = useTabStore()
+  const { tabs, activeTabId, setActiveTab, closeTab, renameTab, isTabModeEnabled } = useTabStore()
+  const { isGridModeEnabled } = useGridStore()
   const [editingTab, setEditingTab] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
-  const [draggedTab, setDraggedTab] = useState<string | null>(null)
-  const [dragOverTab, setDragOverTab] = useState<string | null>(null)
   const [visibleTabs, setVisibleTabs] = useState<typeof tabs>([])
   const [overflowTabs, setOverflowTabs] = useState<typeof tabs>([])
 
   const tabsContainerRef = useRef<HTMLDivElement>(null)
 
+  // Combina scheda griglia con le schede normali
+  const allTabs = useMemo(() => {
+    // Crea la scheda griglia solo se sia il grid mode che il tab mode sono attivi
+    const gridTab = (isGridModeEnabled && isTabModeEnabled) ? {
+      id: 'grid-tab',
+      title: '', // Solo icona, nessun titolo
+      url: '/grid',
+      isActive: activeTabId === 'grid-tab',
+      customTitle: ''
+    } : null
+
+    return gridTab ? [gridTab, ...tabs] : tabs
+  }, [isGridModeEnabled, isTabModeEnabled, activeTabId, tabs])
+
   // Calcola quali schede sono visibili e quali vanno nel dropdown
   const calculateTabVisibility = useCallback(() => {
-    if (!tabsContainerRef.current || tabs.length === 0) {
-      setVisibleTabs(tabs)
+    if (!tabsContainerRef.current || allTabs.length === 0) {
+      setVisibleTabs(allTabs)
       setOverflowTabs([])
       return
     }
@@ -34,53 +48,102 @@ export function TabBar() {
     const container = tabsContainerRef.current
     const containerWidth = container.clientWidth || 800 // fallback
 
-    // Larghezza fissa per ogni scheda (w-36 = 144px + border)
-    const tabWidth = 145 // w-36 + border
-    const dropdownButtonWidth = tabs.length > 1 ? 40 : 0 // Solo se necessario
+    // Larghezza dinamica per le schede
+    const gridTabWidth = 49 // w-12 + border per la scheda griglia
+    const normalTabWidth = 145 // w-36 + border per schede normali
+    const dropdownButtonWidth = allTabs.length > 1 ? 40 : 0 // Solo se necessario
 
-    // Calcola quante schede possono entrare - minimo 1
+    // Calcola quante schede possono entrare considerando la griglia
     const availableWidth = containerWidth - dropdownButtonWidth
-    const maxVisibleTabs = Math.max(1, Math.floor(availableWidth / tabWidth))
+    const hasGridTab = allTabs[0]?.id === 'grid-tab'
+
+    let maxVisibleTabs
+    if (hasGridTab) {
+      // Riserva spazio per la scheda griglia
+      const remainingWidth = availableWidth - gridTabWidth
+      const maxOtherTabs = Math.max(0, Math.floor(remainingWidth / normalTabWidth))
+      maxVisibleTabs = maxOtherTabs + 1 // +1 per la griglia
+    } else {
+      maxVisibleTabs = Math.max(1, Math.floor(availableWidth / normalTabWidth))
+    }
 
     // Assicurati che la scheda attiva sia sempre visibile
-    const activeTabIndex = tabs.findIndex(tab => tab.id === activeTabId)
+    const activeTabIndex = allTabs.findIndex(tab => tab.id === activeTabId)
 
-    if (tabs.length <= maxVisibleTabs) {
+    if (allTabs.length <= maxVisibleTabs) {
       // Tutte le schede sono visibili
-      setVisibleTabs(tabs)
+      setVisibleTabs(allTabs)
       setOverflowTabs([])
     } else {
       // Alcune schede vanno nel dropdown
-      let startIndex = 0
+      const hasGridTab = allTabs[0]?.id === 'grid-tab'
 
-      // Se la scheda attiva esiste, assicurati che sia visibile
-      if (activeTabIndex !== -1) {
-        // Se la scheda attiva è l'ultima (nuova), mostrala nelle prime posizioni
-        if (activeTabIndex === tabs.length - 1) {
-          // Scheda nuova: mostra le ultime schede inclusa quella attiva
-          startIndex = Math.max(0, tabs.length - maxVisibleTabs)
+      if (hasGridTab) {
+        // Se c'è la scheda griglia, assicurati che sia sempre visibile come prima
+        const gridTab = allTabs[0]
+        const otherTabs = allTabs.slice(1)
+        const maxOtherTabs = maxVisibleTabs - 1 // Riserva uno spazio per la griglia
+
+        let visibleOtherTabs: typeof otherTabs = []
+        let overflowOtherTabs: typeof otherTabs = []
+
+        if (otherTabs.length <= maxOtherTabs) {
+          visibleOtherTabs = otherTabs
+          overflowOtherTabs = []
         } else {
-          // Scheda esistente: centrala nelle schede visibili
-          const halfVisible = Math.floor(maxVisibleTabs / 2)
-          startIndex = Math.max(0, activeTabIndex - halfVisible)
-          startIndex = Math.min(startIndex, tabs.length - maxVisibleTabs)
-        }
-      }
+          // Trova l'indice della scheda attiva tra le altre schede
+          const activeOtherIndex = otherTabs.findIndex(tab => tab.id === activeTabId)
 
-      const endIndex = startIndex + maxVisibleTabs
-      setVisibleTabs(tabs.slice(startIndex, endIndex))
-      setOverflowTabs([
-        ...tabs.slice(0, startIndex),
-        ...tabs.slice(endIndex)
-      ])
+          if (activeOtherIndex !== -1) {
+            // Centra la scheda attiva nelle schede visibili
+            const halfVisible = Math.floor(maxOtherTabs / 2)
+            let startIndex = Math.max(0, activeOtherIndex - halfVisible)
+            startIndex = Math.min(startIndex, otherTabs.length - maxOtherTabs)
+
+            const endIndex = startIndex + maxOtherTabs
+            visibleOtherTabs = otherTabs.slice(startIndex, endIndex)
+            overflowOtherTabs = [
+              ...otherTabs.slice(0, startIndex),
+              ...otherTabs.slice(endIndex)
+            ]
+          } else {
+            // Nessuna scheda attiva, mostra le prime
+            visibleOtherTabs = otherTabs.slice(0, maxOtherTabs)
+            overflowOtherTabs = otherTabs.slice(maxOtherTabs)
+          }
+        }
+
+        setVisibleTabs([gridTab, ...visibleOtherTabs])
+        setOverflowTabs(overflowOtherTabs)
+      } else {
+        // Logica normale senza scheda griglia
+        let startIndex = 0
+
+        if (activeTabIndex !== -1) {
+          if (activeTabIndex === allTabs.length - 1) {
+            startIndex = Math.max(0, allTabs.length - maxVisibleTabs)
+          } else {
+            const halfVisible = Math.floor(maxVisibleTabs / 2)
+            startIndex = Math.max(0, activeTabIndex - halfVisible)
+            startIndex = Math.min(startIndex, allTabs.length - maxVisibleTabs)
+          }
+        }
+
+        const endIndex = startIndex + maxVisibleTabs
+        setVisibleTabs(allTabs.slice(startIndex, endIndex))
+        setOverflowTabs([
+          ...allTabs.slice(0, startIndex),
+          ...allTabs.slice(endIndex)
+        ])
+      }
     }
-  }, [tabs, activeTabId])
+  }, [allTabs, activeTabId])
 
   useEffect(() => {
     // Aspetta che il DOM sia renderizzato prima di calcolare
     const timeoutId = setTimeout(calculateTabVisibility, 50)
     return () => clearTimeout(timeoutId)
-  }, [tabs, activeTabId, calculateTabVisibility])
+  }, [allTabs, activeTabId, calculateTabVisibility])
 
   useEffect(() => {
     const handleResize = () => {
@@ -92,16 +155,29 @@ export function TabBar() {
   }, [calculateTabVisibility])
 
   const handleTabClick = (tabId: string) => {
-    setActiveTab(tabId)
+    if (tabId === 'grid-tab') {
+      // Non è una scheda normale, gestisci solo come attiva
+      setActiveTab(tabId)
+    } else {
+      setActiveTab(tabId)
+    }
   }
 
   const handleCloseTab = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation()
+    if (tabId === 'grid-tab') {
+      // La scheda griglia non può essere chiusa direttamente
+      return
+    }
     closeTab(tabId)
   }
 
   const startEditing = (e: React.MouseEvent, tabId: string, currentTitle: string) => {
     e.stopPropagation()
+    if (tabId === 'grid-tab') {
+      // La scheda griglia non può essere rinominata
+      return
+    }
     setEditingTab(tabId)
     setEditValue(currentTitle)
   }
@@ -123,48 +199,8 @@ export function TabBar() {
     }
   }
 
-  // Gestione del drag-and-drop
-  const handleDragStart = (e: React.DragEvent, tabId: string) => {
-    setDraggedTab(tabId)
-    e.dataTransfer.effectAllowed = 'move'
-  }
 
-  const handleDragOver = (e: React.DragEvent, tabId: string) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverTab(tabId)
-  }
-
-  const handleDragLeave = () => {
-    setDragOverTab(null)
-  }
-
-  const handleDrop = (e: React.DragEvent, targetTabId: string) => {
-    e.preventDefault()
-
-    if (!draggedTab || draggedTab === targetTabId) {
-      setDraggedTab(null)
-      setDragOverTab(null)
-      return
-    }
-
-    const fromIndex = tabs.findIndex(tab => tab.id === draggedTab)
-    const toIndex = tabs.findIndex(tab => tab.id === targetTabId)
-
-    if (fromIndex !== -1 && toIndex !== -1) {
-      reorderTabs(fromIndex, toIndex)
-    }
-
-    setDraggedTab(null)
-    setDragOverTab(null)
-  }
-
-  const handleDragEnd = () => {
-    setDraggedTab(null)
-    setDragOverTab(null)
-  }
-
-  if (tabs.length === 0) return null
+  if (allTabs.length === 0) return null
 
   return (
     <div className="flex items-center bg-muted/30 border-b border-border h-8 relative w-full overflow-hidden">
@@ -176,23 +212,16 @@ export function TabBar() {
         {visibleTabs.map((tab) => {
             const isActive = tab.id === activeTabId
             const displayTitle = tab.customTitle || tab.title
-            const isDragging = draggedTab === tab.id
-            const isDragOver = dragOverTab === tab.id
+            const isGridTab = tab.id === 'grid-tab'
 
             return (
               <div
                 key={tab.id}
-                draggable={editingTab !== tab.id}
-                onDragStart={(e) => handleDragStart(e, tab.id)}
-                onDragOver={(e) => handleDragOver(e, tab.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, tab.id)}
-                onDragEnd={handleDragEnd}
                 className={cn(
-                  "flex items-center w-36 h-8 px-2 cursor-pointer border-r border-border bg-muted/50 hover:bg-muted/70 transition-colors group relative flex-shrink-0",
+                  "flex items-center h-8 px-2 cursor-pointer border-r border-border bg-muted/50 hover:bg-muted/70 transition-colors group relative flex-shrink-0",
+                  isGridTab ? "w-12" : "w-36", // Scheda griglia più piccola
                   isActive && "bg-background border-t-2 border-t-primary",
-                  isDragging && "opacity-50",
-                  isDragOver && "bg-primary/10"
+                  isGridTab && !isActive && "bg-primary/20", // Solo quando non è attiva
                 )}
                 onClick={() => handleTabClick(tab.id)}
               >
@@ -217,30 +246,38 @@ export function TabBar() {
                   </div>
                 ) : (
                   <>
-                    <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mr-1 cursor-grab" />
-                    <span
-                      className="flex-1 text-xs font-medium truncate pr-1"
-                      title={displayTitle}
-                    >
-                      {displayTitle}
-                    </span>
+                    {isGridTab && (
+                      <Grid3X3 className="h-4 w-4 text-primary mx-auto" />
+                    )}
+                    {!isGridTab && (
+                      <span
+                        className="flex-1 text-xs font-medium truncate pr-1"
+                        title={displayTitle}
+                      >
+                        {displayTitle}
+                      </span>
+                    )}
                     <div className="flex items-center gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 p-0.5 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => startEditing(e, tab.id, displayTitle)}
-                      >
-                        <Edit3 className="h-3 w-3 p-0.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 p-0.5 hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={(e) => handleCloseTab(e, tab.id)}
-                      >
-                          <X className="h-3 w-3" />
-                      </Button>
+                      {!isGridTab && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-4 w-4 p-0.5 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e: React.MouseEvent) => startEditing(e, tab.id, displayTitle)}
+                          >
+                            <Edit3 className="h-3 w-3 p-0.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-4 w-4 p-0.5 hover:bg-destructive hover:text-destructive-foreground"
+                            onClick={(e: React.MouseEvent) => handleCloseTab(e, tab.id)}
+                          >
+                              <X className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
@@ -283,7 +320,7 @@ export function TabBar() {
                     variant="ghost"
                     size="icon"
                     className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground ml-2 flex-shrink-0"
-                    onClick={(e) => {
+                    onClick={(e: React.MouseEvent) => {
                       e.stopPropagation()
                       handleCloseTab(e, tab.id)
                     }}

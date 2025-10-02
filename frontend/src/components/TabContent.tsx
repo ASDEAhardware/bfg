@@ -1,7 +1,9 @@
 "use client"
 import React from 'react'
 import { useTabStore } from '@/store/tabStore'
+import { useGridStore } from '@/store/gridStore'
 import { usePathname } from 'next/navigation'
+import { GridLayout } from '@/components/GridLayout'
 
 interface TabContentProps {
   children: React.ReactNode
@@ -9,7 +11,17 @@ interface TabContentProps {
 
 export function TabContent({ children }: TabContentProps) {
   const { isTabModeEnabled, tabs, activeTabId } = useTabStore()
+  const { isGridModeEnabled } = useGridStore()
   const pathname = usePathname()
+
+  // Se modalità griglia attiva (con o senza schede)
+  if (isGridModeEnabled && !isTabModeEnabled) {
+    return (
+      <div className="flex-1 flex flex-col">
+        <GridLayout />
+      </div>
+    )
+  }
 
   // Se non siamo in modalità schede, mostra sempre il contenuto
   if (!isTabModeEnabled) {
@@ -24,6 +36,15 @@ export function TabContent({ children }: TabContentProps) {
           <p className="text-lg font-medium">Modalità schede attiva</p>
           <p className="text-sm">Apri una pagina dal menu per iniziare</p>
         </div>
+      </div>
+    )
+  }
+
+  // Se è selezionata la scheda griglia e la griglia è attiva
+  if (activeTabId === 'grid-tab' && isGridModeEnabled) {
+    return (
+      <div className="flex-1 flex flex-col">
+        <GridLayout />
       </div>
     )
   }

@@ -1,10 +1,11 @@
 import { AppSidebar } from "@/components/app-sidebar"
 import { ModeToggle } from "@/components/theme-switch"
 import { TabModeToggle } from "@/components/TabModeToggle"
-import { TabBar } from "@/components/TabBar"
+import { GridModeToggle } from "@/components/GridModeToggle"
 import { TabContent } from "@/components/TabContent"
 import { TabNavigationHandler } from "@/components/TabNavigationHandler"
 import TabAwareBreadcrumb from "@/components/TabAwareBreadcrumb"
+import { ConditionalTabBar } from "@/components/ConditionalTabBar"
 import { Separator } from "@/components/ui/separator"
 import {
     SidebarInset,
@@ -37,10 +38,11 @@ export default async function Layout({
                     </div>
                     <div className="ml-auto flex items-end gap-2 pr-4">
                         <TabModeToggle />
+                        <GridModeToggle />
                         <ModeToggle />
                     </div>
                 </header>
-                <TabBar />
+                <ConditionalTabBar />
                 <TabContent>
                     {children}
                 </TabContent>

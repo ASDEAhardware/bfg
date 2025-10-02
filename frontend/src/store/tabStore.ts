@@ -18,10 +18,10 @@ interface TabState {
   // Actions
   toggleTabMode: () => void
   openTab: (url: string, title: string) => void
+  openTabInBackground: (url: string, title: string) => string // Returns the tab ID
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
   renameTab: (tabId: string, newTitle: string) => void
-  reorderTabs: (fromIndex: number, toIndex: number) => void
   clearAllTabs: () => void
 }
 
@@ -34,12 +34,8 @@ export const useTabStore = create<TabState>()(
 
       toggleTabMode: () => {
         set((state) => ({
-          isTabModeEnabled: !state.isTabModeEnabled,
-          // Se disabilitiamo la modalità schede, resettiamo tutto
-          ...(state.isTabModeEnabled && {
-            tabs: [],
-            activeTabId: null
-          })
+          isTabModeEnabled: !state.isTabModeEnabled
+          // Preserviamo sempre tabs e activeTabId, non resettiamo mai
         }))
       },
 
@@ -74,6 +70,41 @@ export const useTabStore = create<TabState>()(
           ],
           activeTabId: tabId
         }))
+      },
+
+      openTabInBackground: (url: string, title: string) => {
+        const state = get()
+
+        // Se non siamo in modalità schede, non facciamo nulla
+        if (!state.isTabModeEnabled) return ''
+
+        // Genera un ID unico per la scheda usando timestamp
+        const timestamp = Date.now()
+        const existingTabs = state.tabs.filter(tab => tab.url === url)
+        let tabId = url
+        let displayTitle = title
+
+        if (existingTabs.length > 0) {
+          tabId = `${url}-${timestamp}`
+          displayTitle = `${title} (${existingTabs.length + 1})`
+        }
+
+        const newTab: Tab = {
+          id: tabId,
+          title: displayTitle,
+          url,
+          isActive: false // Non attivare la tab
+        }
+
+        set((state) => ({
+          tabs: [
+            ...state.tabs, // Non disattivare le altre tab
+            newTab
+          ]
+          // Non cambiare activeTabId
+        }))
+
+        return tabId // Ritorna l'ID per uso successivo
       },
 
       closeTab: (tabId: string) => {
@@ -123,15 +154,6 @@ export const useTabStore = create<TabState>()(
               : tab
           )
         }))
-      },
-
-      reorderTabs: (fromIndex: number, toIndex: number) => {
-        set((state) => {
-          const newTabs = [...state.tabs]
-          const [removed] = newTabs.splice(fromIndex, 1)
-          newTabs.splice(toIndex, 0, removed)
-          return { tabs: newTabs }
-        })
       },
 
       clearAllTabs: () => {
