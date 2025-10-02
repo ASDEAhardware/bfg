@@ -18,6 +18,36 @@ interface ChangelogEntry {
 
 const changelogData: ChangelogEntry[] = [
   {
+    version: "1.1.0",
+    date: "02 Ottobre 2025",
+    title: "Tab Navigation",
+    description:
+      "Aggiunta la navigazione degli elementi della sidebar tramite tabs.",
+    changes: [
+      {
+        type: "feature",
+        items: [
+          "Aggiunti i componenti per permettere la navigazione con le Tabs.",
+          "Aggiunto il css per nascondere la scrollbar senza disabilitare lo scroll.",
+          "Aggiunto l'alert dialog che viene mostrato quando si disabilita la modalità tabs senza averle chiuse.",
+          "Aggiunto lo store Zustand per le tabs.",
+        ],
+      },
+      {
+        type: "improvement",
+        items: [
+          "Nessun miglioramento al codice esistente rilevante in questa release.",
+        ],
+      },
+      {
+        type: "bugfix",
+        items: [
+          "Nessuna correzione bug rilevante in questa release iniziale.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.0",
     date: "02 Ottobre 2025",
     title: "Release iniziale dell'applicazione web",
