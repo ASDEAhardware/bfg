@@ -4,6 +4,13 @@ Tutte le modifiche notevoli a questo progetto saranno documentate in questo file
 
 Il formato si basa su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-10-02
+
+### Added
+
+#### Tabs
+- **Tabs**: Aggiunta la funzionalità per navigare gli elementi della sidebar tramite le Tabs.
+
 ## [1.0.0] - 2025-10-02
 
 ### Added
