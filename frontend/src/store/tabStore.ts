@@ -22,6 +22,7 @@ interface TabState {
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
   renameTab: (tabId: string, newTitle: string) => void
+  reorderTabs: (fromIndex: number, toIndex: number) => void
   clearAllTabs: () => void
 }
 
@@ -154,6 +155,17 @@ export const useTabStore = create<TabState>()(
               : tab
           )
         }))
+      },
+
+      reorderTabs: (fromIndex: number, toIndex: number) => {
+        const state = get()
+        const newTabs = [...state.tabs]
+        const [movedTab] = newTabs.splice(fromIndex, 1)
+        newTabs.splice(toIndex, 0, movedTab)
+
+        set({
+          tabs: newTabs
+        })
       },
 
       clearAllTabs: () => {

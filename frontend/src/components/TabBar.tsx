@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { X, Edit3, Check, MoreHorizontal, Grid3X3 } from 'lucide-react'
+import { X, Edit3, Check, MoreHorizontal, Grid3X3, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTabStore } from '@/store/tabStore'
 import { useGridStore } from '@/store/gridStore'
@@ -14,12 +14,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 export function TabBar() {
-  const { tabs, activeTabId, setActiveTab, closeTab, renameTab, isTabModeEnabled } = useTabStore()
+  const { tabs, activeTabId, setActiveTab, closeTab, renameTab, reorderTabs, isTabModeEnabled } = useTabStore()
   const { isGridModeEnabled } = useGridStore()
   const [editingTab, setEditingTab] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [visibleTabs, setVisibleTabs] = useState<typeof tabs>([])
   const [overflowTabs, setOverflowTabs] = useState<typeof tabs>([])
+  const [draggedTab, setDraggedTab] = useState<string | null>(null)
+  const [dragOverTab, setDragOverTab] = useState<string | null>(null)
 
   const tabsContainerRef = useRef<HTMLDivElement>(null)
 
@@ -199,6 +201,57 @@ export function TabBar() {
     }
   }
 
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, tabId: string) => {
+    if (tabId === 'grid-tab') return // La scheda griglia non può essere trascinata
+
+    setDraggedTab(tabId)
+    e.dataTransfer.setData('text/plain', tabId)
+    e.dataTransfer.effectAllowed = 'move'
+
+    // Aggiungi classe CSS per feedback visivo
+    e.currentTarget.classList.add('opacity-50')
+  }
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedTab(null)
+    setDragOverTab(null)
+    e.currentTarget.classList.remove('opacity-50')
+  }
+
+  const handleDragOver = (e: React.DragEvent, tabId: string) => {
+    if (tabId === 'grid-tab' || tabId === draggedTab) return
+
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverTab(tabId)
+  }
+
+  const handleDragLeave = () => {
+    setDragOverTab(null)
+  }
+
+  const handleDrop = (e: React.DragEvent, targetTabId: string) => {
+    e.preventDefault()
+
+    if (targetTabId === 'grid-tab' || !draggedTab) return
+
+    const draggedIndex = allTabs.findIndex(tab => tab.id === draggedTab)
+    const targetIndex = allTabs.findIndex(tab => tab.id === targetTabId)
+
+    // Adjusting for grid tab offset
+    const gridOffset = allTabs[0]?.id === 'grid-tab' ? 1 : 0
+    const realDraggedIndex = draggedIndex - gridOffset
+    const realTargetIndex = targetIndex - gridOffset
+
+    if (realDraggedIndex >= 0 && realTargetIndex >= 0 && realDraggedIndex !== realTargetIndex) {
+      reorderTabs(realDraggedIndex, realTargetIndex)
+    }
+
+    setDraggedTab(null)
+    setDragOverTab(null)
+  }
+
 
   if (allTabs.length === 0) return null
 
@@ -217,13 +270,21 @@ export function TabBar() {
             return (
               <div
                 key={tab.id}
+                draggable={!isGridTab}
                 className={cn(
                   "flex items-center h-8 px-2 cursor-pointer border-r border-border bg-muted/50 hover:bg-muted/70 transition-colors group relative flex-shrink-0",
                   isGridTab ? "w-12" : "w-36", // Scheda griglia più piccola
                   isActive && "bg-background border-t-2 border-t-primary",
                   isGridTab && !isActive && "bg-primary/20", // Solo quando non è attiva
+                  dragOverTab === tab.id && "border-l-4 border-l-primary", // Feedback visivo per drop
+                  draggedTab === tab.id && "opacity-50", // Feedback per item trascinato
                 )}
                 onClick={() => handleTabClick(tab.id)}
+                onDragStart={(e) => handleDragStart(e, tab.id)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, tab.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, tab.id)}
               >
                 {editingTab === tab.id ? (
                   <div className="flex items-center flex-1 gap-1">
@@ -250,12 +311,20 @@ export function TabBar() {
                       <Grid3X3 className="h-4 w-4 text-primary mx-auto" />
                     )}
                     {!isGridTab && (
-                      <span
-                        className="flex-1 text-xs font-medium truncate pr-1"
-                        title={displayTitle}
-                      >
-                        {displayTitle}
-                      </span>
+                      <div className="flex items-center flex-1 min-w-0">
+                        <div
+                          className="h-4 w-4 p-0.5 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity mr-1 cursor-grab active:cursor-grabbing flex-shrink-0 rounded flex items-center justify-center"
+                          title="Trascina per riordinare"
+                        >
+                          <GripVertical className="h-3 w-3" />
+                        </div>
+                        <span
+                          className="flex-1 text-xs font-medium truncate pr-1"
+                          title={displayTitle}
+                        >
+                          {displayTitle}
+                        </span>
+                      </div>
                     )}
                     <div className="flex items-center gap-0.5">
                       {!isGridTab && (

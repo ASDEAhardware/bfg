@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator'
 
 interface PageSelectorProps {
-  onPageSelect: (url: string, title: string) => void
+  onPageSelect: (url: string, title: string, existingTabId?: string) => void
 }
 
 export function PageSelector({ onPageSelect }: PageSelectorProps) {
@@ -43,8 +43,8 @@ export function PageSelector({ onPageSelect }: PageSelectorProps) {
   // Schede esistenti (esclusa la griglia)
   const existingTabs = tabs.filter(tab => tab.id !== 'grid-tab')
 
-  const handlePageSelect = (url: string, title: string) => {
-    onPageSelect(url, title)
+  const handlePageSelect = (url: string, title: string, existingTabId?: string) => {
+    onPageSelect(url, title, existingTabId)
     setOpen(false)
   }
 
@@ -85,7 +85,7 @@ export function PageSelector({ onPageSelect }: PageSelectorProps) {
           <div
             key={tab.id}
             className="flex items-center gap-3 p-2 hover:bg-accent rounded cursor-pointer text-sm"
-            onClick={() => handlePageSelect(tab.url, tab.customTitle || tab.title)}
+            onClick={() => handlePageSelect(tab.url, tab.customTitle || tab.title, tab.id)}
           >
             <div className="w-4 h-4 rounded-full bg-blue-500 flex-shrink-0"></div>
             <div className="flex-1 min-w-0">

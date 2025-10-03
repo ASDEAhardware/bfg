@@ -91,16 +91,26 @@ export function GridSection({
     assignTabToSection(section.id, tabId)
   }
 
-  const handleDirectPageAssign = (url: string, title: string) => {
+  const handleDirectPageAssign = (url: string, title: string, existingTabId?: string) => {
     if (isTabModeEnabled) {
-      // When tab mode is enabled, create tab in background without activating it
-      const tabId = openTabInBackground(url, title)
-      if (tabId) {
-        assignTabToSection(section.id, tabId)
+      if (existingTabId) {
+        // Se viene fornito un ID di scheda esistente, collegala direttamente
+        assignTabToSection(section.id, existingTabId)
 
         // If we're currently on the grid tab, keep it active
         if (activeTabId === 'grid-tab') {
           setActiveTab('grid-tab')
+        }
+      } else {
+        // When tab mode is enabled, create tab in background without activating it
+        const tabId = openTabInBackground(url, title)
+        if (tabId) {
+          assignTabToSection(section.id, tabId)
+
+          // If we're currently on the grid tab, keep it active
+          if (activeTabId === 'grid-tab') {
+            setActiveTab('grid-tab')
+          }
         }
       }
     } else {
