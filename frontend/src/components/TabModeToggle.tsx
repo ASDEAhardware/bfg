@@ -1,6 +1,6 @@
 "use client"
 import React from 'react'
-import { Layers, Square } from 'lucide-react'
+import { Layers, SquareChartGantt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTabStore } from '@/store/tabStore'
 
@@ -22,7 +22,7 @@ export function TabModeToggle() {
       {isTabModeEnabled ? (
         <Layers className="h-[1.2rem] w-[1.2rem]" />
       ) : (
-        <Square className="h-[1.2rem] w-[1.2rem]" />
+        <SquareChartGantt className="h-[1.2rem] w-[1.2rem]" />
       )}
       <span className="sr-only">Toggle tab mode</span>
     </Button>

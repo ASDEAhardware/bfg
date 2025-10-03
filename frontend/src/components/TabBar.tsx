@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { X, Edit3, Check, MoreHorizontal, Grid3X3, GripVertical } from 'lucide-react'
+import { X, Edit3, Check, MoreHorizontal, Grid3X3, GripVertical, SquareChartGantt, LayoutDashboard, Shield, MonitorCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTabStore } from '@/store/tabStore'
 import { useGridStore } from '@/store/gridStore'
@@ -252,6 +252,32 @@ export function TabBar() {
     setDragOverTab(null)
   }
 
+  // Funzione per ottenere l'icona appropriata in base all'URL
+  const getTabIcon = (url: string) => {
+    switch (url) {
+      case '/dashboard':
+        return LayoutDashboard
+      case '/staff-admin':
+        return Shield
+      case '/system':
+        return MonitorCog
+      default:
+        return SquareChartGantt // Icona di default per pagine non mappate
+    }
+  }
+
+  // Funzione per abbreviare i titoli delle schede
+  const getAbbreviatedTitle = (title: string, tabIndex: number) => {
+    // Rimuovi spazi e caratteri speciali, prendi solo lettere
+    const cleanTitle = title.replace(/[^a-zA-Z]/g, '')
+
+    // Prendi le prime 3 lettere
+    const firstThreeLetters = cleanTitle.substring(0, 3)
+
+    // Aggiungi numero progressivo (inizia da 1)
+    return `${firstThreeLetters}(${tabIndex + 1})`
+  }
+
 
   if (allTabs.length === 0) return null
 
@@ -262,10 +288,14 @@ export function TabBar() {
         ref={tabsContainerRef}
         className="flex-1 flex h-8 min-w-0 overflow-hidden"
       >
-        {visibleTabs.map((tab) => {
+        {visibleTabs.map((tab, index) => {
             const isActive = tab.id === activeTabId
-            const displayTitle = tab.customTitle || tab.title
             const isGridTab = tab.id === 'grid-tab'
+            const fullTitle = tab.customTitle || tab.title
+            // Per le schede normali, calcola l'indice relativo escludendo la griglia
+            const tabIndex = isGridTab ? 0 : (visibleTabs[0]?.id === 'grid-tab' ? index - 1 : index)
+            const displayTitle = isGridTab ? fullTitle : getAbbreviatedTitle(fullTitle, tabIndex)
+            const TabIcon = !isGridTab ? getTabIcon(tab.url) : null
 
             return (
               <div
@@ -318,9 +348,10 @@ export function TabBar() {
                         >
                           <GripVertical className="h-3 w-3" />
                         </div>
+                        {TabIcon && <TabIcon className="h-3 w-3 mr-1 flex-shrink-0" />}
                         <span
                           className="flex-1 text-xs font-medium truncate pr-1"
-                          title={displayTitle}
+                          title={fullTitle}
                         >
                           {displayTitle}
                         </span>
@@ -333,7 +364,7 @@ export function TabBar() {
                             variant="ghost"
                             size="icon"
                             className="h-4 w-4 p-0.5 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e: React.MouseEvent) => startEditing(e, tab.id, displayTitle)}
+                            onClick={(e: React.MouseEvent) => startEditing(e, tab.id, fullTitle)}
                           >
                             <Edit3 className="h-3 w-3 p-0.5" />
                           </Button>
@@ -369,9 +400,14 @@ export function TabBar() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            {overflowTabs.map((tab) => {
-              const displayTitle = tab.customTitle || tab.title
+            {overflowTabs.map((tab, index) => {
+              const fullTitle = tab.customTitle || tab.title
+              // Calcola l'indice totale: schede visibili (escludendo griglia) + indice overflow
+              const visibleTabsCount = visibleTabs.filter(t => t.id !== 'grid-tab').length
+              const totalIndex = visibleTabsCount + index
+              const displayTitle = getAbbreviatedTitle(fullTitle, totalIndex)
               const isActive = tab.id === activeTabId
+              const TabIcon = getTabIcon(tab.url)
 
               return (
                 <DropdownMenuItem
@@ -382,7 +418,8 @@ export function TabBar() {
                   )}
                   onClick={() => handleTabClick(tab.id)}
                 >
-                  <span className="truncate flex-1" title={displayTitle}>
+                  <TabIcon className="h-3 w-3 mr-2 flex-shrink-0" />
+                  <span className="truncate flex-1" title={fullTitle}>
                     {displayTitle}
                   </span>
                   <Button

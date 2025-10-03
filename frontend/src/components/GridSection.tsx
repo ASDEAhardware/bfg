@@ -1,6 +1,6 @@
 "use client"
 import React, { useState } from 'react'
-import { Plus, X, GripHorizontal, GripVertical, Unlink } from 'lucide-react'
+import { Plus, X, GripHorizontal, GripVertical, Unlink, LayoutDashboard, Shield, MonitorCog, SquareChartGantt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGridStore, GridSection as GridSectionType } from '@/store/gridStore'
 import { useTabStore } from '@/store/tabStore'
@@ -35,6 +35,20 @@ export function GridSection({
   } = useGridStore()
   const { tabs, isTabModeEnabled, openTabInBackground, activeTabId, setActiveTab } = useTabStore()
   const [isDragOver, setIsDragOver] = useState(false)
+
+  // Funzione per ottenere l'icona appropriata in base all'URL
+  const getPageIcon = (url: string) => {
+    switch (url) {
+      case '/dashboard':
+        return LayoutDashboard
+      case '/staff-admin':
+        return Shield
+      case '/system':
+        return MonitorCog
+      default:
+        return SquareChartGantt // Icona di default per pagine non mappate
+    }
+  }
 
   // Handle both real tabs and virtual grid tabs
   const assignedTab = section.tabId ?
@@ -191,6 +205,12 @@ export function GridSection({
       {/* Header con controlli */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1">
+          {assignedTab && (
+            (() => {
+              const PageIcon = getPageIcon(assignedTab.url)
+              return <PageIcon className="h-3 w-3 text-primary flex-shrink-0" />
+            })()
+          )}
           <span className={cn(
             "text-xs",
             assignedTab ? "font-medium" : "text-muted-foreground/60 font-normal italic"

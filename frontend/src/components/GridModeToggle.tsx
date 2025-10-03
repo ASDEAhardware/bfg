@@ -1,6 +1,6 @@
 "use client"
 import React from 'react'
-import { Grid3X3, LayoutGrid } from 'lucide-react'
+import { Grid3X3, PanelsTopLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGridStore } from '@/store/gridStore'
 
@@ -22,7 +22,7 @@ export function GridModeToggle() {
       {isGridModeEnabled ? (
         <Grid3X3 className="h-[1.2rem] w-[1.2rem]" />
       ) : (
-        <LayoutGrid className="h-[1.2rem] w-[1.2rem]" />
+        <PanelsTopLeft className="h-[1.2rem] w-[1.2rem]" />
       )}
       <span className="sr-only">Toggle grid mode</span>
     </Button>
