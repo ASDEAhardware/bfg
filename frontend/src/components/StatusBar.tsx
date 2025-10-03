@@ -85,7 +85,7 @@ export function StatusBar() {
           onClick={() => navigateIntelligently('/version', 'Changelog')}
           className="text-primary hover:text-primary/80 transition-colors hover:underline cursor-pointer"
         >
-          v1.0.0
+          v1.2.0
         </button>
       </div>
     </div>

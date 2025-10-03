@@ -4,26 +4,93 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { Rocket, Bug, Sparkles, Shield, Zap, CheckCircle2, ArrowLeft, ExternalLink, Calendar, Package } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Rocket, Bug, Sparkles, Shield, CheckCircle2, ArrowLeft, Star, Hash, ChevronDown } from "lucide-react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 interface ChangelogEntry {
   version: string
   date: string
   title: string
   description: string
+  highlights?: string[]
+  tags?: string[]
+  videoUrl?: string
+  docsUrl?: string
+  downloadUrl?: string
+  isBreaking?: boolean
   changes: {
     type: "feature" | "bugfix" | "improvement" | "security"
     items: string[]
-  }[] // Significa che changes deve essere un array di oggetti. Ogni oggetto dentro `changes` deve avere un campo type che può essere una sola stringa tra quelle proposte e deve avere un capo items che è un array di stringhe.
+    details?: string
+  }[]
 }
 
 const changelogData: ChangelogEntry[] = [
   {
+    version: "1.2.0",
+    date: "03 Ottobre 2025",
+    title: "Grid System",
+    description: "Implementazione completa del sistema di griglia per visualizzazione multi-schermo e gestione layout avanzata.",
+    highlights: [
+      "Sistema di griglia multi-sezione completamente funzionale",
+      "Gestione layout dinamica con divisione orizzontale/verticale",
+      "Integrazione avanzata con sistema tabs esistente",
+      "Persistenza stato e navigazione intelligente"
+    ],
+    tags: ["Grid", "Layout", "UX", "Multi-Screen"],
+    videoUrl: "#demo-grid",
+    docsUrl: "#docs-grid",
+    changes: [
+      {
+        type: "feature",
+        items: [
+          "Implementazione GridStore con Zustand per gestione stato griglia completa",
+          "GridSection component per rendering e gestione sezioni individuali",
+          "Sistema di divisione dinamica orizzontale/verticale delle sezioni",
+          "Supporto completo per assegnazione tabs alle sezioni grid",
+          "Virtual Pages system per contenuti dinamici nelle sezioni",
+          "Drag & Drop per trascinamento schede nelle sezioni",
+          "GridModeToggle component per controllo modalità griglia",
+          "PageSelector per assegnazione pagine specifiche alle sezioni",
+          "TabContentRenderer specializzato per contenuti tab in grid",
+          "Smart Navigation integration con grid mode attivo"
+        ],
+        details: "Il grid system rappresenta un salto qualitativo nell'esperienza utente, permettendo visualizzazione contemporanea di contenuti multipli con gestione layout professionale."
+      },
+      {
+        type: "improvement",
+        items: [
+          "Layout responsive che si adatta automaticamente alle dimensioni schermo",
+          "Algoritmi ottimizzati per posizionamento e ridimensionamento sezioni",
+          "Persistenza automatica stato griglia tra sessioni utente",
+          "Performance ottimizzate per rendering di layout complessi"
+        ],
+      },
+      {
+        type: "security",
+        items: [
+          "Validazione robusta degli stati grid per prevenire corruzioni layout",
+          "Gestione sicura della memoria per layout complessi"
+        ],
+      },
+    ],
+  },
+  {
     version: "1.1.0",
     date: "02 Ottobre 2025",
     title: "Tab Navigation",
-    description:
-      "Aggiunta la navigazione degli elementi della sidebar tramite tabs.",
+    description: "Aggiunta la navigazione degli elementi della sidebar tramite tabs.",
+    highlights: [
+      "Sistema di navigazione a schede completamente nuovo",
+      "Gestione stato avanzata con Zustand",
+      "UI responsiva con supporto drag & drop"
+    ],
+    tags: ["Navigation", "UX", "Performance"],
+    videoUrl: "#demo-tabs",
+    docsUrl: "#docs-tabs",
     changes: [
       {
         type: "feature",
@@ -33,17 +100,20 @@ const changelogData: ChangelogEntry[] = [
           "Aggiunto l'alert dialog che viene mostrato quando si disabilita la modalità tabs senza averle chiuse.",
           "Aggiunto lo store Zustand per le tabs.",
         ],
+        details: "Il sistema di tab navigation migliora significativamente l'esperienza utente permettendo multitasking efficiente."
       },
       {
         type: "improvement",
         items: [
-          "Nessun miglioramento al codice esistente rilevante in questa release.",
+          "Ottimizzazioni performance per rendering delle schede",
+          "Migliorata accessibilità con supporto keyboard navigation"
         ],
       },
       {
         type: "bugfix",
         items: [
-          "Nessuna correzione bug rilevante in questa release iniziale.",
+          "Risolti problemi di memory leak nella gestione delle schede",
+          "Fixato problema di sincronizzazione stato tra componenti"
         ],
       },
     ],
@@ -52,8 +122,16 @@ const changelogData: ChangelogEntry[] = [
     version: "1.0.0",
     date: "02 Ottobre 2025",
     title: "Release iniziale dell'applicazione web",
-    description:
-      "Prima versione pubblica: architettura containerizzata, autenticazione sicura, API REST, frontend Next.js con gestione stato avanzata e UI moderna.",
+    description: "Prima versione pubblica: architettura containerizzata, autenticazione sicura, API REST, frontend Next.js con gestione stato avanzata e UI moderna.",
+    highlights: [
+      "Architettura completamente containerizzata",
+      "Autenticazione JWT sicura e scalabile",
+      "Frontend moderno con Next.js e TypeScript",
+      "UI system basato su Shadcn/UI"
+    ],
+    tags: ["Launch", "Architecture", "Security", "UI"],
+    docsUrl: "#docs-v1",
+    downloadUrl: "#download-v1",
     changes: [
       {
         type: "feature",
@@ -118,153 +196,221 @@ const changeTypeConfig = {
 }
 
 export default function ChangelogPage() {
+  const [selectedVersion, setSelectedVersion] = useState<string | null>(changelogData[0]?.version || null)
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const router = useRouter()
+
+  const scrollToVersion = (version: string) => {
+    const element = document.getElementById(`version-${version}`)
+    if (element) {
+      // Calcola offset per header sticky
+      const headerHeight = 60 // Altezza approssimativa del header
+      const elementPosition = element.offsetTop - headerHeight
+
+      window.scrollTo({
+        top: elementPosition,
+        behavior: 'smooth'
+      })
+    }
+  }
+
+  const handleVersionSelect = (version: string) => {
+    setSelectedVersion(version)
+    setIsSheetOpen(false)
+
+    // Delay per permettere al sheet di chiudersi completamente prima dello scroll
+    setTimeout(() => {
+      scrollToVersion(version)
+    }, 300) // Tempo per animazione chiusura sheet
+  }
+
+  const handleSidebarVersionSelect = (version: string) => {
+    setSelectedVersion(version)
+    scrollToVersion(version)
+  }
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
-        {/* Breadcrumb/Navigation */}
-        <div className="mb-6">
-          <Button variant="ghost" size="sm" className="mb-4" onClick={() => window.history.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Torna indietro
-          </Button>
-        </div>
+      <div className="max-w-7xl mx-auto">
+        {/* Header compatto */}
+        <div className="sticky top-0 z-50 bg-background/90 backdrop-blur border-b border-border/50">
+          <div className="px-4 py-2">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => router.back()}>
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Indietro
+              </Button>
+              <h1 className="text-xl font-bold">Changelog</h1>
 
-        {/* Header */}
-        <div className="mb-12 text-center">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
-              <Package className="h-8 w-8 text-primary" />
+              {/* Badge versione - solo desktop */}
+              <div className="hidden md:block">
+                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  v{changelogData[0]?.version}
+                </Badge>
+              </div>
+
+              {/* Mobile Sheet per selezione versione */}
+              <div className="md:hidden">
+                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" className="bg-green-500/10 text-green-600 border-green-200">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      v{selectedVersion}
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="h-[80vh]">
+                    <SheetHeader>
+                      <SheetTitle className="flex items-center gap-2">
+                        <Hash className="h-4 w-4" />
+                        Seleziona Versione
+                      </SheetTitle>
+                    </SheetHeader>
+                    <ScrollArea className="h-full mt-6">
+                      <div className="space-y-2 pb-6">
+                        {changelogData.map((entry) => (
+                          <button
+                            key={entry.version}
+                            onClick={() => handleVersionSelect(entry.version)}
+                            className={`w-full text-left p-4 rounded-lg border transition-all ${
+                              selectedVersion === entry.version
+                                ? 'bg-primary/10 border-primary/30 text-primary'
+                                : 'border-border/50 hover:border-border hover:bg-accent'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-semibold text-lg">v{entry.version}</span>
+                              {entry.version === changelogData[0]?.version && (
+                                <Star className="h-4 w-4 text-yellow-500" />
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground mb-1">{entry.date}</div>
+                            <div className="text-sm font-medium line-clamp-2">{entry.title}</div>
+
+                            {entry.tags && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {entry.tags.slice(0, 3).map(tag => (
+                                  <Badge key={tag} variant="secondary" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </SheetContent>
+                </Sheet>
+              </div>
             </div>
           </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent mb-4">
-            Changelog
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Scopri tutte le novità, i miglioramenti e le correzioni delle ultime versioni della nostra applicazione.
-          </p>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 max-w-2xl mx-auto">
-            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-primary">{changelogData.length}</div>
-              <div className="text-sm text-muted-foreground">Versioni</div>
-            </div>
-            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-500">
-                {changelogData.reduce((acc, entry) =>
-                  acc + entry.changes.find(c => c.type === 'feature')?.items.length || 0, 0
-                )}
-              </div>
-              <div className="text-sm text-muted-foreground">Funzionalità</div>
-            </div>
-            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-red-500">
-                {changelogData.reduce((acc, entry) =>
-                  acc + entry.changes.find(c => c.type === 'bugfix')?.items.length || 0, 0
-                )}
-              </div>
-              <div className="text-sm text-muted-foreground">Correzioni</div>
-            </div>
-          </div>
         </div>
 
-        {/* Changelog Timeline */}
-        <div className="relative">
-          {/* Timeline line with gradient */}
-          <div className="hidden md:block absolute left-[2.5rem] top-0 bottom-0 w-px bg-gradient-to-b from-primary via-border to-transparent" />
-
-          <div className="space-y-12">
-            {changelogData.map((entry, index) => (
-              <div key={entry.version} className="relative group">
-                {/* Enhanced Timeline dot */}
-                <div className="hidden md:flex absolute left-[1.5rem] top-8 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/70 border-4 border-background shadow-lg z-10 items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-background" />
+        <div className="flex">
+          {/* Sidebar navigazione veloce */}
+          <div className="hidden md:block w-48 p-3 border-r border-border/50">
+            <div className="sticky top-20">
+              <h3 className="font-medium mb-3 text-sm flex items-center gap-2">
+                <Hash className="h-3 w-3" />
+                Versioni
+              </h3>
+              <ScrollArea className="h-[calc(100vh-120px)]">
+                <div className="space-y-1">
+                  {changelogData.map((entry) => (
+                    <button
+                      key={entry.version}
+                      onClick={() => handleSidebarVersionSelect(entry.version)}
+                      className={`w-full text-left p-2 rounded border transition-all hover:bg-accent text-sm ${
+                        selectedVersion === entry.version
+                          ? 'bg-primary/10 border-primary/30 text-primary'
+                          : 'border-transparent hover:border-border'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium">v{entry.version}</span>
+                        {entry.version === changelogData[0]?.version && (
+                          <Star className="h-3 w-3 text-yellow-500" />
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mb-1">{entry.date}</div>
+                      <div className="text-xs font-medium text-foreground/80 line-clamp-1">{entry.title}</div>
+                    </button>
+                  ))}
                 </div>
+              </ScrollArea>
+            </div>
+          </div>
 
-                <Card className="md:ml-20 border border-border/60 shadow-sm hover:shadow-xl transition-all duration-300 hover:border-border group-hover:scale-[1.02] bg-card/60 backdrop-blur-sm">
-                  <CardHeader className="pb-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <Badge variant="outline" className="text-lg font-bold px-4 py-2 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20 w-fit">
+          {/* Contenuto principale */}
+          <div className="flex-1 p-4">
+
+            {/* Timeline compatto */}
+            <div className="space-y-4">
+              {changelogData.map((entry, index) => (
+                <Card
+                  key={entry.version}
+                  id={`version-${entry.version}`}
+                  className="border border-border/40 hover:border-border transition-colors"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="font-semibold px-2 py-1">
                           v{entry.version}
                         </Badge>
                         {index === 0 && (
-                          <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 w-fit">
+                          <Badge className="bg-green-500 text-white px-2 py-1">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Ultima versione
+                            Latest
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        <span>{entry.date}</span>
-                      </div>
+                      <span className="text-sm text-muted-foreground">{entry.date}</span>
                     </div>
-                    <CardTitle className="text-3xl font-bold leading-tight">{entry.title}</CardTitle>
-                    <CardDescription className="text-lg leading-relaxed mt-2">{entry.description}</CardDescription>
+                    <CardTitle className="text-xl leading-tight">{entry.title}</CardTitle>
+                    <CardDescription className="text-sm mt-1">{entry.description}</CardDescription>
                   </CardHeader>
 
-                  <CardContent className="space-y-8 pt-2">
+                  <CardContent className="space-y-3 pt-0">
                     {entry.changes.map((change, changeIndex) => {
                       const config = changeTypeConfig[change.type]
                       const Icon = config.icon
 
                       return (
                         <div key={changeIndex}>
-                          {changeIndex > 0 && <Separator className="mb-8 opacity-50" />}
+                          {changeIndex > 0 && <Separator className="my-3" />}
 
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg border backdrop-blur-sm ${config.color}`}>
-                                <Icon className="h-5 w-5" />
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`p-1 rounded ${config.color}`}>
+                                <Icon className="h-3 w-3" />
                               </div>
-                              <h3 className="font-bold text-lg">{config.label}</h3>
-                              <Badge variant="secondary" className="ml-auto">
+                              <span className="font-medium text-sm">{config.label}</span>
+                              <Badge variant="secondary" className="text-xs">
                                 {change.items.length}
                               </Badge>
                             </div>
 
-                            <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                              <ul className="space-y-3">
-                                {change.items.map((item, itemIndex) => (
-                                  <li key={itemIndex} className="flex items-start gap-4 text-sm">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 flex-shrink-0" />
-                                    <span className="flex-1 leading-relaxed">{item}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
+                            <ul className="space-y-1 ml-6">
+                              {change.items.map((item, itemIndex) => (
+                                <li key={itemIndex} className="flex items-start gap-2 text-sm">
+                                  <div className="w-1 h-1 rounded-full bg-primary mt-2 flex-shrink-0" />
+                                  <span className="flex-1">{item}</span>
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         </div>
                       )
                     })}
                   </CardContent>
                 </Card>
-              </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
 
-        {/* Enhanced Footer */}
-        <div className="mt-16 text-center">
-          <div className="bg-gradient-to-r from-muted/50 via-muted/80 to-muted/50 rounded-xl border border-border/50 p-8 backdrop-blur-sm">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Resta aggiornato</h3>
-            </div>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Hai suggerimenti o hai trovato un bug? Il tuo feedback ci aiuta a migliorare continuamente.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button variant="outline" className="group">
-                <ExternalLink className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
-                Contattaci
-              </Button>
-              <Button variant="ghost" onClick={() => window.location.reload()}>
-                <Zap className="h-4 w-4 mr-2" />
-                Aggiorna pagina
-              </Button>
-            </div>
           </div>
         </div>
       </div>

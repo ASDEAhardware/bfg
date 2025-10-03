@@ -4,6 +4,31 @@ Tutte le modifiche notevoli a questo progetto saranno documentate in questo file
 
 Il formato si basa su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-10-03
+
+### Added
+
+#### Grid System
+- **Grid Mode**: Implementazione del sistema di griglia per visualizzazione multi-schermo all'interno dell'applicazione.
+- **Grid Layout Manager**: Sistema completo di gestione layout con supporto per divisione orizzontale e verticale delle sezioni.
+- **Section Management**: Funzionalità per aggiungere, rimuovere e gestire sezioni della griglia dinamicamente.
+- **Tab Integration**: Integrazione completa tra modalità griglia e sistema di tabs con assegnazione automatica.
+- **Virtual Pages**: Sistema di pagine virtuali per contenuti dinamici all'interno delle sezioni grid.
+- **Drag & Drop**: Supporto per trascinamento e rilascio di schede nelle sezioni della griglia.
+- **Responsive Grid**: Layout reattivo che si adatta a diverse dimensioni dello schermo.
+- **Grid State Persistence**: Persistenza dello stato della griglia tra sessioni utente.
+- **Smart Navigation**: Navigazione intelligente che si integra automaticamente con il grid mode attivo.
+
+#### Components
+- **GridSection**: Componente principale per rendering e gestione delle sezioni individuali.
+- **GridModeToggle**: Toggle per abilitare/disabilitare la modalità griglia.
+- **PageSelector**: Selettore per assegnare pagine specifiche alle sezioni grid.
+- **TabContentRenderer**: Renderer specializzato per contenuti tab all'interno delle sezioni.
+
+#### Store Management
+- **GridStore**: Store Zustand dedicato per gestione stato griglia con persistenza automatica.
+- **Layout algorithms**: Algoritmi per gestione automatica di posizionamento e ridimensionamento sezioni.
+
 ## [1.1.0] - 2025-10-02
 
 ### Added
