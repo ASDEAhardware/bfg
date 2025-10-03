@@ -1,7 +1,7 @@
 "use client"
 import { type LucideIcon } from "lucide-react"
-import { usePathname, useRouter } from "next/navigation"
-import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Link } from "@/components/ui/link"
 import { Plus, GripVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTabStore } from "@/store/tabStore"
@@ -28,7 +28,6 @@ export function NavMain({
   label?: string
 }) {
   const pathname = usePathname()
-  const router = useRouter()
   const { state } = useSidebar()
   const { isTabModeEnabled, openTab } = useTabStore()
   const { isGridModeEnabled } = useGridStore()
@@ -37,15 +36,6 @@ export function NavMain({
     e.preventDefault()
     e.stopPropagation()
     openTab(item.url, item.title)
-    router.push(item.url)
-  }
-
-  const handleNormalNavigation = (e: React.MouseEvent, item: { title: string, url: string }) => {
-    if (isTabModeEnabled) {
-      e.preventDefault()
-      openTab(item.url, item.title)
-      router.push(item.url)
-    }
   }
 
   const handleDragStart = (e: React.DragEvent, item: { title: string, url: string }) => {
@@ -82,8 +72,8 @@ export function NavMain({
 
                 <Link
                   href={item.url}
+                  title={item.title}
                   className="flex items-center gap-1 flex-1"
-                  onClick={(e) => handleNormalNavigation(e, item)}
                 >
                   <SidebarMenuButton tooltip={item.title} isActive={isActive}>
                     {item.icon && <item.icon className="shrink-0 size-4" />}

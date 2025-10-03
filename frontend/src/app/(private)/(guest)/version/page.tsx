@@ -3,7 +3,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Rocket, Bug, Sparkles, Shield, Zap, CheckCircle2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Rocket, Bug, Sparkles, Shield, Zap, CheckCircle2, ArrowLeft, ExternalLink, Calendar, Package } from "lucide-react"
 
 interface ChangelogEntry {
   version: string
@@ -118,77 +119,121 @@ const changeTypeConfig = {
 
 export default function ChangelogPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
+        {/* Breadcrumb/Navigation */}
+        <div className="mb-6">
+          <Button variant="ghost" size="sm" className="mb-4" onClick={() => window.history.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Torna indietro
+          </Button>
+        </div>
+
         {/* Header */}
-        <div className="mb-12">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Zap className="h-6 w-6 text-primary" />
+        <div className="mb-12 text-center">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
+              <Package className="h-8 w-8 text-primary" />
             </div>
-            <h1 className="text-4xl font-bold text-balance">Aggiornamenti</h1>
           </div>
-          <p className="text-lg text-muted-foreground text-pretty">
+          <h1 className="text-5xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent mb-4">
+            Changelog
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             Scopri tutte le novità, i miglioramenti e le correzioni delle ultime versioni della nostra applicazione.
           </p>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 max-w-2xl mx-auto">
+            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-primary">{changelogData.length}</div>
+              <div className="text-sm text-muted-foreground">Versioni</div>
+            </div>
+            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-blue-500">
+                {changelogData.reduce((acc, entry) =>
+                  acc + entry.changes.find(c => c.type === 'feature')?.items.length || 0, 0
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground">Funzionalità</div>
+            </div>
+            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg p-4">
+              <div className="text-2xl font-bold text-red-500">
+                {changelogData.reduce((acc, entry) =>
+                  acc + entry.changes.find(c => c.type === 'bugfix')?.items.length || 0, 0
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground">Correzioni</div>
+            </div>
+          </div>
         </div>
 
         {/* Changelog Timeline */}
         <div className="relative">
-          {/* Timeline line */}
-          <div className="hidden md:block absolute left-[2.5rem] top-0 bottom-0 w-px bg-border" />
+          {/* Timeline line with gradient */}
+          <div className="hidden md:block absolute left-[2.5rem] top-0 bottom-0 w-px bg-gradient-to-b from-primary via-border to-transparent" />
 
-          <div className="space-y-8">
+          <div className="space-y-12">
             {changelogData.map((entry, index) => (
-              <div key={entry.version} className="relative">
-                {/* Timeline dot */}
-                <div className="hidden md:flex absolute left-[1.875rem] top-8 w-3 h-3 rounded-full bg-primary border-4 border-background z-10" />
+              <div key={entry.version} className="relative group">
+                {/* Enhanced Timeline dot */}
+                <div className="hidden md:flex absolute left-[1.5rem] top-8 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/70 border-4 border-background shadow-lg z-10 items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-background" />
+                </div>
 
-                <Card className="md:ml-20 border border-border">
-                  <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="text-base font-semibold px-3 py-1">
+                <Card className="md:ml-20 border border-border/60 shadow-sm hover:shadow-xl transition-all duration-300 hover:border-border group-hover:scale-[1.02] bg-card/60 backdrop-blur-sm">
+                  <CardHeader className="pb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <Badge variant="outline" className="text-lg font-bold px-4 py-2 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20 w-fit">
                           v{entry.version}
                         </Badge>
                         {index === 0 && (
-                          <Badge className="bg-primary text-primary-foreground">
+                          <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 w-fit">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Ultima versione
                           </Badge>
                         )}
                       </div>
-                      <span className="text-sm text-muted-foreground">{entry.date}</span>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span>{entry.date}</span>
+                      </div>
                     </div>
-                    <CardTitle className="text-2xl">{entry.title}</CardTitle>
-                    <CardDescription className="text-base">{entry.description}</CardDescription>
+                    <CardTitle className="text-3xl font-bold leading-tight">{entry.title}</CardTitle>
+                    <CardDescription className="text-lg leading-relaxed mt-2">{entry.description}</CardDescription>
                   </CardHeader>
 
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-8 pt-2">
                     {entry.changes.map((change, changeIndex) => {
                       const config = changeTypeConfig[change.type]
                       const Icon = config.icon
 
                       return (
                         <div key={changeIndex}>
-                          {changeIndex > 0 && <Separator className="mb-6" />}
+                          {changeIndex > 0 && <Separator className="mb-8 opacity-50" />}
 
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <div className={`p-1.5 rounded-md border ${config.color}`}>
-                                <Icon className="h-4 w-4" />
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg border backdrop-blur-sm ${config.color}`}>
+                                <Icon className="h-5 w-5" />
                               </div>
-                              <h3 className="font-semibold">{config.label}</h3>
+                              <h3 className="font-bold text-lg">{config.label}</h3>
+                              <Badge variant="secondary" className="ml-auto">
+                                {change.items.length}
+                              </Badge>
                             </div>
 
-                            <ul className="space-y-2 ml-1">
-                              {change.items.map((item, itemIndex) => (
-                                <li key={itemIndex} className="flex items-start gap-3 text-sm">
-                                  <span className="text-muted-foreground mt-1.5">•</span>
-                                  <span className="flex-1 leading-relaxed">{item}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                              <ul className="space-y-3">
+                                {change.items.map((item, itemIndex) => (
+                                  <li key={itemIndex} className="flex items-start gap-4 text-sm">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2.5 flex-shrink-0" />
+                                    <span className="flex-1 leading-relaxed">{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           </div>
                         </div>
                       )
@@ -200,14 +245,27 @@ export default function ChangelogPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="mt-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            Hai suggerimenti o hai trovato un bug?{" "}
-            <a href="#" className="text-primary hover:underline">
-              Contattaci
-            </a>
-          </p>
+        {/* Enhanced Footer */}
+        <div className="mt-16 text-center">
+          <div className="bg-gradient-to-r from-muted/50 via-muted/80 to-muted/50 rounded-xl border border-border/50 p-8 backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">Resta aggiornato</h3>
+            </div>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Hai suggerimenti o hai trovato un bug? Il tuo feedback ci aiuta a migliorare continuamente.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button variant="outline" className="group">
+                <ExternalLink className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
+                Contattaci
+              </Button>
+              <Button variant="ghost" onClick={() => window.location.reload()}>
+                <Zap className="h-4 w-4 mr-2" />
+                Aggiorna pagina
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

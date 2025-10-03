@@ -6,7 +6,7 @@ import {
     SidebarInset,
     SidebarProvider,
 } from "@/components/ui/sidebar"
-import AppFooter from "@/components/app-footer"
+import { StatusBar } from "@/components/StatusBar"
 import { HeaderComponent } from "@/components/HeaderComponent"
 
 
@@ -28,7 +28,7 @@ export default async function Layout({
                 <TabContent>
                     <main className="flex flex-1 flex-col p-4 lg:p-6 pb-12">{children}</main>
                 </TabContent>
-                <AppFooter />
+                <StatusBar />
             </SidebarInset>
         </SidebarProvider>
     )

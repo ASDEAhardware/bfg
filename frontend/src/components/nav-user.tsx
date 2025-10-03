@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Skeleton } from "./ui/skeleton"
 import { useLogout } from "@/hooks/useAuth"
-import Link from "next/link"
+import { Link } from "@/components/ui/link"
 
 export function NavUser({
   user,
