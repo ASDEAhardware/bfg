@@ -156,6 +156,8 @@ export function TabBar() {
     return () => window.removeEventListener('resize', handleResize)
   }, [calculateTabVisibility])
 
+  // Non serve più aggiornare i customTitle, vengono gestiti alla creazione nel tabStore
+
   const handleTabClick = (tabId: string) => {
     if (tabId === 'grid-tab') {
       // Non è una scheda normale, gestisci solo come attiva
@@ -266,16 +268,46 @@ export function TabBar() {
     }
   }
 
-  // Funzione per abbreviare i titoli delle schede
-  const getAbbreviatedTitle = (title: string, tabIndex: number) => {
-    // Rimuovi spazi e caratteri speciali, prendi solo lettere
-    const cleanTitle = title.replace(/[^a-zA-Z]/g, '')
+  // Funzione per determinare se una scheda ha un titolo custom (modificato dall'utente)
+  const hasCustomTitle = (tab: any) => {
+    // Se customTitle è diverso da title (che contiene la numerazione automatica)
+    // E se customTitle non segue il pattern "Titolo Base (numero)"
+    if (!tab.customTitle || !tab.baseTitle) return false
 
-    // Prendi le prime 3 lettere
+    // Verifica se il customTitle è diverso dal titolo auto-generato
+    const autoTitle = tab.title // Questo è il titolo con numerazione automatica
+    return tab.customTitle !== autoTitle
+  }
+
+  // Funzione per visualizzare titoli nelle schede
+  const getTabDisplayTitle = (tab: any) => {
+    if (hasCustomTitle(tab)) {
+      // Se è un titolo custom, mostralo completo (verrà troncato dal CSS)
+      return tab.customTitle
+    }
+
+    // Se è un titolo auto-generato, usa la compressione a 3 lettere
+    const fullTitle = tab.customTitle || tab.title
+
+    // Pattern per riconoscere titoli con numerazione: "Titolo Completo (numero)"
+    const numberedPattern = /^(.+?)\s*\((\d+)\)$/
+    const match = fullTitle.match(numberedPattern)
+
+    if (match) {
+      const titlePart = match[1].trim()
+      const number = match[2]
+
+      // Prendi le prime 3 lettere del titolo (solo lettere)
+      const cleanTitle = titlePart.replace(/[^a-zA-Z]/g, '')
+      const firstThreeLetters = cleanTitle.substring(0, 3)
+
+      return `${firstThreeLetters}(${number})`
+    }
+
+    // Se non ha numerazione, prendi semplicemente le prime 3 lettere
+    const cleanTitle = fullTitle.replace(/[^a-zA-Z]/g, '')
     const firstThreeLetters = cleanTitle.substring(0, 3)
-
-    // Aggiungi numero progressivo (inizia da 1)
-    return `${firstThreeLetters}(${tabIndex + 1})`
+    return firstThreeLetters || fullTitle
   }
 
 
@@ -291,10 +323,7 @@ export function TabBar() {
         {visibleTabs.map((tab, index) => {
             const isActive = tab.id === activeTabId
             const isGridTab = tab.id === 'grid-tab'
-            const fullTitle = tab.customTitle || tab.title
-            // Per le schede normali, calcola l'indice relativo escludendo la griglia
-            const tabIndex = isGridTab ? 0 : (visibleTabs[0]?.id === 'grid-tab' ? index - 1 : index)
-            const displayTitle = isGridTab ? fullTitle : getAbbreviatedTitle(fullTitle, tabIndex)
+            const displayTitle = isGridTab ? '' : getTabDisplayTitle(tab)
             const TabIcon = !isGridTab ? getTabIcon(tab.url) : null
 
             return (
@@ -351,7 +380,7 @@ export function TabBar() {
                         {TabIcon && <TabIcon className="h-3 w-3 mr-1 flex-shrink-0" />}
                         <span
                           className="flex-1 text-xs font-medium truncate pr-1"
-                          title={fullTitle}
+                          title={tab.customTitle || tab.title}
                         >
                           {displayTitle}
                         </span>
@@ -364,7 +393,7 @@ export function TabBar() {
                             variant="ghost"
                             size="icon"
                             className="h-4 w-4 p-0.5 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e: React.MouseEvent) => startEditing(e, tab.id, fullTitle)}
+                            onClick={(e: React.MouseEvent) => startEditing(e, tab.id, tab.customTitle || tab.title)}
                           >
                             <Edit3 className="h-3 w-3 p-0.5" />
                           </Button>
@@ -400,12 +429,8 @@ export function TabBar() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            {overflowTabs.map((tab, index) => {
-              const fullTitle = tab.customTitle || tab.title
-              // Calcola l'indice totale: schede visibili (escludendo griglia) + indice overflow
-              const visibleTabsCount = visibleTabs.filter(t => t.id !== 'grid-tab').length
-              const totalIndex = visibleTabsCount + index
-              const displayTitle = getAbbreviatedTitle(fullTitle, totalIndex)
+            {overflowTabs.map((tab) => {
+              const displayTitle = getTabDisplayTitle(tab)
               const isActive = tab.id === activeTabId
               const TabIcon = getTabIcon(tab.url)
 

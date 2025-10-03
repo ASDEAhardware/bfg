@@ -8,6 +8,7 @@ export interface Tab {
   url: string
   isActive: boolean
   customTitle?: string
+  baseTitle?: string
 }
 
 interface TabState {
@@ -48,20 +49,28 @@ export const useTabStore = create<TabState>()(
 
         // Genera un ID unico per la scheda usando timestamp
         const timestamp = Date.now()
-        const existingTabs = state.tabs.filter(tab => tab.url === url)
-        let tabId = url
-        let displayTitle = title
+        const tabId = `${url}-${timestamp}`
 
-        if (existingTabs.length > 0) {
-          tabId = `${url}-${timestamp}`
-          displayTitle = `${title} (${existingTabs.length + 1})`
-        }
+        // Trova schede con lo stesso titolo base per numerazione omonimie
+        // Confronta con il baseTitle (proprietà che aggiungiamo per tenere traccia del titolo originale)
+        const existingTabsWithSameBaseTitle = state.tabs.filter(tab => {
+          // Se la tab ha baseTitle, usalo, altrimenti usa title rimuovendo numerazione
+          const tabBaseTitle = (tab as any).baseTitle || tab.title.replace(/\s*\(\d+\)$/, '')
+          return tabBaseTitle === title
+        })
+
+        // Calcola il titolo con numerazione per omonimie
+        const finalTitle = existingTabsWithSameBaseTitle.length > 0
+          ? `${title} (${existingTabsWithSameBaseTitle.length + 1})`
+          : title
 
         const newTab: Tab = {
           id: tabId,
-          title: displayTitle,
+          title: finalTitle, // Titolo con numerazione
           url,
-          isActive: true
+          isActive: true,
+          customTitle: finalTitle, // Stesso del title
+          baseTitle: title // Titolo base originale senza numerazione
         }
 
         set((state) => ({
@@ -81,20 +90,27 @@ export const useTabStore = create<TabState>()(
 
         // Genera un ID unico per la scheda usando timestamp
         const timestamp = Date.now()
-        const existingTabs = state.tabs.filter(tab => tab.url === url)
-        let tabId = url
-        let displayTitle = title
+        const tabId = `${url}-${timestamp}`
 
-        if (existingTabs.length > 0) {
-          tabId = `${url}-${timestamp}`
-          displayTitle = `${title} (${existingTabs.length + 1})`
-        }
+        // Trova schede con lo stesso titolo base per numerazione omonimie
+        const existingTabsWithSameBaseTitle = state.tabs.filter(tab => {
+          // Se la tab ha baseTitle, usalo, altrimenti usa title rimuovendo numerazione
+          const tabBaseTitle = (tab as any).baseTitle || tab.title.replace(/\s*\(\d+\)$/, '')
+          return tabBaseTitle === title
+        })
+
+        // Calcola il titolo con numerazione per omonimie
+        const finalTitle = existingTabsWithSameBaseTitle.length > 0
+          ? `${title} (${existingTabsWithSameBaseTitle.length + 1})`
+          : title
 
         const newTab: Tab = {
           id: tabId,
-          title: displayTitle,
+          title: finalTitle, // Titolo con numerazione
           url,
-          isActive: false // Non attivare la tab
+          isActive: false, // Non attivare la tab
+          customTitle: finalTitle, // Stesso del title
+          baseTitle: title // Titolo base originale senza numerazione
         }
 
         set((state) => ({
@@ -156,6 +172,7 @@ export const useTabStore = create<TabState>()(
           )
         }))
       },
+
 
       reorderTabs: (fromIndex: number, toIndex: number) => {
         const state = get()

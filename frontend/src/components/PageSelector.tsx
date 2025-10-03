@@ -26,6 +26,7 @@ export function PageSelector({ onPageSelect }: PageSelectorProps) {
   const { tabs } = useTabStore()
   const { data: userData } = useUserInfo()
 
+
   // Pagine Platform
   const platformPages = [
     { url: '/dashboard', title: 'Dashboard', icon: LayoutDashboard, description: 'Panoramica principale' }
@@ -81,19 +82,24 @@ export function PageSelector({ onPageSelect }: PageSelectorProps) {
         ))
 
       case 'tabs':
-        return existingTabs.map((tab) => (
-          <div
-            key={tab.id}
-            className="flex items-center gap-3 p-2 hover:bg-accent rounded cursor-pointer text-sm"
-            onClick={() => handlePageSelect(tab.url, tab.customTitle || tab.title, tab.id)}
-          >
-            <SquareChartGantt className="h-4 w-4 text-primary flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="font-medium">{tab.customTitle || tab.title}</div>
-              <div className="text-xs text-muted-foreground truncate">{tab.url}</div>
+        return existingTabs.map((tab) => {
+          // Usa direttamente il customTitle che ora è già espanso
+          const displayTitle = tab.customTitle || tab.title
+
+          return (
+            <div
+              key={tab.id}
+              className="flex items-center gap-3 p-2 hover:bg-accent rounded cursor-pointer text-sm"
+              onClick={() => handlePageSelect(tab.url, displayTitle, tab.id)}
+            >
+              <SquareChartGantt className="h-4 w-4 text-primary flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{displayTitle}</div>
+                <div className="text-xs text-muted-foreground truncate">{tab.url}</div>
+              </div>
             </div>
-          </div>
-        ))
+          )
+        })
 
       default:
         return null

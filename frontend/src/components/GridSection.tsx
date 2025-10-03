@@ -1,12 +1,13 @@
 "use client"
 import React, { useState } from 'react'
-import { Plus, X, GripHorizontal, GripVertical, Unlink, LayoutDashboard, Shield, MonitorCog, SquareChartGantt } from 'lucide-react'
+import { Plus, X, GripHorizontal, GripVertical, Link2Off, Maximize2, LayoutDashboard, Shield, MonitorCog, SquareChartGantt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGridStore, GridSection as GridSectionType } from '@/store/gridStore'
 import { useTabStore } from '@/store/tabStore'
 import { cn } from '@/lib/utils'
 import { TabContentRenderer } from '@/components/TabContentRenderer'
 import { PageSelector } from '@/components/PageSelector'
+import { useRouter } from 'next/navigation'
 
 interface GridSectionProps {
   section: GridSectionType
@@ -31,9 +32,12 @@ export function GridSection({
     clearSectionTab,
     setActiveSection,
     closeSection,
-    getVirtualPage
+    getVirtualPage,
+    isGridModeEnabled,
+    toggleGridMode
   } = useGridStore()
-  const { tabs, isTabModeEnabled, openTabInBackground, activeTabId, setActiveTab } = useTabStore()
+  const { tabs, isTabModeEnabled, toggleTabMode, openTabInBackground, activeTabId, setActiveTab } = useTabStore()
+  const router = useRouter()
   const [isDragOver, setIsDragOver] = useState(false)
 
   // Funzione per ottenere l'icona appropriata in base all'URL
@@ -48,6 +52,14 @@ export function GridSection({
       default:
         return SquareChartGantt // Icona di default per pagine non mappate
     }
+  }
+
+  // Funzione per ottenere il titolo della scheda (sempre completo, mai compresso)
+  const getDisplayTitle = (tab: any) => {
+    if (!tab) return "Nessuna pagina assegnata"
+
+    // Mostra sempre il titolo completo: customTitle se esiste, altrimenti title
+    return tab.customTitle || tab.title
   }
 
   // Handle both real tabs and virtual grid tabs
@@ -148,6 +160,29 @@ export function GridSection({
     }
   }
 
+  const handleExpandSection = () => {
+    if (!assignedTab) return
+
+    const existingTab = tabs.find(tab => tab.id === assignedTab.id)
+
+    if (existingTab) {
+      // CASO 2: È una scheda reale - riabilita modalità schede e vai alla scheda
+      if (!isTabModeEnabled) {
+        toggleTabMode()
+      }
+      setActiveTab(assignedTab.id)
+    } else {
+      // CASO 1: È un collegamento diretto (pagina virtuale) - disabilita tutto e naviga
+      if (isTabModeEnabled) {
+        toggleTabMode()
+      }
+      if (isGridModeEnabled) {
+        toggleGridMode()
+      }
+      router.push(assignedTab.url)
+    }
+  }
+
   // Gestione drag and drop
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -215,7 +250,7 @@ export function GridSection({
             "text-xs",
             assignedTab ? "font-medium" : "text-muted-foreground/60 font-normal italic"
           )}>
-            {assignedTab ? (assignedTab.customTitle || assignedTab.title) : "Nessuna pagina assegnata"}
+            {getDisplayTitle(assignedTab)}
           </span>
         </div>
 
@@ -243,6 +278,19 @@ export function GridSection({
           >
             <GripHorizontal className="h-3 w-3" />
           </Button>
+
+          {/* Pulsante Espandi - solo se c'è contenuto assegnato */}
+          {assignedTab && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={handleExpandSection}
+              title="Espandi sezione"
+            >
+              <Maximize2 className="h-3 w-3" />
+            </Button>
+          )}
 
           {/* Pulsante intelligente: Attach/Detach/Close */}
           <Button
@@ -272,7 +320,7 @@ export function GridSection({
             disabled={!assignedTab && !canRemove}
           >
             {assignedTab ? (
-              <Unlink className="h-3 w-3" />
+              <Link2Off className="h-3 w-3" />
             ) : canRemove ? (
               <X className="h-3 w-3" />
             ) : (
