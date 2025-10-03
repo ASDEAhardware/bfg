@@ -137,7 +137,14 @@ export function GridSection({
   // Gestione drag and drop
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+
+    // Controlla l'effectAllowed per determinare il dropEffect appropriato
+    if (e.dataTransfer.effectAllowed === 'copy') {
+      e.dataTransfer.dropEffect = 'copy'
+    } else {
+      e.dataTransfer.dropEffect = 'move'
+    }
+
     setIsDragOver(true)
   }
 
@@ -149,9 +156,22 @@ export function GridSection({
     e.preventDefault()
     setIsDragOver(false)
 
-    const tabId = e.dataTransfer.getData('text/plain')
-    if (tabId && tabId !== 'grid-tab') {
-      assignTabToSection(section.id, tabId)
+    const dragData = e.dataTransfer.getData('text/plain')
+
+    // Controlla se è un menu item (formato: menu-item::url::title)
+    if (dragData.startsWith('menu-item::')) {
+      const parts = dragData.split('::')
+      if (parts.length === 3) {
+        const url = parts[1]
+        const title = parts[2]
+        handleDirectPageAssign(url, title)
+        return
+      }
+    }
+
+    // Gestisce il drop di una scheda normale
+    if (dragData && dragData !== 'grid-tab') {
+      assignTabToSection(section.id, dragData)
     }
   }
 

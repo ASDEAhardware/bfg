@@ -1,6 +1,6 @@
 "use client"
 import React, { useState } from 'react'
-import { Plus, LayoutDashboard, Shield, MonitorCog, Layers } from 'lucide-react'
+import { Plus, LayoutDashboard, Shield, MonitorCog, Layers, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTabStore } from '@/store/tabStore'
 import { useUserInfo } from '@/hooks/useAuth'
@@ -87,7 +87,7 @@ export function PageSelector({ onPageSelect }: PageSelectorProps) {
             className="flex items-center gap-3 p-2 hover:bg-accent rounded cursor-pointer text-sm"
             onClick={() => handlePageSelect(tab.url, tab.customTitle || tab.title, tab.id)}
           >
-            <div className="w-4 h-4 rounded-full bg-blue-500 flex-shrink-0"></div>
+            <Square className="h-4 w-4 text-primary flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="font-medium">{tab.customTitle || tab.title}</div>
               <div className="text-xs text-muted-foreground truncate">{tab.url}</div>
