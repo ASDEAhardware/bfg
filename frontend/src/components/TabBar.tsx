@@ -14,12 +14,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 export function TabBar() {
-  const { tabs, activeTabId, setActiveTab, closeTab, renameTab, reorderTabs, isTabModeEnabled } = useTabStore()
+  const { tabs, activeTabId, setActiveTab, closeTab, renameTab, reorderTabs, closeOtherTabs, closeTabsToRight, closeTabsToLeft, closeAllTabs, isTabModeEnabled } = useTabStore()
   const { isGridModeEnabled } = useGridStore()
   const [editingTab, setEditingTab] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [visibleTabs, setVisibleTabs] = useState<typeof tabs>([])
   const [overflowTabs, setOverflowTabs] = useState<typeof tabs>([])
+  const [contextMenuTab, setContextMenuTab] = useState<string | null>(null)
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null)
   const [draggedTab, setDraggedTab] = useState<string | null>(null)
   const [dragOverTab, setDragOverTab] = useState<string | null>(null)
 
@@ -156,6 +158,19 @@ export function TabBar() {
     return () => window.removeEventListener('resize', handleResize)
   }, [calculateTabVisibility])
 
+  // Chiudi menu contestuale quando si clicca fuori
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenuPosition(null)
+      setContextMenuTab(null)
+    }
+
+    if (contextMenuPosition) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [contextMenuPosition])
+
   // Non serve più aggiornare i customTitle, vengono gestiti alla creazione nel tabStore
 
   const handleTabClick = (tabId: string) => {
@@ -192,6 +207,38 @@ export function TabBar() {
     }
     setEditingTab(null)
     setEditValue('')
+  }
+
+  const handleContextMenu = (e: React.MouseEvent, tabId: string) => {
+    e.preventDefault()
+    if (tabId === 'grid-tab') return // Non mostrare menu per la scheda griglia
+    setContextMenuTab(tabId)
+    setContextMenuPosition({ x: e.clientX, y: e.clientY })
+  }
+
+  const handleContextMenuAction = (action: string) => {
+    if (!contextMenuTab) return
+
+    switch (action) {
+      case 'close':
+        closeTab(contextMenuTab)
+        break
+      case 'closeOthers':
+        closeOtherTabs(contextMenuTab)
+        break
+      case 'closeToRight':
+        closeTabsToRight(contextMenuTab)
+        break
+      case 'closeToLeft':
+        closeTabsToLeft(contextMenuTab)
+        break
+      case 'closeAll':
+        closeAllTabs()
+        break
+    }
+
+    setContextMenuPosition(null)
+    setContextMenuTab(null)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -320,7 +367,7 @@ export function TabBar() {
         ref={tabsContainerRef}
         className="flex-1 flex h-8 min-w-0 overflow-hidden"
       >
-        {visibleTabs.map((tab, index) => {
+        {visibleTabs.map((tab) => {
             const isActive = tab.id === activeTabId
             const isGridTab = tab.id === 'grid-tab'
             const displayTitle = isGridTab ? '' : getTabDisplayTitle(tab)
@@ -339,6 +386,7 @@ export function TabBar() {
                   draggedTab === tab.id && "opacity-50", // Feedback per item trascinato
                 )}
                 onClick={() => handleTabClick(tab.id)}
+                onContextMenu={(e) => handleContextMenu(e, tab.id)}
                 onDragStart={(e) => handleDragStart(e, tab.id)}
                 onDragEnd={handleDragEnd}
                 onDragOver={(e) => handleDragOver(e, tab.id)}
@@ -444,7 +492,7 @@ export function TabBar() {
                   onClick={() => handleTabClick(tab.id)}
                 >
                   <TabIcon className="h-3 w-3 mr-2 flex-shrink-0" />
-                  <span className="truncate flex-1" title={fullTitle}>
+                  <span className="truncate flex-1" title={tab.customTitle || tab.title}>
                     {displayTitle}
                   </span>
                   <Button
@@ -463,6 +511,67 @@ export function TabBar() {
             })}
           </DropdownMenuContent>
         </DropdownMenu>
+      )}
+
+      {/* Menu contestuale */}
+      {contextMenuPosition && (
+        <div
+          className="fixed z-50 bg-popover border border-border rounded-md shadow-md py-1 min-w-[180px]"
+          style={{
+            left: contextMenuPosition.x,
+            top: contextMenuPosition.y
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-3 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground"
+            onClick={() => handleContextMenuAction('close')}
+          >
+            Chiudi scheda
+          </button>
+          <button
+            className={cn(
+              "w-full px-3 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground",
+              tabs.length <= 1 && "opacity-50 cursor-not-allowed"
+            )}
+            onClick={() => handleContextMenuAction('closeOthers')}
+            disabled={tabs.length <= 1}
+          >
+            Chiudi altre schede
+          </button>
+          <div className="border-t border-border my-1" />
+          <button
+            className={cn(
+              "w-full px-3 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground",
+              (!contextMenuTab || tabs.findIndex(t => t.id === contextMenuTab) === 0) && "opacity-50 cursor-not-allowed"
+            )}
+            onClick={() => handleContextMenuAction('closeToLeft')}
+            disabled={!contextMenuTab || tabs.findIndex(t => t.id === contextMenuTab) === 0}
+          >
+            Chiudi schede a sinistra
+          </button>
+          <button
+            className={cn(
+              "w-full px-3 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground",
+              (!contextMenuTab || tabs.findIndex(t => t.id === contextMenuTab) === tabs.length - 1) && "opacity-50 cursor-not-allowed"
+            )}
+            onClick={() => handleContextMenuAction('closeToRight')}
+            disabled={!contextMenuTab || tabs.findIndex(t => t.id === contextMenuTab) === tabs.length - 1}
+          >
+            Chiudi schede a destra
+          </button>
+          <div className="border-t border-border my-1" />
+          <button
+            className={cn(
+              "w-full px-3 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground",
+              tabs.length === 0 && "opacity-50 cursor-not-allowed"
+            )}
+            onClick={() => handleContextMenuAction('closeAll')}
+            disabled={tabs.length === 0}
+          >
+            Chiudi tutte le schede
+          </button>
+        </div>
       )}
     </div>
   )

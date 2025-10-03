@@ -25,6 +25,10 @@ interface TabState {
   renameTab: (tabId: string, newTitle: string) => void
   reorderTabs: (fromIndex: number, toIndex: number) => void
   clearAllTabs: () => void
+  closeOtherTabs: (keepTabId: string) => void
+  closeTabsToRight: (tabId: string) => void
+  closeTabsToLeft: (tabId: string) => void
+  closeAllTabs: () => void
 }
 
 export const useTabStore = create<TabState>()(
@@ -52,16 +56,26 @@ export const useTabStore = create<TabState>()(
         const tabId = `${url}-${timestamp}`
 
         // Trova schede con lo stesso titolo base per numerazione omonimie
-        // Confronta con il baseTitle (proprietà che aggiungiamo per tenere traccia del titolo originale)
         const existingTabsWithSameBaseTitle = state.tabs.filter(tab => {
           // Se la tab ha baseTitle, usalo, altrimenti usa title rimuovendo numerazione
           const tabBaseTitle = (tab as any).baseTitle || tab.title.replace(/\s*\(\d+\)$/, '')
           return tabBaseTitle === title
         })
 
+        // Calcola il prossimo numero in base ai numeri esistenti
+        let nextNumber = 1
+        if (existingTabsWithSameBaseTitle.length > 0) {
+          // Trova il numero più alto tra le schede esistenti
+          const existingNumbers = existingTabsWithSameBaseTitle.map(tab => {
+            const match = tab.title.match(/\((\d+)\)$/)
+            return match ? parseInt(match[1]) : 1
+          })
+          nextNumber = Math.max(...existingNumbers) + 1
+        }
+
         // Calcola il titolo con numerazione per omonimie
         const finalTitle = existingTabsWithSameBaseTitle.length > 0
-          ? `${title} (${existingTabsWithSameBaseTitle.length + 1})`
+          ? `${title} (${nextNumber})`
           : title
 
         const newTab: Tab = {
@@ -99,9 +113,20 @@ export const useTabStore = create<TabState>()(
           return tabBaseTitle === title
         })
 
+        // Calcola il prossimo numero in base ai numeri esistenti
+        let nextNumber = 1
+        if (existingTabsWithSameBaseTitle.length > 0) {
+          // Trova il numero più alto tra le schede esistenti
+          const existingNumbers = existingTabsWithSameBaseTitle.map(tab => {
+            const match = tab.title.match(/\((\d+)\)$/)
+            return match ? parseInt(match[1]) : 1
+          })
+          nextNumber = Math.max(...existingNumbers) + 1
+        }
+
         // Calcola il titolo con numerazione per omonimie
         const finalTitle = existingTabsWithSameBaseTitle.length > 0
-          ? `${title} (${existingTabsWithSameBaseTitle.length + 1})`
+          ? `${title} (${nextNumber})`
           : title
 
         const newTab: Tab = {
@@ -186,6 +211,58 @@ export const useTabStore = create<TabState>()(
       },
 
       clearAllTabs: () => {
+        set({
+          tabs: [],
+          activeTabId: null
+        })
+      },
+
+      closeOtherTabs: (keepTabId: string) => {
+        const state = get()
+        const keepTab = state.tabs.find(tab => tab.id === keepTabId)
+        if (keepTab) {
+          set({
+            tabs: [keepTab],
+            activeTabId: keepTabId
+          })
+        }
+      },
+
+      closeTabsToRight: (tabId: string) => {
+        const state = get()
+        const tabIndex = state.tabs.findIndex(tab => tab.id === tabId)
+        if (tabIndex !== -1) {
+          const newTabs = state.tabs.slice(0, tabIndex + 1)
+          // Se la scheda attiva era tra quelle chiuse, attiva quella di riferimento
+          const newActiveTabId = newTabs.find(tab => tab.id === state.activeTabId)
+            ? state.activeTabId
+            : tabId
+
+          set({
+            tabs: newTabs,
+            activeTabId: newActiveTabId
+          })
+        }
+      },
+
+      closeTabsToLeft: (tabId: string) => {
+        const state = get()
+        const tabIndex = state.tabs.findIndex(tab => tab.id === tabId)
+        if (tabIndex !== -1) {
+          const newTabs = state.tabs.slice(tabIndex)
+          // Se la scheda attiva era tra quelle chiuse, attiva quella di riferimento
+          const newActiveTabId = newTabs.find(tab => tab.id === state.activeTabId)
+            ? state.activeTabId
+            : tabId
+
+          set({
+            tabs: newTabs,
+            activeTabId: newActiveTabId
+          })
+        }
+      },
+
+      closeAllTabs: () => {
         set({
           tabs: [],
           activeTabId: null
