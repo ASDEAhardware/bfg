@@ -1,9 +1,10 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Plus, LayoutDashboard, Shield, MonitorCog, Layers, SquareChartGantt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTabStore } from '@/store/tabStore'
 import { useUserInfo } from '@/hooks/useAuth'
+import { pluginRegistry, getUserPermissions } from '@/plugins'
 import {
   Dialog,
   DialogContent,
@@ -26,20 +27,46 @@ export function PageSelector({ onPageSelect }: PageSelectorProps) {
   const { tabs } = useTabStore()
   const { data: userData } = useUserInfo()
 
+  // Get plugin-based pages dynamically
+  const { platformPages, staffPages } = useMemo(() => {
+    if (!userData) {
+      return { platformPages: [], staffPages: [] }
+    }
 
-  // Pagine Platform
-  const platformPages = [
-    { url: '/dashboard', title: 'Dashboard', icon: LayoutDashboard, description: 'Panoramica principale' }
-  ]
+    const userPermissions = getUserPermissions(userData)
+    const pluginNavItems = pluginRegistry.getAllPluginNavItems(userPermissions)
 
-  // Pagine Staff Panel (se l'utente è staff o superuser)
-  const staffPages: typeof platformPages = []
-  if (userData?.is_staff) {
-    staffPages.push({ url: '/staff-admin', title: 'Admin Panel', icon: Shield, description: 'Pannello amministrazione' })
-  }
-  if (userData?.is_superuser) {
-    staffPages.push({ url: '/system', title: 'System Config', icon: MonitorCog, description: 'Configurazione sistema' })
-  }
+    // Convert plugin nav items to page format
+    const pluginPages = pluginNavItems.map(item => ({
+      url: item.url,
+      title: item.title,
+      icon: item.icon || LayoutDashboard,
+      description: item.description || `Accedi a ${item.title}`
+    }))
+
+    // Separate by permission level
+    const platform = pluginPages.filter(page => {
+      const plugin = Array.from(pluginRegistry.plugins.values())
+        .find(p => p.navItems.some(nav => nav.url === page.url))
+      return !plugin?.permissions || plugin.permissions.role === 'guest'
+    })
+
+    const staff = pluginPages.filter(page => {
+      const plugin = Array.from(pluginRegistry.plugins.values())
+        .find(p => p.navItems.some(nav => nav.url === page.url))
+      return plugin?.permissions && ['staff', 'superuser'].includes(plugin.permissions.role)
+    })
+
+    // Add static pages
+    if (userData?.is_staff && !staff.find(p => p.url === '/staff-admin')) {
+      staff.push({ url: '/staff-admin', title: 'Admin Panel', icon: Shield, description: 'Pannello amministrazione' })
+    }
+    if (userData?.is_superuser && !staff.find(p => p.url === '/system')) {
+      staff.push({ url: '/system', title: 'System Config', icon: MonitorCog, description: 'Configurazione sistema' })
+    }
+
+    return { platformPages: platform, staffPages: staff }
+  }, [userData])
 
   // Schede esistenti (esclusa la griglia)
   const existingTabs = tabs.filter(tab => tab.id !== 'grid-tab')

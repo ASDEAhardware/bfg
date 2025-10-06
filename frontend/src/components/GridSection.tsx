@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Plus, X, GripHorizontal, GripVertical, Link2Off, Maximize2, LayoutDashboard, Shield, MonitorCog, SquareChartGantt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGridStore, GridSection as GridSectionType } from '@/store/gridStore'
@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils'
 import { TabContentRenderer } from '@/components/TabContentRenderer'
 import { PageSelector } from '@/components/PageSelector'
 import { useRouter } from 'next/navigation'
+import { pluginRegistry, getUserPermissions } from '@/plugins'
+import { useUserInfo } from '@/hooks/useAuth'
 
 interface GridSectionProps {
   section: GridSectionType
@@ -37,22 +39,37 @@ export function GridSection({
     toggleGridMode
   } = useGridStore()
   const { tabs, isTabModeEnabled, toggleTabMode, openTabInBackground, activeTabId, setActiveTab } = useTabStore()
+  const { data: userData } = useUserInfo()
   const router = useRouter()
   const [isDragOver, setIsDragOver] = useState(false)
 
-  // Funzione per ottenere l'icona appropriata in base all'URL
-  const getPageIcon = (url: string) => {
-    switch (url) {
-      case '/dashboard':
-        return LayoutDashboard
-      case '/staff-admin':
-        return Shield
-      case '/system':
-        return MonitorCog
-      default:
-        return SquareChartGantt // Icona di default per pagine non mappate
+  // Get plugin icon dynamically
+  const getPageIcon = useMemo(() => {
+    return (url: string) => {
+      if (!userData) return SquareChartGantt
+
+      // Check plugin icons first
+      const userPermissions = getUserPermissions(userData)
+      const pluginNavItems = pluginRegistry.getAllPluginNavItems(userPermissions)
+
+      const pluginItem = pluginNavItems.find(item => item.url === url)
+      if (pluginItem && pluginItem.icon) {
+        return pluginItem.icon
+      }
+
+      // Fallback to static icons
+      switch (url) {
+        case '/dashboard':
+          return LayoutDashboard
+        case '/staff-admin':
+          return Shield
+        case '/system':
+          return MonitorCog
+        default:
+          return SquareChartGantt
+      }
     }
-  }
+  }, [userData])
 
   // Funzione per ottenere il titolo della scheda (sempre completo, mai compresso)
   const getDisplayTitle = (tab: any) => {
