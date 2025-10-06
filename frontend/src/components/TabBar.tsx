@@ -12,10 +12,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { pluginRegistry, getUserPermissions } from '@/plugins'
+import { useUserInfo } from '@/hooks/useAuth'
 
 export function TabBar() {
   const { tabs, activeTabId, setActiveTab, closeTab, renameTab, reorderTabs, closeOtherTabs, closeTabsToRight, closeTabsToLeft, closeAllTabs, isTabModeEnabled } = useTabStore()
   const { isGridModeEnabled } = useGridStore()
+  const { data: userData } = useUserInfo()
   const [editingTab, setEditingTab] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [visibleTabs, setVisibleTabs] = useState<typeof tabs>([])
@@ -301,19 +304,33 @@ export function TabBar() {
     setDragOverTab(null)
   }
 
-  // Funzione per ottenere l'icona appropriata in base all'URL
-  const getTabIcon = (url: string) => {
-    switch (url) {
-      case '/dashboard':
-        return LayoutDashboard
-      case '/staff-admin':
-        return Shield
-      case '/system':
-        return MonitorCog
-      default:
-        return SquareChartGantt // Icona di default per pagine non mappate
+  // Get plugin icon dynamically
+  const getTabIcon = useMemo(() => {
+    return (url: string) => {
+      if (!userData) return SquareChartGantt
+
+      // Check plugin icons first
+      const userPermissions = getUserPermissions(userData)
+      const pluginNavItems = pluginRegistry.getAllPluginNavItems(userPermissions)
+
+      const pluginItem = pluginNavItems.find(item => item.url === url)
+      if (pluginItem && pluginItem.icon) {
+        return pluginItem.icon
+      }
+
+      // Fallback to static icons
+      switch (url) {
+        case '/dashboard':
+          return LayoutDashboard
+        case '/staff-admin':
+          return Shield
+        case '/system':
+          return MonitorCog
+        default:
+          return SquareChartGantt
+      }
     }
-  }
+  }, [userData])
 
   // Funzione per determinare se una scheda ha un titolo custom (modificato dall'utente)
   const hasCustomTitle = (tab: any) => {
