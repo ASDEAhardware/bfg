@@ -1,17 +1,23 @@
 'use client';
 //Qui puoi raggruppare tutti i provider client-side di alto livello mantenendo il file layout.tsx pulito e semplice.
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query'; // Importa il provider di React Query
 import { queryClient } from '@/lib/queryClient'; // istanza di QueryClient
 import { ThemeProvider } from "@/components/theme-provider"
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { initializePlugins } from '@/plugins';
 
 interface ProvidersProps {
     children: ReactNode;
 }
 
 export function Providers({ children }: ProvidersProps) {
+    // Initialize plugins on app start
+    useEffect(() => {
+        initializePlugins()
+    }, [])
+
     return (
         <QueryClientProvider client={queryClient}>
             <ThemeProvider

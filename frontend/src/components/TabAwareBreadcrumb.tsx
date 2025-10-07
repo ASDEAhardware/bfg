@@ -1,10 +1,23 @@
 "use client"
 import React from 'react'
 import { useTabStore } from '@/store/tabStore'
+import { useGridStore } from '@/store/gridStore'
 import Breadcrumb from '@/components/Breadcrumb'
 
 export default function TabAwareBreadcrumb() {
   const { isTabModeEnabled, tabs, activeTabId } = useTabStore()
+  const { isGridModeEnabled } = useGridStore()
+
+  // Se modalità griglia attiva senza modalità schede
+  if (isGridModeEnabled && !isTabModeEnabled) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-md font-medium">
+          Modalità griglia attiva
+        </span>
+      </div>
+    )
+  }
 
   // Se non siamo in modalità schede, mostra la breadcrumb normale
   if (!isTabModeEnabled) {

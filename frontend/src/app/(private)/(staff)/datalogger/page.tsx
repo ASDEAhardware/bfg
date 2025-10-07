@@ -1,6 +1,5 @@
 import { PluginRouteRenderer } from "@/components/PluginRouteRenderer";
 
-export default function DashboardPage() {
+export default function DataLoggerPage() {
     return <PluginRouteRenderer />;
 }
-

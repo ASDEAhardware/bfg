@@ -23,31 +23,26 @@ import {
 } from "@/components/ui/sidebar"
 import { useUserInfo } from "@/hooks/useAuth"
 import { Separator } from "@radix-ui/react-separator"
+import { pluginRegistry, getUserPermissions } from "@/plugins"
 
 import Image from "next/image"
-
-// This is sample data.
-const baseItems = {
-
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: LayoutDashboard,
-    },
-  ]
-}
 
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: userData, isLoading, error } = useUserInfo()
   const errorMessage = typeof error === "string" ? error : error ? String(error) : "";
 
+  // Get plugin-based navigation items
+  const pluginNavItems = React.useMemo(() => {
+    if (!userData) return []
+
+    const userPermissions = getUserPermissions(userData)
+    return pluginRegistry.getAllPluginNavItems(userPermissions)
+  }, [userData])
 
   const staffItems = userData?.is_staff
     ? [{ title: "Admin Panel", url: "/staff-admin", icon: Shield }]
     : []
-
 
   const superuserItems = userData?.is_superuser
     ? [{ title: "System Config", url: "/system", icon: MonitorCog }]
@@ -70,7 +65,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={baseItems.navMain} label="Platform" />
+        <NavMain items={pluginNavItems} label="Platform" />
         {adminPanelItems.length > 0 && (
           <>
             <NavMain items={adminPanelItems} label="Staff Panel" />
