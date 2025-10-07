@@ -1,204 +1,122 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';
-import axios, { isAxiosError, AxiosResponse } from 'axios';
+import { apiServer } from './lib/axios-server';
 
-// Utilizziamo una cache in-memory per la chiave pubblica,
-// così non dobbiamo fare una chiamata API ad ogni richiesta.
-let publicKey: jose.CryptoKey | null = null;
-
-// Tipizzazione della risposta della chiamata API per ottenere la chiave pubblica
-interface PublicKeyResponse {
-    public_key: string;
-}
-
-// Tipizzazione del payload del token JWT
+// Interfaccia per il payload del token per includere ruoli
 interface TokenPayload extends jose.JWTPayload {
     is_staff: boolean;
     is_superuser: boolean;
 }
 
-async function getPublicKey(djangoApiUrl: string): Promise<jose.CryptoKey> {
-    // 1. Aggiungi il controllo iniziale per la chiave pubblica
+
+// Cache per la chiave pubblica per evitare chiamate API ripetute
+let publicKey: jose.CryptoKey | null = null;
+
+async function getPublicKey(): Promise<jose.CryptoKey> {
     if (publicKey) {
         return publicKey;
     }
-
-    let response: AxiosResponse<PublicKeyResponse>;
     try {
-        // 2. Esegui la chiamata API
-        response = await axios.get<PublicKeyResponse>(`${djangoApiUrl}/api/v1/core/auth/public-key/`, {
-            headers: {
-                'x-api-key': process.env.API_KEY
-            }
+        const response = await apiServer.get('/api/v1/core/auth/public-key/', {
+            headers: { 'x-api-key': process.env.API_KEY! }
         });
-
-        // 3. Controlla che la risposta contenga la chiave pubblica
-        if (!response.data || !response.data.public_key) {
-            throw new Error("La risposta dell' API non contiene la chiave pubblica.");
+        const data = response.data;
+        if (!data.public_key) {
+            throw new Error("Public key not found in API response.");
         }
-
-        // 4. Importa la chiave pubblica e memorizzala
-        publicKey = await jose.importSPKI(response.data.public_key, 'RS256'); // RS256 ???? 
+        publicKey = await jose.importSPKI(data.public_key, 'RS256');
         return publicKey;
-
     } catch (error) {
-        // 5. Gestisci l'errore in modo più specifico
-        if (isAxiosError(error)) {
-            console.error("Si è verificato il seguente errore durante la chiamata API: ", error.status, error.message);
-        } else {
-            console.error("Si è verificato un errore inaspettato: ", error);
-        }
-        // 6. Rilancia l'errore per gestirlo a livello superiore
+        console.error("Error fetching or importing public key:", error);
         throw error;
     }
 }
 
-// Funzione di validazione locale del token
-// Anche qui, modifichiamo il tipo di 'key' in 'any'
-async function validateToken(token: string, key: CryptoKey): Promise<jose.JWTVerifyResult<TokenPayload> | null> {
+async function validateToken(token: string, key: jose.CryptoKey): Promise<jose.JWTVerifyResult<TokenPayload> | null> {
     try {
-        const verificationResult = await jose.jwtVerify<TokenPayload>(token, key, {
-            algorithms: ['RS256'],
-        });
-        return verificationResult;
+        return await jose.jwtVerify<TokenPayload>(token, key, { algorithms: ['RS256'] });
     } catch (e) {
-        console.log("Token non valido o scaduto, necessita di refresh.");
+        console.log("Access token validation failed. It might be expired.");
         return null;
     }
 }
 
 export async function middleware(request: NextRequest) {
-    const djangoApiUrl = process.env.DJANGO_API_URL || 'http://localhost:8000';
-    const loginPage = '/login';
+    const { pathname } = request.nextUrl;
+    const loginUrl = new URL('/login', request.url);
 
     const accessToken = request.cookies.get('access_token')?.value;
     const refreshToken = request.cookies.get('refresh_token')?.value;
 
-    const protectedRoutes = ['/dashboard', '/change-password', '/settings', '/profile', '/staff-admin', '/system'];
-    const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route));
+    const isAuthRoute = ['/login', '/register', '/reset-password'].some(p => pathname.startsWith(p));
+    const isProtectedRoute = !isAuthRoute && pathname !== '/';
 
-    const authRoutes = ['/login', '/register', '/reset-password'];
-    const isAuthRoute = authRoutes.some(route => request.nextUrl.pathname.startsWith(route));
-
-    const staffRoutes = ['/staff-admin']
-    const isStaffRoute = staffRoutes.some(route => request.nextUrl.pathname.startsWith(route));
-    
-    const superuserRoutes = ['/system'];
-    const isSuperuserRoute = superuserRoutes.some(route => request.nextUrl.pathname.startsWith(route));
-
-    // Se l'utente non è autenticato e sta cercando di accedere a una rotta di autenticazione,
-    // lasciagli continuare la navigazione.
-    if (isAuthRoute && !refreshToken) {
+    // Se l'utente è su una rotta di autenticazione
+    if (isAuthRoute) {
+        if (refreshToken) {
+            // Se ha un refresh token, è già loggato, quindi lo mandiamo alla dashboard
+            return NextResponse.redirect(new URL('/dashboard', request.url));
+        }
         return NextResponse.next();
     }
 
-    // Gestione della rotta radice ("/")
-    if (request.nextUrl.pathname === '/') {
-        // Se l'utente non è loggato (nessun refresh token), reindirizza a /login
-        if (!refreshToken) {
-            return NextResponse.redirect(new URL(loginPage, request.url));
-        }
-        // Se l'utente è loggato, reindirizza alla dashboard
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+    // Redirect dalla rotta radice
+    if (pathname === '/') {
+        return NextResponse.redirect(new URL(refreshToken ? '/dashboard' : '/login', request.url));
     }
 
     if (isProtectedRoute) {
-        // 1. Nessun token disponibile: reindirizza al login
-        if (!accessToken && !refreshToken) {
-            const response = NextResponse.redirect(new URL(loginPage, request.url));
-            response.cookies.delete('refresh_token');
+        if (!refreshToken) {
+            // Nessun refresh token, l'utente non è autenticato
+            const response = NextResponse.redirect(loginUrl);
             response.cookies.delete('access_token');
+            response.cookies.delete('refresh_token');
             return response;
         }
 
-        let pubKey: CryptoKey;
+        let pubKey: jose.CryptoKey;
         try {
-            pubKey = await getPublicKey(djangoApiUrl);
+            pubKey = await getPublicKey();
         } catch (error) {
-            console.error(error);
-            const response = NextResponse.redirect(new URL(loginPage, request.url));
-            return response;
+            console.error("Could not retrieve public key, redirecting to login.");
+            return NextResponse.redirect(loginUrl);
         }
 
-        let payload: jose.JWTVerifyResult<TokenPayload> | null = null;
-        if (accessToken) {
-            payload = await validateToken(accessToken, pubKey);
-        }
+        const isAccessTokenValid = accessToken ? await validateToken(accessToken, pubKey) : null;
 
-        if (!payload && refreshToken) {
-            console.log("Access token scaduto, tento il refresh...");
-            try {
-                const refreshResponse = await axios.post(`${djangoApiUrl}/api/v1/user/token/refresh/`,
-                    {}, // Il corpo della richiesta ora è vuoto
-                    {
-                        headers: {
-                            // Inoltriamo il cookie di refresh al backend
-                            'Cookie': `refresh_token=${refreshToken}`
-                        }
-                    }
-                );
-                const newTokens = refreshResponse.data;
-                const response = NextResponse.next();
-                response.cookies.set('access_token', newTokens.access, {
-                    path: '/',
-                    secure: process.env.NODE_ENV === 'production',
-                    sameSite: 'strict',
-                });
-                response.cookies.set('refresh_token', newTokens.refresh, {
-                    path: '/',
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === 'production',
-                    sameSite: 'strict',
-                });
-
-                payload = await validateToken(newTokens.access, pubKey);
-                
-                return response;
-            } catch (error) {
-                if (isAxiosError(error)) {
-                    console.log(`Refresh token non valido o scaduto (status: ${error.response?.status}). Reindirizzamento al login.`);
-                } else {
-                    console.error("Errore imprevisto durante il refresh del token:", error);
-                }
-                
-                const response = NextResponse.redirect(new URL(loginPage, request.url));
-                response.cookies.delete('refresh_token');
-                response.cookies.delete('access_token');
-                return response;
-            }
-        }
-
-        if (payload) {
-            const { is_staff, is_superuser } = payload.payload;
-
-            if (isStaffRoute && !is_staff && !is_superuser) {
-                console.log("Accesso negato: utente non ha i permessi di staff.");
+        if (isAccessTokenValid) {
+            // L'access token è valido, controlliamo i permessi per le rotte specifiche
+            const { is_staff, is_superuser } = isAccessTokenValid.payload;
+            if (pathname.startsWith('/staff-admin') && !is_staff && !is_superuser) {
                 return NextResponse.redirect(new URL('/dashboard', request.url));
             }
-
-            if (isSuperuserRoute && !is_superuser) {
-                console.log("Accesso negato: l'utente non ha i permessi di superuser.");
+            if (pathname.startsWith('/system') && !is_superuser) {
                 return NextResponse.redirect(new URL('/dashboard', request.url));
             }
-
             return NextResponse.next();
-        } else {
-            const response = NextResponse.redirect(new URL(loginPage, request.url));
-            response.cookies.delete('refresh_token');
-            response.cookies.delete('access_token');
-            return response;
         }
+
+        // L'access token non è valido o assente, ma c'è un refresh token.
+        // Invece di fare il refresh qui, lasciamo che la richiesta vada al client.
+        // La pagina caricherà uno stato "loading" e l'intercettore di Axios gestirà il refresh.
+        // Questo previene il reindirizzamento anomalo.
+        return NextResponse.next();
     }
 
-    // Prosegui se la rotta non è protetta
     return NextResponse.next();
 }
 
 export const config = {
-    // Il matcher deve includere tutte le rotte che il middleware deve intercettare.
-    // Questo include sia le rotte protette che le rotte di autenticazione.
-    matcher: ['/', '/login', '/reset-password', '/reset-password/:path*', '/dashboard', '/change-password', '/change-password:path*', '/dashboard/:path*', '/settings/:path*', '/profile/:path*', '/staff-admin/:path*', '/system/:path*'],
+    matcher: [
+        '/',
+        '/login',
+        '/register',
+        '/reset-password/:path*',
+        '/dashboard/:path*',
+        '/settings/:path*',
+        '/profile/:path*',
+        '/staff-admin/:path*',
+        '/system/:path*',
+    ],
 };
- 
-    
