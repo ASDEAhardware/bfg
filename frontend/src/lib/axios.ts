@@ -1,39 +1,74 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
+import { useAuthStore } from "@/store/authStore";
 
-// Il client Axios viene configurato per inviare i cookie con le richieste.
-// Non è più necessario leggere i token da Zustand.
 const api = axios.create({
     baseURL: '/api/',
     withCredentials: true,
 });
 
-// L'interceptor di richiesta non deve più aggiungere l'header di autorizzazione,
-// perché i cookie vengono inviati automaticamente dal browser.
-// Questo intercettore ora può essere rimosso o utilizzato per altre logiche.
-api.interceptors.request.use(
-    (config) => {
-        // Esempio di utilizzo: aggiungere un header diverso
-        // config.headers["X-Custom-Header"] = "value";
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+// Variabile per tracciare se il token è in fase di refresh
+let isRefreshing = false;
+// Coda per le richieste fallite in attesa di un nuovo token
+let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: any) => void; }[] = [];
 
-// L'interceptor di risposta gestisce solo i casi in cui l'autenticazione è fallita.
+const processQueue = (error: AxiosError | null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(api(error!.config!));
+        }
+    });
+    failedQueue = [];
+};
+
 api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
+    response => response,
+    async (error: AxiosError) => {
         const originalRequest = error.config;
-
-        // Se la risposta è 401 e la richiesta non è per il login,
-        // significa che il middleware di Next.js non è riuscito a rinfrescare il token.
-        // L'utente deve essere reindirizzato al login.
-        if (error.response?.status === 401 && !originalRequest.url.includes('/user/login/')) {
-            // Reindirizza l'utente alla pagina di login.
-            // Dato che l'access e refresh token sono cookie, verranno puliti dal middleware
-            // al reindirizzamento.
-            window.location.href = "/";
+        if (!originalRequest) {
             return Promise.reject(error);
+        }
+
+        // Escludiamo gli endpoint di autenticazione per evitare loop o comportamenti indesiderati.
+        const excludedPaths = ['/auth/login/', '/auth/token/refresh', '/auth/logout/'];
+        if (
+            error.response?.status === 401 &&
+            originalRequest.url &&
+            !excludedPaths.includes(originalRequest.url)
+        ) {
+            if (isRefreshing) {
+                // Se un refresh è già in corso, accodiamo la richiesta
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                }).then(() => {
+                    // Quando il refresh è finito, la richiesta viene rieseguita
+                    return api(originalRequest);
+                });
+            }
+
+            isRefreshing = true;
+            useAuthStore.getState().setRefreshing(true);
+
+            try {
+                await api.post('/auth/token/refresh');
+                processQueue(null);
+                return api(originalRequest);
+            } catch (refreshError) {
+                processQueue(refreshError as AxiosError);
+
+                if ((refreshError as AxiosError).response?.status === 401) {
+                    api.post('/auth/logout/').finally(() => {
+                        useAuthStore.getState().clearUser();
+                        window.location.href = '/login?sessionExpired=true';
+                    });
+                }
+
+                return new Promise(() => {});
+            } finally {
+                isRefreshing = false;
+                useAuthStore.getState().setRefreshing(false);
+            }
         }
 
         return Promise.reject(error);
@@ -41,4 +76,3 @@ api.interceptors.response.use(
 );
 
 export { api };
-

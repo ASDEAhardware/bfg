@@ -42,7 +42,7 @@ const changelogData: ChangelogEntry[] = [
       {
         type: "bugfix",
         items: [
-          "Nessuna correzione bug rilevante in questa release iniziale.",
+          "Nessuna correzione bug rilevante in questa release.",
         ],
       },
     ],

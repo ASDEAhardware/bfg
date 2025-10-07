@@ -13,7 +13,6 @@ export async function POST(request: Request) {
 
         // Se il login ha successo, crea una nuova risposta per il client Next.js.
         const response = NextResponse.json(djangoResponse.data); //Restituisce un oggetto JSON contenente principalmente un HTTP status code
-
         // Axios memorizza i cookie in un array sotto l'header 'set-cookie'.
         // Memorizziamo in una variabile i cookies che otteniamo da django, accedendo all'header set-cookie che può contenere più elementi
         // (access_token e refresh_token), quindi spesso viene gestito come array

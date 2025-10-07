@@ -8,14 +8,15 @@ import { Button } from "@/components/ui/button";
 import { useSaveTheme } from "@/hooks/useSaveTheme";
 
 export function ModeToggle() {
-    const { theme, setTheme } = useTheme(); //theme = tema corrente, setTheme = funzione per cambiare tema
-    const { mutate: saveTheme } = useSaveTheme(); //hook per salvare la preferenza del tema del DB
+    const { theme, setTheme } = useTheme();
+    const { mutate: saveTheme } = useSaveTheme();
 
-    // Logica del cambio tema ciclico
+    // Usiamo una ref per tenere traccia del timer del debounce
+    const debounceTimer = React.useRef<NodeJS.Timeout | null>(null);
+
     const handleThemeToggle = () => {
         let newTheme: "light" | "dark" | "system";
 
-        // Cicla tra i temi: light -> dark -> system -> light
         switch (theme) {
             case "light":
                 newTheme = "dark";
@@ -29,9 +30,28 @@ export function ModeToggle() {
                 break;
         }
 
-        setTheme(newTheme); // Viene aggiornato il tema lato client
-        saveTheme(newTheme); // Viene chiamato l'hook che esegue una chiamata API per aggiornare il tema nel Database
+        // Aggiorna immediatamente il tema lato client per una UX reattiva
+        setTheme(newTheme);
+
+        // Pulisci il timer precedente se esiste
+        if (debounceTimer.current) {
+            clearTimeout(debounceTimer.current);
+        }
+
+        // Imposta un nuovo timer per salvare il tema dopo 500ms
+        debounceTimer.current = setTimeout(() => {
+            saveTheme(newTheme);
+        }, 500);
     };
+
+    // Assicurati di pulire il timer quando il componente viene smontato
+    React.useEffect(() => {
+        return () => {
+            if (debounceTimer.current) {
+                clearTimeout(debounceTimer.current);
+            }
+        };
+    }, []);
 
     // Gestisce lo stato non montato per evitare mismatch SSR/CSR
     // (next-themes gestisce questo internamente, ma un controllo non fa male)

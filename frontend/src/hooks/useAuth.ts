@@ -45,7 +45,6 @@ export const useLogin = () => {
 
 export const useLogout = () => {
   const clearUser = useAuthStore((state) => state.clearUser);
-  const router = useRouter();
   const queryClient = useQueryClient();
 
   return useMutation({
