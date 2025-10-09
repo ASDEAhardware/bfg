@@ -4,6 +4,30 @@ Tutte le modifiche notevoli a questo progetto saranno documentate in questo file
 
 Il formato si basa su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-10-08
+
+### Added
+
+- **Modularità**: nel frontend le app sono state suddivise in moduli tramite un'apposita architettura per facilitarne l'aggiunta e lo sgancio del modulo.
+
+- **Refresh token BFF Endpoint**: è stato aggiunto l'endpoint del refresh dell'access_token nel server BFF in quanto questa chiamata API deve essere effettuata dal Client (che comunica obbligatoriamente con il server BFF) e non più dal middleware.ts, rispettando le regole dell'architettura BFF Pattern.
+
+- **Tooltips**: sono stati aggiunti dei Tooltips, per spiegare brevemente la funzione di un dato button all'hover del mouse.
+
+### Fixed
+- **Token race condition**: è stata fixata la race condition per cui l'access_token non veniva refreshato correttamente per cui ogni 5 minuti, al suo refresh, si veniva redirectati alla `/dashboard`.
+
+- **Save Theme race condition**: fixata tramite un `debouncer` la race condition del tema per cui il tema mostrato nella UI non era sempre sincronizzato con il rispettivo valore all'interno del database.
+
+- **Issue #6 Fixed**: è stato fixato l'issue #6 aperto in quanto nel terminale poteva essere visualizzato un error 400 durante il refresh dell'access_token. Questo errore era causato dalla token race condition.
+
+- **Scroll on Grid contents**: è stato fixato lo scroll per il contenuto delle pagine che eccedevano lo spazio disponibile durante la Grid Mode.
+
+- **Header Version Page**: fixato lo z-index dell'header della pagina per visualizzare i rilasci delle varie versioni, in quanto scrollando si sovrapponeva all'header della sidebar.
+
+- **nav-user.tsx**: Fixata la tipizzazione di user nel file, utilizzando il tipo `User` definito in `/types/user.ts`.
+
+
 ## [1.2.0] - 2025-10-03
 
 ### Added

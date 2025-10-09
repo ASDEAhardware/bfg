@@ -1,13 +1,7 @@
 "use client"
 import * as React from "react"
 import {
-  AudioWaveform,
-  BookOpen,
-  LockKeyhole,
   MonitorCog,
-  GalleryVerticalEnd,
-  Settings2,
-  LayoutDashboard,
   Shield,
 } from "lucide-react"
 
@@ -19,10 +13,8 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarRail,
 } from "@/components/ui/sidebar"
 import { useUserInfo } from "@/hooks/useAuth"
-import { Separator } from "@radix-ui/react-separator"
 import { pluginRegistry, getUserPermissions } from "@/plugins"
 
 import Image from "next/image"
@@ -73,7 +65,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={userData} isLoading={isLoading} error={errorMessage} />
+        <NavUser user={userData} tooltip="Profile" isLoading={isLoading} error={errorMessage} />
       </SidebarFooter>
     </Sidebar>
   )
