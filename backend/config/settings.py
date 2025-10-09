@@ -52,7 +52,9 @@ INSTALLED_APPS = [
     'django.contrib.sites',  # Necessario per alcune funzioni (come il reset password)
     'user',
     'corsheaders',
-    'dashboard',]
+    'dashboard',
+    'mqtt',
+]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -67,6 +69,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'config.urls'
+
+# URL configuration
+APPEND_SLASH = True  # Automatic redirect for missing trailing slash
 
 TEMPLATES = [
     {
@@ -234,5 +239,23 @@ dice a Django di usare il sito con ID 1 nella tabella django_site come sito corr
     modificare il campo "Domain name" per il sito con ID 1. (Questo avviene sempre per la possibilità di avere più siti, in 
     un'istanza Django, ognuno con il proprio dominio e configurazione.)	
 
-''' 
+'''
+
+# MQTT Configuration
+MQTT_BROKER = os.environ.get('MQTT_BROKER', 'zionnode.ovh')
+MQTT_PORT = int(os.environ.get('MQTT_PORT', 8883))
+MQTT_USERNAME = os.environ.get('MQTT_USERNAME', 'msapp_dev')
+MQTT_PASSWORD = os.environ.get('MQTT_PASSWORD', 'KJHdsfgb86!')
+
+# MQTT Topics
+MQTT_CONTROL_TOPIC = os.environ.get('MQTT_CONTROL_TOPIC', 'acquisition24/control')
+MQTT_OUTPUT_TOPIC = os.environ.get('MQTT_OUTPUT_TOPIC', 'acquisition24/output')
+MQTT_ERROR_TOPIC = os.environ.get('MQTT_ERROR_TOPIC', 'acquisition24/error')
+
+# MQTT Client IDs
+MQTT_CLIENT_ID = os.environ.get('MQTT_CLIENT_ID', 'msapp_output_sub')
+MQTT_DATALOG_CLIENT_ID = os.environ.get('MQTT_DATALOG_CLIENT_ID', 'msapp_dev_python')
+MQTT_OUTPUT_CLIENT_ID = os.environ.get('MQTT_OUTPUT_CLIENT_ID', 'msapp_output_sub')
+MQTT_CONTROL_CLIENT_ID = os.environ.get('MQTT_CONTROL_CLIENT_ID', 'msapp_control_sub')
+MQTT_ERROR_CLIENT_ID = os.environ.get('MQTT_ERROR_CLIENT_ID', 'msapp_error_sub')
 

@@ -119,7 +119,7 @@ export function TabContentRenderer({ tab }: TabContentRendererProps) {
   }
 
   return (
-    <div className="h-full w-full overflow-auto">
+    <div className="h-full w-full">
       {renderContent()}
     </div>
   )

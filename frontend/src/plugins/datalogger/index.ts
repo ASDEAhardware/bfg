@@ -1,5 +1,5 @@
 import { Plugin } from '../types'
-import { Database } from 'lucide-react'
+import { Videotape } from 'lucide-react'
 
 export const dataloggerPlugin: Plugin = {
   metadata: {
@@ -20,7 +20,7 @@ export const dataloggerPlugin: Plugin = {
     {
       title: 'Data Logger',
       url: '/datalogger',
-      icon: Database,
+      icon: Videotape,
       description: 'Monitor and log system events'
     }
   ],

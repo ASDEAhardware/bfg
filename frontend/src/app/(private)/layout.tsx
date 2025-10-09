@@ -26,7 +26,7 @@ export default async function Layout({
                 <HeaderComponent />
                 <ConditionalTabBar />
                 <TabContent>
-                    <main className="flex flex-1 flex-col p-4 lg:p-6 pb-12">{children}</main>
+                    <main className="flex flex-1 flex-col pb-12">{children}</main>
                 </TabContent>
                 <StatusBar />
             </SidebarInset>

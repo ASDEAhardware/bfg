@@ -20,7 +20,8 @@ export default function Breadcrumb() {
                 {pathSegments.map((segment, index) => {
                     const href = `/${pathSegments.slice(0, index + 1).join('/')}`;
                     const isLast = index === pathSegments.length - 1;
-                    const segmentTitle = segment.charAt(0).toUpperCase() + segment.slice(1);
+                    const segmentTitle = segment === 'datalogger' ? 'Data Logger' :
+                                        segment.charAt(0).toUpperCase() + segment.slice(1);
 
                     return (
                         <div key={href} className="flex items-center">

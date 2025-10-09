@@ -5,5 +5,6 @@ urlpatterns = [
     path('core/', include('core.urls')),  # Include the CORE dir URLs
     path('user/', include('user.urls')),  # Include the user management URLs
     path('dashboard/', include('dashboard.urls')),
+    path('mqtt/', include('mqtt.urls')),  # Include MQTT control URLs
 ]
     

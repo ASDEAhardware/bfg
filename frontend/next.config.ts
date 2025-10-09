@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
     },
   },
 
+  // Proxy gestito da middleware.ts
+
   // Configurazione webpack per polling in ambienti con problemi di HMR
   webpack: (config, { dev }) => {
     if (dev) {

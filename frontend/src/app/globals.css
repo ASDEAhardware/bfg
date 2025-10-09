@@ -129,4 +129,10 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Colori standardizzati per tutta l'app */
+  .text-status-success { @apply text-green-600 dark:text-green-400; }
+  .text-status-info { @apply text-blue-600 dark:text-blue-400; }
+  .text-status-danger { @apply text-red-600 dark:text-red-400; }
+  .text-status-warning { @apply text-yellow-600 dark:text-yellow-400; }
 }
