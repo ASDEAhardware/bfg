@@ -19,7 +19,7 @@ import axios from "axios"
 const settingsNavigation = [
     {
         id: "profile",
-        name: "Profilo",
+        name: "Profile",
         icon: User,
     },
     {
@@ -56,7 +56,7 @@ export default function SettingsPage() {
                     <div className="p-4 md:p-6">
                         <div className="flex items-center gap-2 mb-6">
                             <Settings className="h-5 w-5" />
-                            <h2 className="text-lg font-semibold">Impostazioni</h2>
+                            <h2 className="text-lg font-semibold">Settings</h2>
                         </div>
                         <nav className="space-y-2">
                             {settingsNavigation.map((item) => {
@@ -85,7 +85,7 @@ export default function SettingsPage() {
                         <div className="p-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <Settings className="h-5 w-5" />
-                                <h2 className="text-lg font-semibold">Impostazioni</h2>
+                                <h2 className="text-lg font-semibold">Settings</h2>
                             </div>
                             <div className="flex gap-2 overflow-x-auto pb-2">
                                 {settingsNavigation.map((item) => (
@@ -143,17 +143,17 @@ function ProfileSection() {
         },
         onSuccess: (data) => {
             // 4. GESTIONE DEL SUCCESS
-            toast.success("Immagine del profilo aggiornata con successo.");
+            toast.success("Profile picture updated successfully.");
             queryClient.invalidateQueries({ queryKey: ["userInfo"] });
         },
         onError: (error) => {
             // 5. GESTIONE DEGLI ERROR
             // Questa parte gestisce principalmente `error 400 Bad Request` (formato troppo grande o errato) in quanto l'error `401` è già gestito dall'istanza Axios (api).
             if (axios.isAxiosError(error)) {
-                toast.error(error.response?.data?.error || "Qualcosa è andato storto.");
+                toast.error(error.response?.data?.error || "Something went wrong.");
             } else {
                 // Gestisce errori di rete o altri errori non-Axios
-                toast.error("Qualcosa è andato storto. Riprova più tardi.");
+                toast.error("Something went wrong. Try again later.");
             }
             // Ripristina l'anteprima dell'immagine solo in caso di errore
             setPreviewImage(data?.profile_image);
@@ -174,9 +174,9 @@ function ProfileSection() {
         return (
             <div className="flex flex-col items-center h-40 justify-center">
                 <span className="text-red-500 mb-2">
-                    Errore nel caricamento dei dati utente.
+                    Error loading user data.
                 </span>
-                <Button onClick={() => window.location.reload()}>Riprova</Button>
+                <Button onClick={() => window.location.reload()}>Try Again</Button>
             </div>
         );
     }
@@ -189,7 +189,7 @@ function ProfileSection() {
         if (file) {
 
             if (file.size > 2 * 1024 * 1024) { // Limite di 2MB, in quanto file.size è in Bytes
-                toast.error("L'immagine è troppo grande. Il limite massimo è 2MB");
+                toast.error("The image is too large. The maximum size is 2MB.");
                 return;
             }
 
@@ -216,14 +216,14 @@ function ProfileSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Profilo</h1>
-                <p className="text-muted-foreground">Gestisci le informazioni del tuo profilo e le preferenze dell&apos;account.</p>
+                <h1 className="text-2xl font-bold">Profile</h1>
+                <p className="text-muted-foreground">Manage your profile information and account preferences.</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Informazioni Personali</CardTitle>
-                    <CardDescription>Aggiorna la tua foto profilo e i dettagli personali qui.</CardDescription>
+                    <CardTitle>Personal Information</CardTitle>
+                    <CardDescription>Update your profile picture and personal details here.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="flex items-center gap-6">
@@ -251,7 +251,7 @@ function ProfileSection() {
                                 {mutation.isPending ? (
                                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                                 ) : null}
-                                Cambia foto
+                                Change Picture
                             </Button>
                             {/* !!!! SBLOCCA QUESTO INPUT PER FARLO FUNZIONARE !!!! */}
                             {/* <input
@@ -261,7 +261,7 @@ function ProfileSection() {
                                 onChange={handleFileChange} // 6.
                                 accept="image/jpeg,image/png,image/gif"
                             /> */}
-                            <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Massimo 2MB.</p>
+                            <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p>
                         </div>
                     </div>
 
@@ -291,7 +291,7 @@ function ProfileSection() {
                     {/* </div> */}
 
                     <div className="flex justify-end">
-                        <Button className="cursor-pointer">Salva modifiche</Button>
+                        <Button className="cursor-pointer">Save Changes</Button>
                     </div>
                 </CardContent>
             </Card>
@@ -316,13 +316,13 @@ function PasswordSection() {
                 onSuccess: () => {
                     setSubmitted(true);
                     // Pulisci il form 
-                    toast.success("Password aggiornata con successo!");
+                    toast.success("Password updated successfully!");
                     setOldPassword("");
                     setNewPassword1("");
                     setNewPassword2("");
                 },
                 onError: () => {
-                    toast.error("Si è verificato un errore, controlla che i dati siano corretti.");
+                    toast.error("An error occurred, please check that your information is correct.");
                 },
             }
         );
@@ -332,18 +332,18 @@ function PasswordSection() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Password</h1>
-                <p className="text-muted-foreground">Aggiorna la tua password per mantenere il tuo account sicuro.</p>
+                <p className="text-muted-foreground">Update your password to keep your account secure.</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Cambia Password</CardTitle>
-                    <CardDescription>Assicurati che la tua nuova password sia forte e sicura.</CardDescription>
+                    <CardTitle>Change Password</CardTitle>
+                    <CardDescription>Make sure your new password is strong and secure.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <form onSubmit={handleSubmit} className="space-y-2">
                         <div className="space-y-2">
-                            <Label htmlFor="old-password">Password attuale</Label>
+                            <Label htmlFor="old-password">Current Password</Label>
                             <Input
                                 id="old-password"
                                 type="password"
@@ -353,7 +353,7 @@ function PasswordSection() {
                                 placeholder="Inserisci la password attuale" />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password1">Nuova password</Label>
+                            <Label htmlFor="new-password1">New password</Label>
                             <Input
                                 id="new-password1"
                                 type="password"
@@ -363,7 +363,7 @@ function PasswordSection() {
                                 placeholder="Inserisci la nuova password" />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password2">Conferma nuova password</Label>
+                            <Label htmlFor="new-password2">Confirm new password</Label>
                             <Input
                                 id="new-password2"
                                 type="password"
@@ -376,19 +376,19 @@ function PasswordSection() {
                         <Separator />
 
                         <div className="bg-muted/50 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium mb-2">Requisiti password:</h4>
+                            <h4 className="text-sm font-medium mb-2">Password Requirements:</h4>
                             <ul className="text-xs text-muted-foreground space-y-1">
-                                <li>• Almeno 8 caratteri</li>
-                                <li>• Almeno una lettera maiuscola</li>
-                                <li>• Almeno una lettera minuscola</li>
-                                <li>• Almeno un numero</li>
-                                <li>• Almeno un carattere speciale</li>
+                                <li>• At least 8 characters</li>
+                                <li>• At least one capital letter</li>
+                                <li>• At least one lowercase letter</li>
+                                <li>• At least one number</li>
+                                <li>• At least one special character</li>
                             </ul>
                         </div>
 
                         <div className="flex justify-end">
                             <Button className="cursor-pointer" type="submit" disabled={mutation.isPending}>
-                                {mutation.isPending ? 'Aggiornamento...' : 'Aggiorna Password'}
+                                {mutation.isPending ? 'Updating...' : 'Update Password'}
                             </Button>
                         </div>
                     </form>
@@ -402,17 +402,17 @@ function NotificationsSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Notifiche</h1>
-                <p className="text-muted-foreground">Configura come e quando ricevere le notifiche.</p>
+                <h1 className="text-2xl font-bold">Notifications</h1>
+                <p className="text-muted-foreground">Configure how and when to receive notifications.</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Preferenze Notifiche</CardTitle>
-                    <CardDescription>Scegli quali notifiche vuoi ricevere.</CardDescription>
+                    <CardTitle>Notification Preferences</CardTitle>
+                    <CardDescription>Choose which notifications you want to receive.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground">Sezione in sviluppo...</p>
+                    <p className="text-muted-foreground">Section under development...</p>
                 </CardContent>
             </Card>
         </div>
@@ -424,16 +424,16 @@ function PrivacySection() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Privacy</h1>
-                <p className="text-muted-foreground">Gestisci le tue impostazioni di privacy e sicurezza.</p>
+                <p className="text-muted-foreground">Manage your privacy and security settings.</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Impostazioni Privacy</CardTitle>
-                    <CardDescription>Controlla chi può vedere le tue informazioni.</CardDescription>
+                    <CardTitle>Privacy settings</CardTitle>
+                    <CardDescription>Control who can see your information.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground">Sezione in sviluppo...</p>
+                    <p className="text-muted-foreground">Section under development...</p>
                 </CardContent>
             </Card>
         </div>
@@ -444,17 +444,17 @@ function AppearanceSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Aspetto</h1>
-                <p className="text-muted-foreground">Personalizza l&apos;aspetto dell&apos;interfaccia.</p>
+                <h1 className="text-2xl font-bold">Aspect</h1>
+                <p className="text-muted-foreground">Customize the aspect of the interface.</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Tema</CardTitle>
-                    <CardDescription>Scegli come vuoi che appaia l&apos;interfaccia.</CardDescription>
+                    <CardTitle>Theme</CardTitle>
+                    <CardDescription>Choose how you want the interface to appear.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground">Sezione in sviluppo...</p>
+                    <p className="text-muted-foreground">Section under development...</p>
                 </CardContent>
             </Card>
         </div>

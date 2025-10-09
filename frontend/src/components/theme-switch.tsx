@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
 import { useSaveTheme } from "@/hooks/useSaveTheme";
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 export function ModeToggle() {
     const { theme, setTheme } = useTheme();
@@ -41,7 +42,7 @@ export function ModeToggle() {
         // Imposta un nuovo timer per salvare il tema dopo 500ms
         debounceTimer.current = setTimeout(() => {
             saveTheme(newTheme);
-        }, 500);
+        }, 2000);
     };
 
     // Assicurati di pulire il timer quando il componente viene smontato
@@ -67,13 +68,24 @@ export function ModeToggle() {
         );
     }
 
-    return (
-        <Button variant="outline" size="icon" onClick={handleThemeToggle}>
+    const button =  (
+        <Button variant="outline" size="icon" onClick={handleThemeToggle} title="Change Theme">
             {theme === "light" && <Sun className="h-[1.2rem] w-[1.2rem]" />}
             {theme === "dark" && <Moon className="h-[1.2rem] w-[1.2rem]" />}
             {theme === "system" && <Monitor className="h-[1.2rem] w-[1.2rem]" />}
             <span className="sr-only">Toggle theme</span>
         </Button>
     );
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                {button}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center">
+                Change Theme
+            </TooltipContent>
+        </Tooltip>
+    )
 }
 

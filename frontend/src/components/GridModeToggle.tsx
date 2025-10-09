@@ -3,21 +3,20 @@ import React from 'react'
 import { Grid3X3, PanelsTopLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGridStore } from '@/store/gridStore'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 export function GridModeToggle() {
   const { isGridModeEnabled, toggleGridMode } = useGridStore()
 
-  const handleToggle = () => {
-    toggleGridMode()
-  }
+  const tooltipMessage = (isGridModeEnabled ? "Disable Grid Mode" : "Enable Grid Mode");
 
-  return (
+  const button = (
     <Button
       variant={isGridModeEnabled ? "default" : "outline"}
       size="icon"
-      onClick={handleToggle}
-      title={isGridModeEnabled ? "Disabilita modalità griglia" : "Abilita modalità griglia"}
+      onClick={toggleGridMode}
       className={isGridModeEnabled ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
+      title={isGridModeEnabled ? "Disable Grid Mode" : "Enable Grid Mode"}
     >
       {isGridModeEnabled ? (
         <Grid3X3 className="h-[1.2rem] w-[1.2rem]" />
@@ -26,5 +25,16 @@ export function GridModeToggle() {
       )}
       <span className="sr-only">Toggle grid mode</span>
     </Button>
+  )
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {button}
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="center">
+        {tooltipMessage}
+      </TooltipContent>
+    </Tooltip>
   )
 }
