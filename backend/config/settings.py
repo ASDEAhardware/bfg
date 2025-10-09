@@ -49,11 +49,11 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'dj_rest_auth',
     #'dj_rest_auth.registration',  # Se vuoi usare la registrazione
-    'django.contrib.sites',  # Necessario per alcune funzioni (come il reset password)
     'user',
     'corsheaders',
     'dashboard',
     'mqtt',
+    'sites',
 ]
 
 MIDDLEWARE = [
@@ -223,7 +223,6 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')  # SMTP server passw
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'False'  # Set to True if using SSL
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')  # Default sender email address !!!!#UNICO PARAMETRO UTILIZZATO IN FASE DI SVILUPPO IN QUANTO ABBIAMO smtp in console
 
-SITE_ID = 1  # Necessario per dj-rest-auth
 '''
 SITE_ID = 1  # Necessario per dj-rest-auth, 
 indica il sito predefinito per le operazioni di autenticazione e registrazione

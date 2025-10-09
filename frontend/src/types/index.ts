@@ -17,3 +17,25 @@ export type ChangePasswordPayload = {
     new_password2: string;
 }
 
+export type SiteType = 'bridge' | 'building' | 'tunnel' | 'dam' | 'tower' | 'pipeline' | 'other';
+
+export type Site = {
+    id: number;
+    name: string;
+    site_type: SiteType;
+    latitude: string;
+    longitude: string;
+    customer_name: string;
+    description?: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export type SiteListItem = {
+    id: number;
+    name: string;
+    customer_name: string;
+    site_type: SiteType;
+}
+
