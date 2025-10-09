@@ -22,7 +22,7 @@ docker compose up --build
 ### 2. Verifica Setup
 
 - Frontend: http://localhost:3000
-- Backend: http://localhost:8000/admin
+- Backend: http://localhost:8000/developers-admin/
 - Login con credenziali di test
 
 ## 📝 Tipi di Contribuzione

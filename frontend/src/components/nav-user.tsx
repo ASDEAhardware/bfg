@@ -1,4 +1,3 @@
-
 "use client"
 
 import {
@@ -32,21 +31,22 @@ import {
 import { Skeleton } from "./ui/skeleton"
 import { useLogout } from "@/hooks/useAuth"
 import { Link } from "@/components/ui/link"
+import { User } from "@/types/user"
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+
 
 export function NavUser({
   user,
   isLoading,
-  error
+  error,
+  tooltip
 }: {
-  user?: {
-    username: string
-    email: string
-    profile_image: string
-  },
+  user?: User,
   isLoading?: boolean,
-  error?: string
+  error?: string,
+  tooltip?: string
 }) {
-  const { isMobile } = useSidebar()
+  const { isMobile, state } = useSidebar() // Assicurati che isSidebarCollapsed sia disponibile
   const logout = useLogout()
 
   // Definisci qui errorMessage
@@ -87,7 +87,7 @@ export function NavUser({
     return url;
   }
 
-  return (
+  const userComponent = (
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
@@ -144,4 +144,20 @@ export function NavUser({
       </SidebarMenuItem>
     </SidebarMenu>
   )
+
+  // Mostra il tooltip solo se la sidebar è collapsed
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {userComponent}
+      </TooltipTrigger>
+      <TooltipContent side="right" align="center" hidden={state !== "collapsed" || isMobile}>
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  )
+  
+
+  // Altrimenti mostra solo il componente utente senza tooltip
+  return userComponent
 }

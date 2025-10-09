@@ -75,31 +75,20 @@ backend/
 └── manage.py
 ```
 
-### API Endpoints
-
-```python
-# Authentication
-POST /api/auth/login/              # Login utente
-POST /api/auth/logout/             # Logout utente
-POST /api/auth/password-reset/     # Reset password
-GET  /api/auth/user/               # Info utente corrente
-GET  /api/auth/public-key/         # Chiave pubblica JWT
-
-# Core API
-GET  /api/core/health/             # Health check
-GET  /api/core/version/            # Versione API
-```
-
 ### Modelli Dati
 
 ```python
-# apps/authentication/models.py
-class User(AbstractUser):
-    email = models.EmailField(unique=True)
-    is_staff = models.BooleanField(default=False)
-    is_superuser = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+# user/models.py
+class CustomUser(AbstractUser):
+    profile_image = models.ImageField(
+        upload_to=user_directory_path,
+        blank=True,
+        null=True
+    )
+
+    def __str__(self):
+        return self.username
+
 ```
 
 ### Middleware e Security
@@ -340,6 +329,17 @@ const ROLE_HIERARCHY = {
 function hasAccess(userRole: string, requiredRole: string): boolean {
   return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole]
 }
+```
+
+### API Endpoints
+
+```Node
+# Authentication server BFF endpoints
+POST /api/auth/login/              # Login utente
+POST /api/auth/logout/             # Logout utente
+POST /api/auth/password-reset/     # Reset password
+GET  /api/auth/user/               # Info utente corrente
+GET  /api/auth/public-key/         # Chiave pubblica JWT
 ```
 
 ## 💾 Database e Persistenza

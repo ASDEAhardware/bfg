@@ -4,10 +4,11 @@ import { User } from '@/types/user';
 
 interface AuthState {
     isAuthenticated: boolean;
+    isRefreshing: boolean; // Stato per tracciare il refresh del token
     user: User | null;
     clearUser: () => void;
-    // setUser ora accetta solo i dati dell'utente, non più l'access token
     setUser: (user: User) => void;
+    setRefreshing: (isRefreshing: boolean) => void; // Azione per aggiornare lo stato di refresh
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -15,16 +16,18 @@ export const useAuthStore = create<AuthState>()(
         (set) => ({
             // Stato iniziale
             isAuthenticated: false,
+            isRefreshing: false, // Inizializzato a false
             user: null,
 
             // Azioni dello store
-            clearUser: () => set({ isAuthenticated: false, user: null }),
+            clearUser: () => set({ isAuthenticated: false, user: null, isRefreshing: false }),
             setUser: (user) => set({ isAuthenticated: true, user }),
+            setRefreshing: (isRefreshing) => set({ isRefreshing }),
         }),
         {
-            name: 'auth-storage', // Nome per la chiave nel Local Storage
+            name: 'auth-storage',
 
-            // persistiamo solo isAuthenticated e user
+            // Non persistiamo lo stato 'isRefreshing', che deve essere volatile
             partialize: (state) => ({
                 isAuthenticated: state.isAuthenticated,
                 user: state.user,
@@ -32,5 +35,3 @@ export const useAuthStore = create<AuthState>()(
         }
     )
 );
-
-  

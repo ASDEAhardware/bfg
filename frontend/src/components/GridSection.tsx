@@ -10,6 +10,7 @@ import { PageSelector } from '@/components/PageSelector'
 import { useRouter } from 'next/navigation'
 import { pluginRegistry, getUserPermissions } from '@/plugins'
 import { useUserInfo } from '@/hooks/useAuth'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 interface GridSectionProps {
   section: GridSectionType
@@ -241,6 +242,43 @@ export function GridSection({
     }
   }
 
+  const SPLIT_VERTICAL_BUTTON = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6"
+      onClick={handleSplitVertical}
+      disabled={!canSplitVertical}
+      title="Dividi verticalmente"
+    >
+      <GripVertical className="h-3 w-3" />
+    </Button>
+  );
+
+  const SPLIT_HORIZONTAL_BUTTON = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6"
+      onClick={handleSplitHorizontal}
+      disabled={!canSplitHorizontal}
+      title="Dividi orizzontalmente"
+    >
+      <GripHorizontal className="h-3 w-3" />
+    </Button>
+  );
+
+  const EXPAND_SECTION_BUTTON = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6"
+      onClick={handleExpandSection}
+      title="Espandi sezione"
+    >
+      <Maximize2 className="h-3 w-3" />
+    </Button>
+  );
 
   return (
     <div
@@ -273,82 +311,88 @@ export function GridSection({
 
         <div className="flex items-center gap-1">
           {/* Split verticale */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={handleSplitVertical}
-            disabled={!canSplitVertical}
-            title="Dividi verticalmente"
-          >
-            <GripVertical className="h-3 w-3" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {SPLIT_VERTICAL_BUTTON}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center">
+              Split vertically
+            </TooltipContent>
+          </Tooltip>
 
           {/* Split orizzontale */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={handleSplitHorizontal}
-            disabled={!canSplitHorizontal}
-            title="Dividi orizzontalmente"
-          >
-            <GripHorizontal className="h-3 w-3" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {SPLIT_HORIZONTAL_BUTTON}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center">
+              Split horizontally
+            </TooltipContent>
+          </Tooltip>
 
           {/* Pulsante Espandi - solo se c'è contenuto assegnato */}
           {assignedTab && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={handleExpandSection}
-              title="Espandi sezione"
-            >
-              <Maximize2 className="h-3 w-3" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {EXPAND_SECTION_BUTTON}
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="center">
+                Expand
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {/* Pulsante intelligente: Attach/Detach/Close */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-6 w-6",
-              assignedTab ? "hover:bg-destructive hover:text-destructive-foreground" : ""
-            )}
-            onClick={() => {
-              if (assignedTab) {
-                // Se c'è una tab assegnata, detach (diventa X per chiudere)
-                handleDetachTab()
-              } else if (canRemove) {
-                // Se non c'è tab e può essere rimossa, chiudi sezione
-                handleCloseSection()
-              }
-              // Se non c'è tab e non può essere rimossa, non fare nulla (stato base)
-            }}
-            title={
-              assignedTab
-                ? "Scollega pagina dalla sezione"
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-6 w-6",
+                  assignedTab ? "hover:bg-destructive hover:text-destructive-foreground" : ""
+                )}
+                onClick={() => {
+                  if (assignedTab) {
+                    // Se c'è una tab assegnata, detach (diventa X per chiudere)
+                    handleDetachTab()
+                  } else if (canRemove) {
+                    // Se non c'è tab e può essere rimossa, chiudi sezione
+                    handleCloseSection()
+                  }
+                  // Se non c'è tab e non può essere rimossa, non fare nulla (stato base)
+                }}
+                title={
+                  assignedTab
+                    ? "Unlink page from section"
+                    : canRemove
+                      ? "Close section"
+                      : "Main section"
+                }
+                disabled={!assignedTab && !canRemove}
+              >
+                {assignedTab ? (
+                  <Link2Off className="h-3 w-3" />
+                ) : canRemove ? (
+                  <X className="h-3 w-3" />
+                ) : (
+                  <Plus className="h-3 w-3 opacity-30" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center">
+              {assignedTab
+                ? "Unlink page from section"
                 : canRemove
-                  ? "Chiudi sezione"
-                  : "Sezione principale"
-            }
-            disabled={!assignedTab && !canRemove}
-          >
-            {assignedTab ? (
-              <Link2Off className="h-3 w-3" />
-            ) : canRemove ? (
-              <X className="h-3 w-3" />
-            ) : (
-              <Plus className="h-3 w-3 opacity-30" />
-            )}
-          </Button>
+                  ? "Close section"
+                  : "Main section"}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
       {/* Contenuto della sezione */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-y-auto">
         {assignedTab ? (
           <div className="flex-1 min-h-0">
             <TabContentRenderer tab={assignedTab} />
