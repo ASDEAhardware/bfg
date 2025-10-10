@@ -21,6 +21,10 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# LOGS dir and file
+LOG_DIR = BASE_DIR.parent / "resources" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True) # crea la dir solo se non esiste
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -43,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -53,7 +58,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'dashboard',
     'mqtt',
-    'sites',
+    'sites.apps.SitesConfig',
 ]
 
 MIDDLEWARE = [
@@ -133,8 +138,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # Logging per sicurezza
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
+    'disable_existing_loggers': False, #serve a non disattivare i logger  predefiniti (come django.request e django.db.backends etc.), se fosse True dovresti riconfigurarli manualmente.
+    'formatters': { # I formatter definiscono come appare il messaggio di log nel file o in console.
         'verbose': {
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
             'style': '{',
@@ -144,32 +149,38 @@ LOGGING = {
             'style': '{',
         },
     },
-    'handlers': {
+    'handlers': { # Gli handler definiscono dove vanno scritti i log.
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
+            'class': 'logging.handlers.TimedRotatingFileHandler', # la precedente classe era: logging.FileHandler
+            'filename': LOG_DIR / 'django.log',
             'formatter': 'verbose',
+            'when': 'W0', # ogni quanto eseguire la rotazione dei file di log (in questo caso settimanalmente il lunedì)
+            'backupCount': 7, # conserva solo gli ultimi 7 file, compreso quello corrente
+            'encoding': 'utf-8'
         },
         'security': {
             'level': 'WARNING',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'security.log',
+            'class': 'logging.handlers.TimedRotatingFileHandler', # la precedente classe era: logging.FileHandler
+            'filename': LOG_DIR / 'security.log',
             'formatter': 'security',
+            'when': 'W0',
+            'backupCount': 15,      # conserva 15 giorni di log di sicurezza
+            'encoding': 'utf-8',
         },
     },
-    'loggers': {
-        'django': {
+    'loggers': { # I logger dicono quali moduli inviano messaggi e a quali handler.
+        'django': { # Tutti i log generici del framework (come richieste e segnali) vanno al file django.log
             'handlers': ['file'],
             'level': 'INFO',
             'propagate': True,
         },
-        'django.security': {
+        'django.security': { # Log generati dal sistema di sicurezza di Django (es. login falliti, tentativi sospetti) e vanno nel file security.log
             'handlers': ['security'],
             'level': 'WARNING',
-            'propagate': False,
+            'propagate': False, # propagate=False significa che questi log non risalgono ai logger “padri” (es. non finiscono anche in django.log
         },
-        'django_ratelimit': {
+        'django_ratelimit': { # log del pacchetto django_ratelimit, stessi degli handler ddi sicurezza
             'handlers': ['security'],
             'level': 'WARNING',
         },
@@ -392,6 +403,8 @@ dice a Django di usare il sito con ID 1 nella tabella django_site come sito corr
     un'istanza Django, ognuno con il proprio dominio e configurazione.)	
 
 '''
+
+SITE_ID = 1
 
 # MQTT Configuration
 MQTT_BROKER = os.environ.get('MQTT_BROKER', 'zionnode.ovh')
