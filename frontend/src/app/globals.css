@@ -135,4 +135,27 @@
   .text-status-info { @apply text-blue-600 dark:text-blue-400; }
   .text-status-danger { @apply text-red-600 dark:text-red-400; }
   .text-status-warning { @apply text-yellow-600 dark:text-yellow-400; }
+
+  /* Layout standardizzati per card e container */
+  .card-standard { @apply hover:shadow-md transition-shadow border border-border/50; }
+  .card-spacing { @apply gap-3; }
+  .card-content-standard { @apply p-3; }
+  .card-content-detailed { @apply p-4; }
+
+  /* Grid layouts standardizzati */
+  .grid-responsive-cards {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  .grid-responsive-list { @apply space-y-2; }
+
+  /* Spacing standard per sezioni */
+  .section-spacing { @apply mb-4; }
+  .section-spacing-large { @apply mb-6; }
+  .content-spacing { @apply p-4; }
+  .content-spacing-dense { @apply p-2; }
+
+  /* Bordi e superfici standard */
+  .surface-elevated { @apply bg-card border border-border/50 rounded-lg; }
+  .surface-status-bar { @apply bg-muted/30 border-b px-4 py-2; }
 }

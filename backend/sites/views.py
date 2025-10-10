@@ -2,11 +2,14 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Site, UserSiteAccess
+from .models import Site, UserSiteAccess, Datalogger, Sensor
 from .serializers import (
     SiteSerializer,
     SiteListSerializer,
-    UserSiteAccessSerializer
+    UserSiteAccessSerializer,
+    DataloggerListSerializer,
+    DataloggerDetailSerializer,
+    SensorSerializer
 )
 
 
@@ -126,3 +129,124 @@ class UserSiteAccessViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set granted_by when creating new access record"""
         serializer.save(granted_by=self.request.user)
+
+
+class DataloggerViewSet(viewsets.ModelViewSet):
+    queryset = Datalogger.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return DataloggerListSerializer
+        return DataloggerDetailSerializer
+
+    def get_queryset(self):
+        """Filter dataloggers based on user site access"""
+        user = self.request.user
+        site_id = self.request.query_params.get('site_id')
+
+        if user.is_superuser:
+            queryset = Datalogger.objects.select_related('site').prefetch_related('sensors')
+        else:
+            # Return only dataloggers from sites the user has access to
+            queryset = Datalogger.objects.filter(
+                site__user_accesses__user=user,
+                site__is_active=True
+            ).select_related('site').prefetch_related('sensors').distinct()
+
+        # Filter by site_id if provided
+        if site_id:
+            queryset = queryset.filter(site_id=site_id)
+
+        return queryset
+
+    @action(detail=False, methods=['get'], url_path='by-site/(?P<site_id>[^/.]+)')
+    def by_site(self, request, site_id=None):
+        """Get all dataloggers for a specific site"""
+        try:
+            # Check if user has access to this site
+            site = Site.objects.get(id=site_id)
+            if not request.user.is_superuser:
+                # Verify user has access to this site
+                if not UserSiteAccess.objects.filter(user=request.user, site=site).exists():
+                    return Response(
+                        {'error': 'You do not have access to this site'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+            dataloggers = Datalogger.objects.filter(
+                site_id=site_id,
+                is_active=True
+            ).select_related('site').prefetch_related('sensors')
+
+            serializer = DataloggerListSerializer(dataloggers, many=True)
+            return Response(serializer.data)
+
+        except Site.DoesNotExist:
+            return Response(
+                {'error': 'Site not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, pk=None):
+        """Update datalogger status (for MQTT integration)"""
+        datalogger = self.get_object()
+        new_status = request.data.get('status')
+        last_communication = request.data.get('last_communication')
+
+        if new_status and new_status in ['active', 'inactive', 'maintenance', 'error']:
+            datalogger.status = new_status
+
+        if last_communication:
+            from django.utils.dateparse import parse_datetime
+            datalogger.last_communication = parse_datetime(last_communication)
+
+        datalogger.save()
+        serializer = self.get_serializer(datalogger)
+        return Response(serializer.data)
+
+
+class SensorViewSet(viewsets.ModelViewSet):
+    queryset = Sensor.objects.all()
+    serializer_class = SensorSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter sensors based on user site access"""
+        user = self.request.user
+        if user.is_superuser:
+            return Sensor.objects.select_related('datalogger__site')
+
+        # Return only sensors from dataloggers of sites the user has access to
+        return Sensor.objects.filter(
+            datalogger__site__user_accesses__user=user,
+            datalogger__site__is_active=True
+        ).select_related('datalogger__site').distinct()
+
+    @action(detail=False, methods=['get'], url_path='by-datalogger/(?P<datalogger_id>[^/.]+)')
+    def by_datalogger(self, request, datalogger_id=None):
+        """Get all sensors for a specific datalogger"""
+        try:
+            # Check if user has access to this datalogger's site
+            datalogger = Datalogger.objects.select_related('site').get(id=datalogger_id)
+            if not request.user.is_superuser:
+                if not UserSiteAccess.objects.filter(user=request.user, site=datalogger.site).exists():
+                    return Response(
+                        {'error': 'You do not have access to this datalogger'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
+            sensors = Sensor.objects.filter(
+                datalogger_id=datalogger_id,
+                is_active=True
+            ).select_related('datalogger__site')
+
+            serializer = self.get_serializer(sensors, many=True)
+            return Response(serializer.data)
+
+        except Datalogger.DoesNotExist:
+            return Response(
+                {'error': 'Datalogger not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )

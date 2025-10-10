@@ -13,6 +13,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { useUserInfo } from "@/hooks/useAuth"
 import { pluginRegistry, getUserPermissions } from "@/plugins"
@@ -22,6 +23,7 @@ import Image from "next/image"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: userData, isLoading, error } = useUserInfo()
+  const { state } = useSidebar()
   const errorMessage = typeof error === "string" ? error : error ? String(error) : "";
 
   // Get plugin-based navigation items
@@ -53,7 +55,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             className="rounded-full"
             priority
           />
-          <span className="font-semibold group-data-[state=collapsed]:hidden">Placeholder</span>
+          <span className="font-semibold group-data-[state=collapsed]:hidden">Big Features GUI</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -66,6 +68,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={userData} tooltip="Profile" isLoading={isLoading} error={errorMessage} />
+        <div className="bg-sidebar border-t border-sidebar-border px-2 py-1">
+          {state === "collapsed" ? (
+            // Collapsed: Solo versione centrata
+            <div className="text-[8px] text-sidebar-foreground/50 font-mono tracking-wider text-center">
+              <a href="/version" className="hover:text-sidebar-foreground/80 transition-colors cursor-pointer">v1.2.1</a>
+            </div>
+          ) : (
+            // Expanded: Layout completo
+            <div className="text-[10px] text-sidebar-foreground/50 font-mono tracking-wider flex justify-between items-center">
+              <span>© {new Date().getFullYear()} BFG</span>
+              <a href="/version" className="hover:text-sidebar-foreground/80 transition-colors cursor-pointer underline-offset-2 hover:underline">v1.2.1</a>
+            </div>
+          )}
+        </div>
       </SidebarFooter>
     </Sidebar>
   )
