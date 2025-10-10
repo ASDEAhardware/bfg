@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SchedulerModal } from "@/components/SchedulerModal";
 import { DataloggerCard } from "@/components/DataloggerCard";
+import { SensorCard } from "@/components/SensorCard";
 import { ContextualStatusBar, useContextualStatusBar } from "@/components/ContextualStatusBar";
 import { useSiteContext } from "@/contexts/SiteContext";
 import {
@@ -35,7 +36,9 @@ import {
   Grid3X3,
   List,
   AlertCircle,
-  Building2
+  Videotape,
+  Activity,
+  Gauge
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -56,23 +59,37 @@ interface Datalogger {
   active_sensors_count: number;
 }
 
-interface Site {
+interface Sensor {
   id: string;
   name: string;
-  customer_name: string;
-  site_type: string;
+  sensor_type: string;
+  channel: number;
+  unit_of_measure?: string;
+  min_value?: number;
+  max_value?: number;
+  status: 'active' | 'inactive' | 'calibrating' | 'error' | 'maintenance';
+  is_active: boolean;
+  last_reading?: string;
+  current_value?: number;
+  description?: string;
 }
 
 export default function DataLoggerPage() {
-  const pathname = usePathname();
   const { createCountItems, createFilterItems } = useContextualStatusBar();
-  const { selectedSite, selectedSiteId } = useSiteContext();
+  const { selectedSiteId } = useSiteContext();
   const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Sensors states
+  const [sensors, setSensors] = useState<Sensor[]>([]);
+  const [sensorsLoading, setSensorsLoading] = useState(false);
+  const [sensorsError, setSensorsError] = useState<string | null>(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [sensorSearchTerm, setSensorSearchTerm] = useState("");
 
   // Legacy states for the connected datalogger view
   const [selectedLogger, setSelectedLogger] = useState<Datalogger | null>(null);
@@ -86,7 +103,7 @@ export default function DataLoggerPage() {
   const [showScheduler, setShowScheduler] = useState(false);
 
   // Hook per rilevare la larghezza del container
-  const [containerRef, { isMobile, isTablet, isDesktop, isXLarge }] = useContainerWidth();
+  const [containerRef, { isMobile, isTablet, isDesktop }] = useContainerWidth();
 
   // Fetch all dataloggers for the selected site
   useEffect(() => {
@@ -134,9 +151,38 @@ export default function DataLoggerPage() {
     return matchesSearch && matchesOnlineFilter;
   });
 
+  // Fetch sensors for connected datalogger
+  const fetchSensors = async (datalogger: Datalogger) => {
+    if (!datalogger) return;
+
+    setSensorsLoading(true);
+    setSensorsError(null);
+
+    try {
+      const response = await fetch(`/api/v1/sites/sensors/by-datalogger/${datalogger.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch sensors');
+      }
+
+      const data = await response.json();
+      setSensors(data);
+    } catch (err) {
+      setSensorsError(err instanceof Error ? err.message : 'Unknown error occurred');
+      setSensors([]);
+    } finally {
+      setSensorsLoading(false);
+    }
+  };
+
   const handleConnect = (datalogger: Datalogger) => {
     setSelectedLogger(datalogger);
     setIsConnected(true);
+    fetchSensors(datalogger);
   };
 
   const refreshDataloggers = async () => {
@@ -169,8 +215,43 @@ export default function DataLoggerPage() {
     setIsConnected(false);
     setIsLogging(false);
     setSelectedLogger(null);
+    setSensors([]);
+    setSensorSearchTerm("");
     setShowDisconnectConfirm(false);
   };
+
+  // Filter sensors based on search term
+  const filteredSensors = sensors.filter(sensor =>
+    sensor.name.toLowerCase().includes(sensorSearchTerm.toLowerCase()) ||
+    sensor.sensor_type.toLowerCase().includes(sensorSearchTerm.toLowerCase()) ||
+    sensor.channel.toString().includes(sensorSearchTerm)
+  );
+
+  // Reset everything when site changes
+  React.useEffect(() => {
+    // If we're connected to a datalogger and site changes, disconnect and reset
+    if (isConnected) {
+      setIsConnected(false);
+      setIsLogging(false);
+      setSelectedLogger(null);
+      setSensors([]);
+      setSensorSearchTerm("");
+    }
+    // Reset search terms and states when site changes
+    setSearchTerm("");
+    setShowOnlineOnly(false);
+  }, [selectedSiteId]);
+
+  // Auto-refresh sensors every 10 seconds when connected and auto-refresh is enabled
+  React.useEffect(() => {
+    if (!isConnected || !selectedLogger || !autoRefreshEnabled) return;
+
+    const interval = setInterval(() => {
+      fetchSensors(selectedLogger);
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [isConnected, selectedLogger, autoRefreshEnabled]);
 
   const handleStart = () => {
     setShowStartConfirm(true);
@@ -190,10 +271,6 @@ export default function DataLoggerPage() {
     setShowStopConfirm(false);
   };
 
-  const handleStatus = () => {
-    console.log("Check status");
-  };
-
   const handleSchedule = () => {
     setShowScheduler(true);
   };
@@ -208,87 +285,58 @@ export default function DataLoggerPage() {
     return (
       <div ref={containerRef} className="flex flex-col h-full">
         {/* Connected Datalogger Interface */}
-        <div className="bg-background border-b border-border">
-          {/* Mobile Layout (< md) */}
-          <div className={isMobile ? "block" : "hidden"}>
-          {!isConnected ? (
-            <div className="px-4 py-3 space-y-3">
-              <Select value={selectedLogger} onValueChange={setSelectedLogger}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleziona acquisitore..." />
-                </SelectTrigger>
-                <SelectContent className="w-full">
-                  {availableLoggers.map((logger) => (
-                    <SelectItem key={logger.id} value={logger.id} className="cursor-pointer">
-                      <div className="flex items-center gap-2 w-full">
-                        <Circle
-                          className={`h-2 w-2 fill-current flex-shrink-0 ${
-                            logger.status === 'online' ? 'text-status-success' : 'text-status-danger'
-                          }`}
-                        />
-                        <span className="flex-1 truncate">{logger.name}</span>
-                        <Badge variant="outline" className="ml-2 flex-shrink-0 text-xs">
-                          {logger.type}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button
-                onClick={handleConnect}
-                disabled={!selectedLogger}
-                className="w-full cursor-pointer"
-                size="sm"
-              >
-                Connetti
-              </Button>
-            </div>
-          ) : (
-            <div className="px-4 py-3 space-y-3">
-              {/* Connected Device Info */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <h2 className="text-base font-semibold truncate">
-                    {selectedLogger?.name}
-                  </h2>
+        <div className="bg-background border-b border-border px-4 py-3">
+          <div className="flex flex-col gap-3">
+            {/* Header row: Title + Controls */}
+            <div className={`flex ${isDesktop ? 'flex-row gap-4' : 'flex-col gap-3'}`}>
+              {/* Left section: Device Info */}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Videotape className="h-5 w-5 text-muted-foreground shrink-0" />
+                <h1 className="text-lg font-semibold truncate">{selectedLogger?.name}</h1>
+                {!isMobile && (
                   <Badge variant="outline" className="flex-shrink-0 text-xs">
                     {selectedLogger?.model}
                   </Badge>
-                  {/* Status indicators */}
-                  <div className="flex items-center gap-1 ml-2">
-                    <Circle className="h-1.5 w-1.5 fill-current text-status-success animate-pulse" />
-                    <span className="text-xs text-status-success">Connesso</span>
+                )}
+                {/* Status indicators - only on desktop in same row */}
+                {isDesktop && (
+                  <div className="flex items-center gap-1">
+                    <Circle className="h-1.5 w-1.5 fill-current text-green-500 animate-pulse" />
+                    <span className="text-xs text-green-600">Connesso</span>
                     {isLogging && (
                       <>
-                        <Circle className="h-1.5 w-1.5 fill-current text-status-info animate-pulse ml-1" />
-                        <span className="text-xs text-status-info">Acquisizione</span>
+                        <Circle className="h-1.5 w-1.5 fill-current text-blue-500 animate-pulse ml-1" />
+                        <span className="text-xs text-blue-600">Logging</span>
                       </>
                     )}
                   </div>
-                </div>
-                <div className="pl-2 ml-2 border-l border-border">
-                  <button
-                    onClick={handleDisconnect}
-                    className="px-2 py-1.5 text-sm text-status-danger cursor-pointer"
-                  >
-                    Disconnetti
-                  </button>
-                </div>
+                )}
+
+                {/* Search integrated inline only on desktop */}
+                {isDesktop && (
+                  <div className="flex relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Cerca sensori..."
+                      value={sensorSearchTerm}
+                      onChange={(e) => setSensorSearchTerm(e.target.value)}
+                      className="pl-10 h-9"
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Control Buttons - All aligned to the right */}
-              <div className="flex justify-end gap-2">
+              {/* Right section: Control Buttons - always in top row */}
+              <div className="flex items-center gap-2">
                 <Button
                   onClick={handleStart}
                   disabled={isLogging}
                   size="sm"
                   variant="default"
-                  className="flex items-center justify-center gap-1 cursor-pointer"
+                  className="flex items-center gap-1 h-8"
                 >
-                  <Play className="h-3 w-3" />
-                  <span className="text-xs">Start</span>
+                  <Play className="h-4 w-4" />
+                  {!isMobile && <span>Start</span>}
                 </Button>
 
                 <Button
@@ -296,135 +344,51 @@ export default function DataLoggerPage() {
                   disabled={!isLogging}
                   size="sm"
                   variant="destructive"
-                  className="flex items-center justify-center gap-1 cursor-pointer"
+                  className="flex items-center gap-1 h-8"
                 >
-                  <Square className="h-3 w-3" />
-                  <span className="text-xs">Stop</span>
+                  <Square className="h-4 w-4" />
+                  {!isMobile && <span>Stop</span>}
                 </Button>
 
-                <Button
-                  onClick={handleSchedule}
-                  size="sm"
-                  variant="outline"
-                  className="flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <Calendar className="h-3 w-3" />
-                  <span className="text-xs">Pianifica</span>
-                </Button>
+                {isDesktop && (
+                  <Button
+                    onClick={handleSchedule}
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-1 h-8"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    <span>Pianifica</span>
+                  </Button>
+                )}
+
+                <div className="pl-2 ml-2 border-l border-border">
+                  <Button
+                    onClick={handleDisconnect}
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8"
+                  >
+                    {!isMobile ? <span>Disconnetti</span> : <span>×</span>}
+                  </Button>
+                </div>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Tablet/Desktop Layout (>= md) */}
-        <div className={!isMobile ? "flex items-center justify-between px-6 py-4 min-h-[64px]" : "hidden"}>
-          <div className="flex items-center gap-4">
-            {!isConnected ? (
-              <div className="flex items-center gap-3">
-                <Select value={selectedLogger} onValueChange={setSelectedLogger}>
-                  <SelectTrigger className="w-auto min-w-[280px] max-w-[400px]">
-                    <SelectValue placeholder="Seleziona acquisitore..." />
-                  </SelectTrigger>
-                  <SelectContent className="w-auto min-w-[280px] max-w-[500px]">
-                    {availableLoggers.map((logger) => (
-                      <SelectItem key={logger.id} value={logger.id} className="cursor-pointer">
-                        <div className="flex items-center gap-2 w-full">
-                          <Circle
-                            className={`h-2 w-2 fill-current flex-shrink-0 ${
-                              logger.status === 'online' ? 'text-status-success' : 'text-status-danger'
-                            }`}
-                          />
-                          <span className="flex-1 truncate">{logger.name}</span>
-                          <Badge variant="outline" className="ml-2 flex-shrink-0">
-                            {logger.type}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  onClick={handleConnect}
-                  disabled={!selectedLogger}
-                  size="sm"
-                  className="cursor-pointer"
-                >
-                  Connetti
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold">
-                  {selectedLogger?.name}
-                </h2>
-                <Badge variant="outline">
-                  {selectedLogger?.model}
-                </Badge>
-                {/* Status indicators */}
-                <div className="flex items-center gap-1 ml-2">
-                  <Circle className="h-1.5 w-1.5 fill-current text-green-500 animate-pulse" />
-                  <span className="text-xs text-green-600">Connesso</span>
-                  {isLogging && (
-                    <>
-                      <Circle className="h-1.5 w-1.5 fill-current text-blue-500 animate-pulse ml-1" />
-                      <span className="text-xs text-blue-600">Acquisizione</span>
-                    </>
-                  )}
-                </div>
+            {/* Search row - separate row for tablet and mobile */}
+            {!isDesktop && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cerca sensori..."
+                  value={sensorSearchTerm}
+                  onChange={(e) => setSensorSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
             )}
           </div>
-
-          {isConnected && (
-            <div className="flex items-center justify-end gap-2">
-              {/* Control Buttons - All aligned to the right */}
-              <Button
-                onClick={handleStart}
-                disabled={isLogging}
-                size="sm"
-                variant="default"
-                className={`cursor-pointer ${isDesktop || isXLarge ? "flex items-center gap-1" : "block"}`}
-              >
-                <Play className="h-4 w-4" />
-                {(isDesktop || isXLarge) && <span>Start</span>}
-              </Button>
-
-              <Button
-                onClick={handleStop}
-                disabled={!isLogging}
-                size="sm"
-                variant="destructive"
-                className={`cursor-pointer ${isDesktop || isXLarge ? "flex items-center gap-1" : "block"}`}
-              >
-                <Square className="h-4 w-4" />
-                {(isDesktop || isXLarge) && <span>Stop</span>}
-              </Button>
-
-              <Button
-                onClick={handleSchedule}
-                size="sm"
-                variant="outline"
-                className={`cursor-pointer ${isXLarge ? "flex items-center gap-1" : "block"}`}
-              >
-                <Calendar className="h-4 w-4" />
-                {isXLarge && <span>Pianifica</span>}
-              </Button>
-
-              <div className="pl-2 ml-2 border-l border-border">
-                <button
-                  onClick={handleDisconnect}
-                  className={`px-3 py-1.5 text-sm text-status-danger cursor-pointer ${
-                    isDesktop || isXLarge ? "flex items-center gap-1" : "block"
-                  }`}
-                >
-                  {(isDesktop || isXLarge) ? "Disconnetti" : "×"}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
 
       <div className="flex-1 overflow-auto p-6">
         {!isConnected ? (
@@ -439,27 +403,96 @@ export default function DataLoggerPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-lg font-medium mb-2">
-                Acquisitore Connesso: {selectedLogger?.name}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {isLogging
-                  ? "Acquisizione dati in corso..."
-                  : "Pronto per acquisire dati. Clicca Start per iniziare."
-                }
-              </p>
+          <div className="space-y-4">
+            {/* Sensors Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium">
+                  Sensori - {selectedLogger?.name}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {isLogging ? "Acquisizione dati in corso..." : "Monitoraggio sensori attivo"}
+                  {autoRefreshEnabled && " • Aggiornamento automatico ogni 10s"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                  className="h-8"
+                >
+                  <Activity className="h-4 w-4 mr-2" />
+                  {autoRefreshEnabled ? "Auto" : "Manuale"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => selectedLogger && fetchSensors(selectedLogger)}
+                  disabled={sensorsLoading}
+                  className="h-8"
+                >
+                  <RefreshCw className={`h-4 w-4 ${sensorsLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </div>
 
-            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-              <p className="text-muted-foreground">
-                Qui verra visualizzato il contenuto dell acquisizione dati
-              </p>
-            </div>
+            {/* Sensors Grid */}
+            {sensorsLoading && sensors.length === 0 ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="text-center">
+                  <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Caricamento sensori...</p>
+                </div>
+              </div>
+            ) : sensorsError ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="text-center">
+                  <AlertCircle className="h-6 w-6 mx-auto mb-2 text-destructive" />
+                  <p className="text-sm text-destructive">{sensorsError}</p>
+                </div>
+              </div>
+            ) : filteredSensors.length === 0 ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="text-center">
+                  <Gauge className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    {sensors.length === 0 ? 'Nessun sensore configurato' : 'Nessun sensore trovato'}
+                  </p>
+                  {sensors.length > 0 && sensorSearchTerm && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Prova a modificare il termine di ricerca
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="grid-responsive-cards">
+                {filteredSensors.map((sensor) => (
+                  <SensorCard key={sensor.id} sensor={sensor} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Sensors Status Bar - only when connected */}
+      {isConnected && selectedLogger && (
+        <ContextualStatusBar
+          leftItems={[
+            { label: 'Datalogger', value: selectedLogger.name },
+            { label: 'Sensori', value: sensors.length },
+            { label: 'Attivi', value: sensors.filter(s => s.status === 'active').length, color: 'success' },
+            { label: 'Offline', value: sensors.filter(s => s.status !== 'active').length, color: sensors.filter(s => s.status !== 'active').length > 0 ? 'error' : 'default' }
+          ]}
+          rightItems={[
+            ...(sensorSearchTerm ? [{ label: 'Filtrati', value: filteredSensors.length }] : []),
+            { label: 'Auto-refresh', value: autoRefreshEnabled ? 'ON' : 'OFF', color: autoRefreshEnabled ? 'success' : 'default' },
+            { label: 'Stato', value: isLogging ? 'Logging' : 'Standby', color: isLogging ? 'success' : 'warning' }
+          ]}
+        />
+      )}
 
       {/* Dialog di conferma per Start */}
       <AlertDialog open={showStartConfirm} onOpenChange={setShowStartConfirm}>
@@ -531,68 +564,75 @@ export default function DataLoggerPage() {
     <div ref={containerRef} className="flex flex-col h-full">
       {/* Dashboard Header */}
       <div className="bg-background border-b border-border px-4 py-3">
-        <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
-          {/* Left section: Title + Search */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Building2 className="h-5 w-5 text-muted-foreground shrink-0" />
-            <h1 className="text-lg font-semibold truncate">Datalogger</h1>
+        <div className="flex flex-col gap-3">
+          {/* Header row: Title + Controls */}
+          <div className={`flex ${isDesktop ? 'flex-row gap-4' : 'flex-col gap-3'}`}>
+            {/* Left section: Title */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <Videotape className="h-5 w-5 text-muted-foreground shrink-0" />
+              <h1 className="text-lg font-semibold truncate">Datalogger</h1>
 
-            {/* Search integrated inline on larger screens */}
-            <div className="hidden md:flex relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Cerca datalogger..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-9"
-              />
+              {/* Search integrated inline only on desktop */}
+              {isDesktop && (
+                <div className="flex relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cerca datalogger..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-9"
+                  />
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Right section: Controls */}
-          <div className="flex items-center gap-3">
+            {/* Right section: Controls - always in top row */}
             <div className="flex items-center gap-2">
-              <Switch
-                id="online-only"
-                checked={showOnlineOnly}
-                onCheckedChange={setShowOnlineOnly}
-              />
-              <Label htmlFor="online-only" className="text-sm whitespace-nowrap">Solo online</Label>
-            </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="online-only"
+                  checked={showOnlineOnly}
+                  onCheckedChange={setShowOnlineOnly}
+                />
+                {!isMobile && (
+                  <Label htmlFor="online-only" className="text-sm whitespace-nowrap">Solo online</Label>
+                )}
+              </div>
 
-            <div className="flex items-center border rounded-md">
+              <div className="flex items-center border rounded-md">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="rounded-r-none h-8 w-8 p-0"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="rounded-l-none h-8 w-8 p-0"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+
               <Button
-                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                variant="outline"
                 size="sm"
-                onClick={() => setViewMode('grid')}
-                className="rounded-r-none h-8 w-8 p-0"
+                onClick={refreshDataloggers}
+                disabled={loading}
+                className="h-8 px-3"
               >
-                <Grid3X3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className="rounded-l-none h-8 w-8 p-0"
-              >
-                <List className="h-4 w-4" />
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                {!isMobile && <span className="ml-2">Aggiorna</span>}
               </Button>
             </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refreshDataloggers}
-              disabled={loading}
-              className="h-8 px-3"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:ml-2 sm:inline">Aggiorna</span>
-            </Button>
           </div>
 
-          {/* Mobile search - separate row */}
-          <div className="md:hidden">
+          {/* Search row - separate row for tablet and mobile */}
+          {!isDesktop && (
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -602,7 +642,7 @@ export default function DataLoggerPage() {
                 className="pl-10"
               />
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -611,7 +651,7 @@ export default function DataLoggerPage() {
         {!selectedSiteId ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <Building2 className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+              <Videotape className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-medium text-muted-foreground mb-2">
                 Nessun sito selezionato
               </h3>
@@ -650,7 +690,7 @@ export default function DataLoggerPage() {
         ) : filteredDataloggers.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <Building2 className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+              <Videotape className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-medium text-muted-foreground mb-2">
                 {dataloggers.length === 0 ? 'Nessun datalogger trovato' : 'Nessun risultato'}
               </h3>

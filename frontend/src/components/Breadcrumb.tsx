@@ -16,7 +16,7 @@ export default function Breadcrumb() {
 
     // Mappa per titoli personalizzati
     const segmentTitles: Record<string, string> = {
-        'datalogger': 'Data Logger',
+        'datalogger': 'Datalogger',
         'dashboard': 'Dashboard',
         'staff-admin': 'Admin Panel',
         'system': 'System Config'

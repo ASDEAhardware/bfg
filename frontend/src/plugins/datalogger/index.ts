@@ -4,7 +4,7 @@ import { Videotape } from 'lucide-react'
 export const dataloggerPlugin: Plugin = {
   metadata: {
     id: 'datalogger',
-    name: 'Data Logger',
+    name: 'Datalogger',
     version: '1.0.0',
     description: 'Real-time data logging and monitoring system',
     author: 'BFG Team'
@@ -13,12 +13,12 @@ export const dataloggerPlugin: Plugin = {
     {
       path: '/datalogger',
       component: () => import('./DataLoggerPage'),
-      title: 'Data Logger'
+      title: 'Datalogger'
     }
   ],
   navItems: [
     {
-      title: 'Data Logger',
+      title: 'Datalogger',
       url: '/datalogger',
       icon: Videotape,
       description: 'Monitor and log system events'
