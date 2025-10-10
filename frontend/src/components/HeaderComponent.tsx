@@ -3,7 +3,6 @@ import React from "react"
 import { ModeToggle } from "@/components/theme-switch"
 import { TabModeToggle } from "@/components/TabModeToggle"
 import { GridModeToggle } from "@/components/GridModeToggle"
-import TabAwareBreadcrumb from "@/components/TabAwareBreadcrumb"
 import { SiteSelector } from "@/components/SiteSelector"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -17,9 +16,6 @@ export function HeaderComponent() {
                     orientation="vertical"
                     className="mr-2 data-[orientation=vertical]:h-4"
                 />
-                <TabAwareBreadcrumb />
-            </div>
-            <div className="flex items-center gap-2">
                 <SiteSelector />
             </div>
             <div className="ml-auto flex items-end gap-2 pr-4">

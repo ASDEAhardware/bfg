@@ -26,6 +26,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state } = useSidebar()
   const errorMessage = typeof error === "string" ? error : error ? String(error) : "";
 
+  const version = "1.2.1";
+  const shortVersion = version.split('.').slice(0, 2).join('.');
+
   // Get plugin-based navigation items
   const pluginNavItems = React.useMemo(() => {
     if (!userData) return []
@@ -70,15 +73,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavUser user={userData} tooltip="Profile" isLoading={isLoading} error={errorMessage} />
         <div className="bg-sidebar border-t border-sidebar-border px-2 py-1">
           {state === "collapsed" ? (
-            // Collapsed: Solo versione centrata
-            <div className="text-[8px] text-sidebar-foreground/50 font-mono tracking-wider text-center">
-              <a href="/version" className="hover:text-sidebar-foreground/80 transition-colors cursor-pointer">v1.2.1</a>
+            // Collapsed: Versione abbreviata centrata
+            <div className="text-[10px] text-sidebar-foreground/50 font-mono tracking-wider text-center w-full">
+              <a href="/version" className="hover:text-sidebar-foreground/80 transition-colors cursor-pointer">v{shortVersion}</a>
             </div>
           ) : (
             // Expanded: Layout completo
-            <div className="text-[10px] text-sidebar-foreground/50 font-mono tracking-wider flex justify-between items-center">
+            <div className="text-[10px] text-sidebar-foreground/50 font-mono tracking-wider flex justify-between items-center w-full">
               <span>© {new Date().getFullYear()} BFG</span>
-              <a href="/version" className="hover:text-sidebar-foreground/80 transition-colors cursor-pointer underline-offset-2 hover:underline">v1.2.1</a>
+              <a href="/version" className="hover:text-sidebar-foreground/80 transition-colors cursor-pointer underline-offset-2 hover:underline">v{version}</a>
             </div>
           )}
         </div>

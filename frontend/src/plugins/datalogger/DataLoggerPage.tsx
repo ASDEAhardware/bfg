@@ -530,35 +530,69 @@ export default function DataLoggerPage() {
   return (
     <div ref={containerRef} className="flex flex-col h-full">
       {/* Dashboard Header */}
-      <div className="bg-background border-b border-border p-4">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <h1 className="text-lg font-semibold">Centrale di Controllo Datalogger</h1>
-              <p className="text-sm text-muted-foreground">
-                {selectedSite ? `Gestisci tutti i datalogger di ${selectedSite.name}` : 'Seleziona un sito per visualizzare i datalogger'}
-              </p>
+      <div className="bg-background border-b border-border px-4 py-3">
+        <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
+          {/* Left section: Title + Search */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Building2 className="h-5 w-5 text-muted-foreground shrink-0" />
+            <h1 className="text-lg font-semibold truncate">Datalogger</h1>
+
+            {/* Search integrated inline on larger screens */}
+            <div className="hidden md:flex relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cerca datalogger..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 h-9"
+              />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Right section: Controls */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="online-only"
+                checked={showOnlineOnly}
+                onCheckedChange={setShowOnlineOnly}
+              />
+              <Label htmlFor="online-only" className="text-sm whitespace-nowrap">Solo online</Label>
+            </div>
+
+            <div className="flex items-center border rounded-md">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="rounded-r-none h-8 w-8 p-0"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="rounded-l-none h-8 w-8 p-0"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+
             <Button
               variant="outline"
               size="sm"
               onClick={refreshDataloggers}
               disabled={loading}
-              className="flex items-center gap-2"
+              className="h-8 px-3"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Aggiorna
+              <span className="hidden sm:ml-2 sm:inline">Aggiorna</span>
             </Button>
           </div>
-        </div>
 
-        {/* Filters and Controls */}
-        <div className="flex flex-col sm:flex-row gap-4 mt-4">
-          <div className="flex-1 max-w-md">
+          {/* Mobile search - separate row */}
+          <div className="md:hidden">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -567,36 +601,6 @@ export default function DataLoggerPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="online-only"
-                checked={showOnlineOnly}
-                onCheckedChange={setShowOnlineOnly}
-              />
-              <Label htmlFor="online-only" className="text-sm">Solo online</Label>
-            </div>
-
-            <div className="flex items-center border rounded-md">
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-                className="rounded-r-none"
-              >
-                <Grid3X3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className="rounded-l-none"
-              >
-                <List className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </div>
