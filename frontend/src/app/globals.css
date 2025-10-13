@@ -147,6 +147,13 @@
     @apply grid gap-3;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
+
+  /* Grid responsive per container piccoli (modalità griglia quando in spazi ristretti) */
+  .grid-responsive-cards-container {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+
   .grid-responsive-list { @apply space-y-2; }
 
   /* Spacing standard per sezioni */
