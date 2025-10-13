@@ -285,7 +285,8 @@ export function GridSection({
     <div
       className={cn(
         "relative bg-background h-full w-full flex flex-col",
-        isActive && assignedTab && "ring-1 ring-primary/20", // Ring solo se ha contenuto
+        // Ring molto tenue solo in modalità griglia pura (senza schede) e se ha contenuto
+        isActive && assignedTab && !isTabModeEnabled,
         isDragOver && "bg-primary/5"
       )}
       onClick={handleSectionClick}
