@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button'
 import { useGridStore, GridSection as GridSectionType } from '@/store/gridStore'
 import { useTabStore } from '@/store/tabStore'
 import { cn } from '@/lib/utils'
-import { TabContentRenderer } from '@/components/TabContentRenderer'
+import { TabContentWithProvider } from '@/components/TabContentWithProvider'
 import { PageSelector } from '@/components/PageSelector'
+import { SectionSiteSelector } from '@/components/SectionSiteSelector'
 import { useRouter } from 'next/navigation'
 import { pluginRegistry, getUserPermissions } from '@/plugins'
 import { useUserInfo } from '@/hooks/useAuth'
@@ -283,7 +284,7 @@ export function GridSection({
   return (
     <div
       className={cn(
-        "relative bg-background h-full w-full flex flex-col p-2",
+        "relative bg-background h-full w-full flex flex-col",
         isActive && assignedTab && "ring-1 ring-primary/20", // Ring solo se ha contenuto
         isDragOver && "bg-primary/5"
       )}
@@ -293,23 +294,36 @@ export function GridSection({
       onDrop={handleDrop}
     >
       {/* Header con controlli */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
+        <div className="flex items-center gap-2">
           {assignedTab && (
-            (() => {
-              const PageIcon = getPageIcon(assignedTab.url)
-              return <PageIcon className="h-3 w-3 text-primary flex-shrink-0" />
-            })()
+            <>
+              {(() => {
+                const PageIcon = getPageIcon(assignedTab.url)
+                return <PageIcon className="h-3 w-3 text-primary flex-shrink-0" />
+              })()}
+              <span className="text-xs font-medium">
+                {getDisplayTitle(assignedTab)}
+              </span>
+
+              {/* Site Selector dopo il titolo */}
+              <SectionSiteSelector
+                size="sm"
+                variant="outline"
+                showInheritanceInfo={true}
+                className="min-w-[100px]"
+              />
+            </>
           )}
-          <span className={cn(
-            "text-xs",
-            assignedTab ? "font-medium" : "text-muted-foreground/60 font-normal italic"
-          )}>
-            {getDisplayTitle(assignedTab)}
-          </span>
+          {!assignedTab && (
+            <span className="text-xs text-muted-foreground/60 font-normal italic">
+              {getDisplayTitle(assignedTab)}
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+
           {/* Split verticale */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -395,7 +409,7 @@ export function GridSection({
       <div className="flex-1 flex flex-col overflow-y-auto">
         {assignedTab ? (
           <div className="flex-1 min-h-0">
-            <TabContentRenderer tab={assignedTab} />
+            <TabContentWithProvider tab={assignedTab} showContextHeader={false} />
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center">

@@ -1,6 +1,7 @@
 "use client"
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { useSectionSiteStore } from '@/contexts/SectionSiteContext'
 
 export interface GridSection {
   id: string
@@ -322,6 +323,31 @@ export const useGridStore = create<GridState>()(
       },
 
       resetGrid: () => {
+        const state = get()
+
+        // Pulisci tutti i contesti delle sezioni esistenti
+        try {
+          if (state.currentLayout) {
+            const collectAllSectionIds = (sections: GridSection[]): string[] => {
+              const ids: string[] = []
+              sections.forEach(section => {
+                ids.push(section.id)
+                if (section.children) {
+                  ids.push(...collectAllSectionIds(section.children))
+                }
+              })
+              return ids
+            }
+
+            const allSectionIds = collectAllSectionIds(state.currentLayout.sections)
+            allSectionIds.forEach(sectionId => {
+              useSectionSiteStore.getState().clearSectionSiteId(sectionId)
+            })
+          }
+        } catch (error) {
+          console.warn('Failed to clear section site contexts:', error)
+        }
+
         const initialLayout = createInitialLayout()
         set({
           currentLayout: initialLayout,
@@ -332,6 +358,13 @@ export const useGridStore = create<GridState>()(
       closeSection: (sectionId: string) => {
         const state = get()
         if (!state.currentLayout) return
+
+        // Pulisci il contesto site della sezione prima di chiuderla
+        try {
+          useSectionSiteStore.getState().clearSectionSiteId(sectionId)
+        } catch (error) {
+          console.warn('Failed to clear section site context:', error)
+        }
 
         // Funzione ricorsiva per chiudere una sezione
         const closeSectionRecursive = (sections: GridSection[]): GridSection[] => {

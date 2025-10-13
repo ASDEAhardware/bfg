@@ -7,7 +7,7 @@ import { SchedulerModal } from "@/components/SchedulerModal";
 import { DataloggerCard } from "@/components/DataloggerCard";
 import { SensorCard } from "@/components/SensorCard";
 import { ContextualStatusBar, useContextualStatusBar } from "@/components/ContextualStatusBar";
-import { useSiteContext } from "@/contexts/SiteContext";
+import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,7 +76,7 @@ interface Sensor {
 
 export default function DataLoggerPage() {
   const { createCountItems, createFilterItems } = useContextualStatusBar();
-  const { selectedSiteId } = useSiteContext();
+  const { selectedSiteId } = useUnifiedSiteContext();
   const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

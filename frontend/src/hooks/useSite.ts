@@ -1,7 +1,7 @@
-import { useSiteContext } from '@/contexts/SiteContext';
+import { useUnifiedSiteContext } from '@/hooks/useUnifiedSiteContext';
 
 export function useSite() {
-  const { selectedSite, selectedSiteId, setSelectedSiteId } = useSiteContext();
+  const { selectedSite, selectedSiteId, setSelectedSiteId } = useUnifiedSiteContext();
 
   return {
     site: selectedSite,
@@ -11,11 +11,11 @@ export function useSite() {
 }
 
 export function useSelectedSite() {
-  const { selectedSite } = useSiteContext();
+  const { selectedSite } = useUnifiedSiteContext();
   return selectedSite;
 }
 
 export function useSelectedSiteId() {
-  const { selectedSiteId } = useSiteContext();
+  const { selectedSiteId } = useUnifiedSiteContext();
   return selectedSiteId;
 }

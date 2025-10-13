@@ -480,6 +480,7 @@ export function TabBar() {
           })}
       </div>
 
+
       {/* Dropdown per schede overflow */}
       {overflowTabs.length > 0 && (
         <DropdownMenu>
