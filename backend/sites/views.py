@@ -16,21 +16,6 @@ from .serializers import (
     SensorSerializer
 )
 
-logger = logging.getLogger('django.security')
-
-# Custom throttling classes per operazioni sensibili
-class SensitiveOperationThrottle(UserRateThrottle):
-    scope = 'sensitive'
-
-class AdminOperationThrottle(UserRateThrottle):
-    scope = 'sensitive'
-
-    def allow_request(self, request, view):
-        if not request.user.is_superuser:
-            return super().allow_request(request, view)
-        # Admin users have higher limits
-        return True
-
 
 class SiteViewSet(viewsets.ModelViewSet):
     queryset = Site.objects.all()
