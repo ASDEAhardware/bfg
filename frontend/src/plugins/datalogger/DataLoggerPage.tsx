@@ -8,6 +8,7 @@ import { DataloggerCard } from "@/components/DataloggerCard";
 import { SensorCard } from "@/components/SensorCard";
 import { ContextualStatusBar, useContextualStatusBar } from "@/components/ContextualStatusBar";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
+import { useGridStore } from "@/store/gridStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,6 +78,7 @@ interface Sensor {
 export default function DataLoggerPage() {
   const { createCountItems, createFilterItems } = useContextualStatusBar();
   const { selectedSiteId } = useUnifiedSiteContext();
+  const { isGridModeEnabled } = useGridStore();
   const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -492,8 +494,8 @@ export default function DataLoggerPage() {
         )}
       </div>
 
-      {/* Sensors Status Bar - only when connected */}
-      {isConnected && selectedLogger && (
+      {/* Sensors Status Bar - only when connected and not in grid mode */}
+      {isConnected && selectedLogger && !isGridModeEnabled && (
         <ContextualStatusBar
           leftItems={[
             { label: 'Datalogger', value: selectedLogger.name },
@@ -740,15 +742,17 @@ export default function DataLoggerPage() {
         )}
       </div>
 
-      {/* Contextual Status Bar */}
-      <ContextualStatusBar
-        leftItems={createCountItems(
-          dataloggers.length,
-          dataloggers.filter(d => d.status === 'active').length,
-          dataloggers.filter(d => d.status !== 'active').length
-        )}
-        rightItems={createFilterItems(filteredDataloggers.length, searchTerm)}
-      />
+      {/* Contextual Status Bar - only when not in grid mode */}
+      {!isGridModeEnabled && (
+        <ContextualStatusBar
+          leftItems={createCountItems(
+            dataloggers.length,
+            dataloggers.filter(d => d.status === 'active').length,
+            dataloggers.filter(d => d.status !== 'active').length
+          )}
+          rightItems={createFilterItems(filteredDataloggers.length, searchTerm)}
+        />
+      )}
     </div>
   );
 }
