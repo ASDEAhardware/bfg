@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
-from decimal import Decimal
 
 
 User = get_user_model()
@@ -27,7 +26,7 @@ class Site(models.Model):
     latitude = models.DecimalField(
         max_digits=17,
         decimal_places=12,
-        default=Decimal(42.445341640630),
+        default=42.445341640630,
         validators=[
             MinValueValidator(-90.0),
             MaxValueValidator(90.0)
@@ -37,7 +36,7 @@ class Site(models.Model):
     longitude = models.DecimalField(
         max_digits=17,
         decimal_places=12,
-        default=Decimal(14.198652738540),
+        default=14.198652738540,
         validators=[
             MinValueValidator(-180.0),
             MaxValueValidator(180.0)

@@ -21,10 +21,6 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# LOGS dir and file
-LOG_DIR = BASE_DIR.parent / "resources" / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True) # crea la dir solo se non esiste
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -47,7 +43,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.sites',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -58,18 +53,12 @@ INSTALLED_APPS = [
     'corsheaders',
     'dashboard',
     'mqtt',
-    'sites.apps.SitesConfig',
+    'sites',
 ]
 
 MIDDLEWARE = [
-    # CORS deve essere il primo
     'corsheaders.middleware.CorsMiddleware',
 
-    # Security middleware personalizzati (prima di tutto)
-    'core.middleware.SecurityMiddleware',
-    'core.middleware.AuditMiddleware',
-
-    # Django security middleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -79,113 +68,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# Security settings avanzate
+# Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
-
-# Produzione Security Headers
-PRODUCTION = os.environ.get('PRODUCTION', 'False') == 'True'
-
-if PRODUCTION:
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000  # 1 anno
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-
-# Content Security Policy
-CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'")
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
-CSP_IMG_SRC = ("'self'", "data:")
-CSP_CONNECT_SRC = ("'self'",)
-
-# Rate Limiting e Throttling
-RATELIMIT_ENABLE = True
-RATELIMIT_USE_CACHE = 'default'
-
-# Session Security
-SESSION_COOKIE_AGE = 3600  # 1 ora
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Strict' if PRODUCTION else 'Lax'
-
-# CSRF Protection Enhanced
-CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = 'Strict' if PRODUCTION else 'Lax'
-CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
-
-# Password Security
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-        'OPTIONS': {'min_length': 12}
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
-# Logging per sicurezza
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False, #serve a non disattivare i logger  predefiniti (come django.request e django.db.backends etc.), se fosse True dovresti riconfigurarli manualmente.
-    'formatters': { # I formatter definiscono come appare il messaggio di log nel file o in console.
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'security': {
-            'format': 'SECURITY {asctime} {name} {levelname} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': { # Gli handler definiscono dove vanno scritti i log.
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.TimedRotatingFileHandler', # la precedente classe era: logging.FileHandler
-            'filename': LOG_DIR / 'django.log',
-            'formatter': 'verbose',
-            'when': 'W0', # ogni quanto eseguire la rotazione dei file di log (in questo caso settimanalmente il lunedì)
-            'backupCount': 7, # conserva solo gli ultimi 7 file, compreso quello corrente
-            'encoding': 'utf-8'
-        },
-        'security': {
-            'level': 'WARNING',
-            'class': 'logging.handlers.TimedRotatingFileHandler', # la precedente classe era: logging.FileHandler
-            'filename': LOG_DIR / 'security.log',
-            'formatter': 'security',
-            'when': 'W0',
-            'backupCount': 15,      # conserva 15 giorni di log di sicurezza
-            'encoding': 'utf-8',
-        },
-    },
-    'loggers': { # I logger dicono quali moduli inviano messaggi e a quali handler.
-        'django': { # Tutti i log generici del framework (come richieste e segnali) vanno al file django.log
-            'handlers': ['file'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'django.security': { # Log generati dal sistema di sicurezza di Django (es. login falliti, tentativi sospetti) e vanno nel file security.log
-            'handlers': ['security'],
-            'level': 'WARNING',
-            'propagate': False, # propagate=False significa che questi log non risalgono ai logger “padri” (es. non finiscono anche in django.log
-        },
-        'django_ratelimit': { # log del pacchetto django_ratelimit, stessi degli handler ddi sicurezza
-            'handlers': ['security'],
-            'level': 'WARNING',
-        },
-    },
-}
 
 ROOT_URLCONF = 'config.urls'
 
@@ -232,7 +118,7 @@ DATABASES = {
     }
 }
 
-# Config REST Framework con throttling
+# Config REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
@@ -240,42 +126,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
-        'login': '5/min',
-        'sensitive': '10/min'
-    },
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-    ],
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-    ],
-    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler'
 }
-
-# Cache Configuration per rate limiting
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-        'TIMEOUT': 300,
-        'OPTIONS': {
-            'MAX_ENTRIES': 1000,
-            'CULL_FREQUENCY': 3,
-        }
-    }
-}
-
-# Rate Limiting Configuration
-RATE_LIMIT_REQUESTS = 100  # richieste per finestra temporale
-RATE_LIMIT_WINDOW = 300    # 5 minuti in secondi
-MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB
 
 AUTH_USER_MODEL = 'user.CustomUser'
 STATIC_URL = '/static/'
@@ -295,7 +146,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 SIMPLE_JWT = {
-    # Algoritmo di firma sicuro
+    # Specifica l'algoritmo di firma
     "ALGORITHM": "RS256",
 
     # Carica la chiave privata per firmare i token
@@ -304,42 +155,32 @@ SIMPLE_JWT = {
     # Carica la chiave pubblica per verificare i token
     "VERIFYING_KEY": open(BASE_DIR / 'keys' / 'public.pem').read(),
 
-    # Token lifetimes ottimizzati per sicurezza
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-
-    # Sicurezza avanzata - Rotazione token
-    "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
-    "UPDATE_LAST_LOGIN": True,
-
-    # Headers e validazione
+    # Aggiungi un endpoint per la gestione del JWKS (opzionale, ma consigliato)
+    # Questo non è nativamente supportato da simple_jwt, ma puoi implementarlo
+    # come un'API custom su Django per Next.js
+    # "JWKS_URI": "/api/auth/jwks/", # Esempio di URL per il JWK Set
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    'JWT_AUTH_REFRESH_COOKIE_MAX_AGE': timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": False,
     "AUTH_HEADER_TYPES": ("Bearer",),
-    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
-
-    # Claims personalizzati per audit
-    "TOKEN_OBTAIN_SERIALIZER": "user.serializers.MyTokenObtainPairSerializer",
-
-    # Validazione aggiuntiva
-    "CHECK_REVOKE_TOKEN": True,
 }
 
 REST_AUTH = {
     'USE_JWT': True,
-
-    # Access Token Cookie Configuration
     'JWT_AUTH_COOKIE': 'access_token',
     'JWT_AUTH_COOKIE_PATH': '/',
-    'JWT_AUTH_HTTPONLY': False,  # Access token readable by JS per middleware
-    'JWT_AUTH_SECURE': os.environ.get('DJANGO_SECURE_COOKIES', 'False') == 'True',
-    'JWT_AUTH_COOKIE_SAMESITE': 'Strict' if os.environ.get('PRODUCTION', 'False') == 'True' else 'Lax',
+    'JWT_AUTH_HTTPONLY': False,  # L'access token NON deve essere HttpOnly per essere letto dal middleware
+    'JWT_AUTH_SECURE': False,    # ⚠️ Imposta a True in produzione con HTTPS
+    'JWT_AUTH_COOKIE_SAMESITE': 'Lax', # Consigliato per lo sviluppo, più permissivo di 'Strict'
 
-    # Refresh Token Cookie Configuration (Massima Sicurezza)
-    'JWT_AUTH_REFRESH_COOKIE': 'refresh_token',
+    # Configurazione del Cookie per il Refresh Token
+    'JWT_AUTH_REFRESH_COOKIE': 'refresh_token',  # Questo è il nome del cookie per il REFRESH TOKEN.
     'JWT_AUTH_REFRESH_COOKIE_PATH': '/',
-    'JWT_AUTH_REFRESH_COOKIE_HTTP_ONLY': True,  # HttpOnly per sicurezza
-    'JWT_AUTH_REFRESH_COOKIE_SECURE': os.environ.get('DJANGO_SECURE_COOKIES', 'False') == 'True',
-    'JWT_AUTH_REFRESH_COOKIE_SAMESITE': 'Strict' if os.environ.get('PRODUCTION', 'False') == 'True' else 'Lax',
+    'JWT_AUTH_REFRESH_COOKIE_HTTP_ONLY': True,  # Il refresh token DEVE essere HttpOnly
+    'JWT_AUTH_REFRESH_COOKIE_SECURE': False,    # ⚠️ Imposta a True in produzione con HTTPS
+    'JWT_AUTH_REFRESH_COOKIE_SAMESITE': 'Lax',
 
 
     'LOGIN_SERIALIZER': 'dj_rest_auth.serializers.LoginSerializer',
@@ -403,8 +244,6 @@ dice a Django di usare il sito con ID 1 nella tabella django_site come sito corr
     un'istanza Django, ognuno con il proprio dominio e configurazione.)	
 
 '''
-
-SITE_ID = 1
 
 # MQTT Configuration
 MQTT_BROKER = os.environ.get('MQTT_BROKER', 'zionnode.ovh')
