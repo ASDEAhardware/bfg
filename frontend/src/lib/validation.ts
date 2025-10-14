@@ -285,11 +285,46 @@ export function validateSecurityHeaders(request: NextRequest): { valid: boolean;
     }
 
     // Controlla headers sospetti
-    const suspiciousHeaders = ['x-forwarded-host', 'x-forwarded-server'];
-    for (const header of suspiciousHeaders) {
+    // Lista di header che *DEVONO* essere bloccati perché non hanno ragioni legittime di essere presenti 
+    // e sono spesso usati per attacchi di Request Smuggling, ecc.
+    const strictlySuspiciousHeaders = [
+        'te',         // Transfer-Encoding
+        'trailer',    // Altro potenziale per Request Smuggling
+        // 'connection', <--- LO GESTIAMO SEPARATAMENTE QUI SOTTO
+    ];
+
+    // Inizializza l'array degli errori
+    const headerErrors: string[] = [];
+
+    // 1. Controllo degli header strettamente sospetti
+    for (const header of strictlySuspiciousHeaders) {
         if (request.headers.get(header)) {
-            errors.push(`Suspicious header detected: ${header}`);
+            headerErrors.push(`Strictly suspicious header detected: ${header}`);
         }
+    }
+
+    // 2. Gestione specifica dell'header 'Connection'
+    // L'header 'Connection' dovrebbe essere gestito come un caso speciale. 
+    // Se ha un valore "normale" (es. keep-alive), lo si può ignorare, 
+    // ma solo se non ci sono header che il proxy dovrebbe aver rimosso.
+    const connectionHeader = request.headers.get('connection');
+
+    if (connectionHeader) {
+        // Il valore di 'Connection' specifica quali header devono essere rimossi.
+        // Se il valore dell'header Connection è un elenco di altri header, 
+        // e questi header sono ancora presenti nella richiesta, è un segnale di allarme.
+
+        // CASO SEMPLICE (Soluzione al tuo problema attuale):
+        // Se il valore è semplicemente 'keep-alive' (il più comune e innocuo in un proxy), lo ignoriamo.
+        // Altrimenti, lo consideriamo sospetto e blocchiamo.
+
+        if (connectionHeader.toLowerCase().trim() !== 'keep-alive' && connectionHeader.toLowerCase().trim() !== 'close') {
+            // Se il valore non è un valore standard di persistenza della connessione, è sospetto.
+            errors.push(`Suspicious 'connection' header value: ${connectionHeader}`);
+        }
+        // Nota: in un codice di produzione, faresti un controllo più sofisticato 
+        // qui per verificare se l'elenco di header specificato in 'Connection' 
+        // è ancora presente.
     }
 
     return {

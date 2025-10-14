@@ -1,9 +1,27 @@
 import logging
-from rest_framework.views import exception_handler
-from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.views import exception_handler #type: ignore
+from rest_framework.response import Response #type: ignore
+from rest_framework import status #type: ignore
 from django.core.exceptions import ValidationError
 from django.http import Http404
+
+"""
+Questo file definisce un gestore di eccezioni personalizzato per l'API costruita con Django Rest Framework.
+Il suo ruolo è quello di intercettare qualsiasi errore (eccezione) non gestito che si verifica durante
+l'elaborazione di una richiesta API. Invece di lasciare che DRF restituisca una risposta di errore predefinita, che potrebbe essere poco
+chiara o esporre dati sensibili.
+
+Questo sistema viene attivato da:
+# settings.py
+REST_FRAMEWORK = {
+    # ... altre impostazioni
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler'
+}
+
+Una volta configurato, ogni volta che un'eccezione (un errore) si verifica all'interno di una vista API e non
+viene catturata da un blocco try...except specifico, DRF non userà il suo gestore di default ma invocherà la
+funzione custom_exception_handler di questo file.
+"""
 
 logger = logging.getLogger('django.security')
 
@@ -63,6 +81,31 @@ def handle_generic_exception(exc, context):
     """
     request = context.get('request')
 
+    # Gestione delle eccezioni di sicurezza personalizzate
+    if isinstance(exc, RateLimitExceeded):
+        return Response({
+            'error': True,
+            'message': 'Rate limit exceeded. Try again later.',
+            'code': 429,
+            'timestamp': __import__('time').time(),
+        }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+    if isinstance(exc, SuspiciousActivity):
+        return Response({
+            'error': True,
+            'message': 'Invalid request headers',
+            'code': 400,
+            'timestamp': __import__('time').time(),
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    if isinstance(exc, RequestTooLarge):
+        return Response({
+            'error': True,
+            'message': 'Request entity too large',
+            'code': 413,
+            'timestamp': __import__('time').time(),
+        }, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+
     if isinstance(exc, Http404):
         return Response({
             'error': True,
@@ -105,7 +148,7 @@ def _get_error_message(exc, response):
 
     # Per errori di validazione
     if response.status_code == 400:
-        if hasattr(response, 'data') and isinstance(response.data, dict):
+        if hasattr(response, 'data') and isinstance(response.data, dict): # isinstance(onj, type) è una funzione python che conrolla se un'oggetto è un'istanza di un certo tipo e restituisce True o False
             # Estrai il primo messaggio di errore
             for field, errors in response.data.items():
                 if isinstance(errors, list) and errors:
@@ -133,6 +176,8 @@ def _get_client_ip(request):
         ip = request.META.get('REMOTE_ADDR', 'unknown')
     return ip
 
+
+# Classi utilizzate in ./middleware.py
 
 class SecurityException(Exception):
     """
@@ -163,3 +208,12 @@ class SuspiciousActivity(SecurityException):
         if details:
             message += f" - {details}"
         super().__init__(message, 'SUSPICIOUS_ACTIVITY', ip_address)
+
+
+class RequestTooLarge(SecurityException):
+    """
+    Eccezione per richieste con body troppo grande
+    """
+    def __init__(self, ip_address, size):
+        message = f"Request from {ip_address} is too large: {size} bytes"
+        super().__init__(message, 'REQUEST_TOO_LARGE', ip_address)

@@ -69,10 +69,13 @@ api.interceptors.request.use(
         }
 
         // Security headers
-        config.headers = {
-            ...config.headers,
-            'X-Timestamp': Date.now().toString(),
-        };
+        if (config.headers && typeof (config.headers as any).set === 'function') {
+            // AxiosHeaders instance
+            (config.headers as any).set('X-Timestamp', Date.now().toString());
+        } else if (config.headers) {
+            // Plain object
+            config.headers['X-Timestamp'] = Date.now().toString();
+        }
 
         return config;
     },
@@ -93,22 +96,38 @@ api.interceptors.response.use(
     },
     async (error: AxiosError) => {
         const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+        const status = error.response?.status; // Aggiunto per chiarezza
 
         if (!originalRequest) {
             console.error('No original request config available');
             return Promise.reject(error);
         }
 
-        // Log errori per debugging
-        console.error(`❌ ${originalRequest.method?.toUpperCase()} ${originalRequest.url} - ${error.response?.status}`, error.message);
+        // ----------------------------------------------------
+        // LOGICA DI SOPPRESSIONE DEL LOG (FIX RACE CONDITION)
+        // ----------------------------------------------------
 
-        // Lista endpoint esclusi da auto-refresh
-        const excludedPaths = ['/auth/login/', '/auth/token/refresh/', '/auth/logout/'];
-        const isExcluded = excludedPaths.some(path => originalRequest.url?.includes(path));
+        const isExcluded = ['/auth/login/', '/auth/token/refresh/', '/auth/logout/'].some(
+            path => originalRequest.url?.includes(path)
+        );
 
-        // Gestione 401 con token refresh automatico
+        // Stampiamo l'errore SOLO SE:
+        // 1. NON è un 401
+        // OPPURE
+        // 2. È un 401 MA la richiesta è esclusa (es. login fallito è un errore finale)
+        // OPPURE
+        // 3. È un 401 MA stiamo già ritentando (ovvero è fallito anche il tentativo di refresh/retry)
+        if (status !== 401 || originalRequest._retry || isExcluded) {
+            console.error(`❌ ${originalRequest.method?.toUpperCase()} ${originalRequest.url} - ${status}`, error.message);
+        }
+
+        // ----------------------------------------------------
+        // LOGICA DI GESTIONE 401 / REFRESH AUTOMATICO
+        // ----------------------------------------------------
+
+        // La logica di refresh deve ignorare il log del 401 iniziale.
         if (
-            error.response?.status === 401 &&
+            status === 401 &&
             !originalRequest._retry &&
             !isExcluded
         ) {
@@ -117,6 +136,8 @@ api.interceptors.response.use(
                 return new Promise((resolve, reject) => {
                     subscribeTokenRefresh((token: string) => {
                         originalRequest.headers = originalRequest.headers || {};
+                        // L'access token è in cookie HttpOnly=false e viene aggiunto
+                        // automaticamente da Next.js. Non è necessario aggiungerlo qui.
                         resolve(api(originalRequest));
                     });
                 }).catch(() => {
@@ -133,13 +154,13 @@ api.interceptors.response.use(
                 const refreshResponse = await api.post('/auth/token/refresh/');
 
                 console.log('✅ Token refresh successful');
-                onRefreshed('refreshed');
+                onRefreshed('refreshed'); // Notifica la coda in attesa
 
                 // Retry richiesta originale
                 return api(originalRequest);
 
             } catch (refreshError) {
-                console.error('❌ Token refresh failed:', refreshError);
+                console.error('❌ Token refresh failed (Final error):', refreshError); // Logga qui l'errore del fallimento finale
                 onRefreshFailure();
 
                 // Logout cleanup
@@ -156,9 +177,9 @@ api.interceptors.response.use(
             }
         }
 
-        // Gestione altri errori HTTP
+        // Gestione altri errori HTTP (qui il log è già avvenuto se status != 401)
         if (error.response) {
-            switch (error.response.status) {
+            switch (status) {
                 case 403:
                     console.warn('Accesso negato - Permessi insufficienti');
                     break;
@@ -171,8 +192,7 @@ api.interceptors.response.use(
                 case 500:
                     console.error('Errore interno del server');
                     break;
-                default:
-                    console.error(`Errore HTTP ${error.response.status}:`, error.message);
+                // Non serve un default qui, lo gestisce il log iniziale
             }
         } else if (error.request) {
             console.error('Errore di rete - Nessuna risposta dal server');

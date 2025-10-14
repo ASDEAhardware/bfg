@@ -10,13 +10,19 @@ import {
 } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
-    const startTime = Date.now();
+    const startTime = Date.now(); // const che registra l'inizio della chiamata per monitorarne la durata.
 
     try {
+        // Extract IP address from headers or fallback
+        const ip =
+            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+            request.headers.get('x-real-ip') ||
+            'unknown';
+
         // 1. Rate limiting check
         const rateLimitResult = checkRateLimit(request, 'login');
         if (!rateLimitResult.allowed) {
-            console.warn(`Login rate limit exceeded for IP: ${request.ip}`);
+            console.warn(`Login rate limit exceeded for IP: ${ip}`);
             return NextResponse.json(
                 { error: rateLimitResult.error },
                 { status: 429 }
@@ -26,7 +32,7 @@ export async function POST(request: NextRequest) {
         // 2. Security headers validation
         const headerValidation = validateSecurityHeaders(request);
         if (!headerValidation.valid) {
-            console.warn(`Invalid security headers from IP ${request.ip}:`, headerValidation.errors);
+            console.warn(`Invalid security headers from IP ${ip}:`, headerValidation.errors);
             return NextResponse.json(
                 { error: 'Invalid request headers' },
                 { status: 400 }
@@ -40,7 +46,7 @@ export async function POST(request: NextRequest) {
         // 4. Validate input
         const validation = validateData(credentials, LoginSchema);
         if (!validation.isValid) {
-            console.warn(`Login validation failed for IP ${request.ip}:`, validation.errors);
+            console.warn(`Login validation failed for IP ${ip}:`, validation.errors);
             return NextResponse.json(
                 {
                     error: 'Validation failed',
@@ -88,13 +94,16 @@ export async function POST(request: NextRequest) {
         response.headers.set('X-XSS-Protection', '1; mode=block');
 
         return response;
-
-    } catch (error) {
+    } catch (error: any) {
         const duration = Date.now() - startTime;
+        const ip =
+            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+            request.headers.get('x-real-ip') ||
+            'unknown';
 
         if (axios.isAxiosError(error) && error.response) {
             // Log failed login attempt
-            console.warn(`❌ Failed login attempt from IP ${request.ip} in ${duration}ms:`, {
+            console.warn(`❌ Failed login attempt from IP ${ip} in ${duration}ms:`, {
                 status: error.response.status,
                 data: error.response.data
             });
@@ -102,14 +111,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 {
                     error: 'Authentication failed',
-                    message: error.response.data?.message || 'Invalid credentials'
                 },
                 { status: error.response.status }
             );
         }
 
         // Log unexpected errors
-        console.error(`💥 Login error from IP ${request.ip} in ${duration}ms:`, error);
+        console.error(`💥 Login error from IP ${ip} in ${duration}ms:`, error);
 
         return NextResponse.json(
             {
