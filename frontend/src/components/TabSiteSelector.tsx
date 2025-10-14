@@ -93,24 +93,6 @@ export function TabSiteSelector({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="min-w-[200px]" align="start">
-        {tabId && (
-          <>
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Tab Context: {tabId.slice(-8)}...
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-          </>
-        )}
-
-        {inheritedFromGlobal && (
-          <>
-            <DropdownMenuLabel className="text-xs text-muted-foreground flex items-center gap-1">
-              <Badge variant="secondary" className="text-xs">Global</Badge>
-              Currently using global site selection
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-          </>
-        )}
 
         {sites.map((site) => (
           <DropdownMenuItem

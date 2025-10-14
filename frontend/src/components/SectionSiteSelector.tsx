@@ -1,13 +1,12 @@
 "use client";
 
 import React from 'react';
-import { MapPin, ChevronDown, RefreshCw, ArrowUp } from 'lucide-react';
+import { MapPin, ChevronDown, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -88,12 +87,6 @@ export function SectionSiteSelector({
     );
   };
 
-  const getInheritanceSource = () => {
-    if (isSectionIsolated) return "Section isolated";
-    if (inheritedFromTab) return `Inherited from tab ${tabId?.slice(-8)}...`;
-    if (inheritedFromGlobal) return "Inherited from global";
-    return "Direct";
-  };
 
   const isDisabled = isLoading || sites.length === 0;
 
@@ -111,20 +104,6 @@ export function SectionSiteSelector({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="min-w-[200px]" align="start">
-        {sectionId && (
-          <>
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Section: {sectionId.slice(-8)}...
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-          </>
-        )}
-
-        <DropdownMenuLabel className="text-xs text-muted-foreground flex items-center gap-1">
-          <ArrowUp className="h-3 w-3" />
-          {getInheritanceSource()}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
 
         {sites.map((site) => (
           <DropdownMenuItem
