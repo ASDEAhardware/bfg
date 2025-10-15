@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { pluginRegistry, getUserPermissions } from '@/plugins'
 import { useUserInfo } from '@/hooks/useAuth'
+import { useAuthStore } from '@/store/authStore'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function PluginRouteRenderer() {
   const pathname = usePathname()
-  const { data: userData } = useUserInfo()
+  const { data: userData, isLoading: isUserLoading } = useUserInfo()
+  const isRefreshing = useAuthStore((state) => state.isRefreshing)
   const [PluginComponent, setPluginComponent] = useState<React.ComponentType<any> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -16,7 +18,8 @@ export function PluginRouteRenderer() {
   useEffect(() => {
     async function loadPluginComponent() {
       if (!userData) {
-        setIsLoading(false)
+        // Se stiamo caricando i dati utente o facendo refresh, mantieni loading
+        setIsLoading(isUserLoading || isRefreshing)
         return
       }
 
@@ -51,12 +54,22 @@ export function PluginRouteRenderer() {
     }
 
     loadPluginComponent()
-  }, [pathname, userData])
+  }, [pathname, userData, isUserLoading, isRefreshing])
 
   if (isLoading) {
     return (
-      <div className="flex justify-center p-6">
+      <div className="flex flex-col items-center justify-center p-6 space-y-4">
         <Skeleton className="h-10 w-48" />
+        {isRefreshing && (
+          <div className="text-sm text-muted-foreground animate-pulse">
+            Aggiornamento in corso...
+          </div>
+        )}
+        {isUserLoading && !isRefreshing && (
+          <div className="text-sm text-muted-foreground animate-pulse">
+            Caricamento...
+          </div>
+        )}
       </div>
     )
   }

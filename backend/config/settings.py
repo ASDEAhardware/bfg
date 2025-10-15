@@ -159,7 +159,7 @@ SIMPLE_JWT = {
     # Questo non è nativamente supportato da simple_jwt, ma puoi implementarlo
     # come un'API custom su Django per Next.js
     # "JWKS_URI": "/api/auth/jwks/", # Esempio di URL per il JWK Set
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     'JWT_AUTH_REFRESH_COOKIE_MAX_AGE': timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": False,

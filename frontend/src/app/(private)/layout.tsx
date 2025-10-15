@@ -2,6 +2,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { TabContent } from "@/components/TabContent"
 import { TabNavigationHandler } from "@/components/TabNavigationHandler"
 import { ConditionalTabBar } from "@/components/ConditionalTabBar"
+import { RefreshIndicator } from "@/components/RefreshIndicator"
 import {
     SidebarInset,
     SidebarProvider,
@@ -21,6 +22,7 @@ export default async function Layout({
     return (
         <SidebarProvider>
             <SiteProvider>
+                <RefreshIndicator />
                 <AppSidebar />
                 <SidebarInset>
                     <TabNavigationHandler />

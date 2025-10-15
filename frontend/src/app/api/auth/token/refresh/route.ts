@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         response.cookies.set("access_token", access, {
             httpOnly: false, // Accessibile da JS
             secure: process.env.NODE_ENV !== "development",
-            maxAge: 60 * 5, // 5 minuti
+            maxAge: 60 * 15, // 15 minuti (aumentato da 5)
             path: "/",
             sameSite: "lax",
         });

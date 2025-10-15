@@ -5,9 +5,11 @@ import { useAuthStore } from "@/store/authStore";
 import { useTheme } from "next-themes";
 import { useEffect } from "react";
 import { User } from "@/types/user";
+import { useSilentRefresh } from "./useSilentRefresh";
 
 export const useUserInfo = () => {
   const setUser = useAuthStore((state) => state.setUser);
+  const { startSilentRefresh, stopSilentRefresh } = useSilentRefresh();
 
   const query = useQuery({
     queryKey: ["userInfo"],
@@ -19,8 +21,13 @@ export const useUserInfo = () => {
   useEffect(() => {
     if (query.data) {
       setUser(query.data);
+      // Avvia il silent refresh quando l'utente è autenticato
+      startSilentRefresh();
+    } else {
+      // Ferma il silent refresh quando l'utente non è autenticato
+      stopSilentRefresh();
     }
-  }, [query.data, setUser]);
+  }, [query.data, setUser, startSilentRefresh, stopSilentRefresh]);
 
   return query;
 };
@@ -46,11 +53,13 @@ export const useLogin = () => {
 export const useLogout = () => {
   const clearUser = useAuthStore((state) => state.clearUser);
   const queryClient = useQueryClient();
+  const { stopSilentRefresh } = useSilentRefresh();
 
   return useMutation({
     mutationFn: authService.logout, // <-- Usa la funzione del service
     onSuccess: () => {
       clearUser();
+      stopSilentRefresh(); // Ferma il silent refresh al logout
       queryClient.removeQueries({ queryKey: ['userInfo'] });
       window.location.href = "/login?logoutSuccess=true"; // a differenza di router.push() causa un full page reload (hard navigation) della pagina
     },
