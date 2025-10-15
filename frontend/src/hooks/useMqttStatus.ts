@@ -24,6 +24,7 @@ export interface MqttSensorData {
 
 export interface MqttConnectionStatus {
   id: number;
+  site_id: number;
   site__name: string;
   site__code: string;
   status: 'connected' | 'connecting' | 'disconnected' | 'error';
@@ -160,7 +161,7 @@ export function useMqttConnectionStatus(siteId: string | number | null) {
   const { statusData } = useMqttStatus();
 
   const connectionStatus = statusData?.connections.find(
-    conn => conn.id === Number(siteId)
+    conn => conn.site_id === Number(siteId)
   );
 
   const siteStats = siteId ? statusData?.sensor_stats[siteId.toString()] : null;

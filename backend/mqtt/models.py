@@ -43,6 +43,12 @@ class MqttConnection(models.Model):
     ssl_enabled = models.BooleanField(default=False)
     ca_cert_path = models.CharField(max_length=500, blank=True)
 
+    # Connection control
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text="Se disabilitata, questa connessione MQTT viene ignorata dal sistema"
+    )
+
     # Status tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='disconnected')
     last_connected_at = models.DateTimeField(null=True, blank=True)
@@ -58,7 +64,8 @@ class MqttConnection(models.Model):
         verbose_name_plural = "MQTT Connections"
 
     def __str__(self):
-        return f"MQTT {self.site.name} - {self.broker_host}"
+        status_icon = "✅" if self.is_enabled else "❌"
+        return f"{status_icon} MQTT {self.site.name} - {self.broker_host}"
 
 
 class SensorDevice(models.Model):
@@ -214,26 +221,3 @@ class MqttTopic(models.Model):
         return f"{status} {self.get_full_topic()} (QoS {self.qos_level})"
 
 
-class ConnectionLog(models.Model):
-    """
-    Log eventi connessione MQTT per benchmark continuità
-    """
-    EVENT_CHOICES = [
-        ('connected', 'Connected'),
-        ('disconnected', 'Disconnected'),
-        ('heartbeat_missed', 'Heartbeat Missed'),
-        ('error', 'Error')
-    ]
-
-    mqtt_connection = models.ForeignKey(MqttConnection, on_delete=models.CASCADE)
-    event_type = models.CharField(max_length=20, choices=EVENT_CHOICES)
-    message = models.TextField(blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-timestamp']
-        verbose_name = "Connection Log"
-        verbose_name_plural = "Connection Logs"
-
-    def __str__(self):
-        return f"{self.mqtt_connection.site.name} - {self.event_type} - {self.timestamp}"

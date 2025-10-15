@@ -1,69 +1,15 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
-from django.views.generic import TemplateView
 from django.views import View
-from django.contrib.admin.views.decorators import staff_member_required
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Count, Q
 from django.utils import timezone
-from datetime import timedelta
 import subprocess
 import json
 import re
-from .models import MqttConnection, SensorDevice, SensorData, ConnectionLog
+from .models import MqttConnection, SensorDevice, SensorData
 from .services.message_parser import MqttMessageParser
 
-
-@method_decorator(staff_member_required, name='dispatch')
-class MqttDashboardView(TemplateView):
-    """
-    Dashboard principale MQTT con overview di tutte le connessioni
-    """
-    template_name = 'mqtt/dashboard.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        # Statistics generali
-        total_connections = MqttConnection.objects.count()
-        active_connections = MqttConnection.objects.filter(status='connected').count()
-        error_connections = MqttConnection.objects.filter(status='error').count()
-
-        total_sensors = SensorDevice.objects.count()
-        online_sensors = SensorDevice.objects.filter(is_online=True).count()
-        offline_sensors = SensorDevice.objects.filter(is_online=False).count()
-
-        # Connessioni con dettagli
-        connections = MqttConnection.objects.select_related('site').annotate(
-            sensor_count=Count('site__sensordevice'),
-            online_sensor_count=Count('site__sensordevice', filter=Q(site__sensordevice__is_online=True))
-        ).order_by('site__name')
-
-        # Log recenti (ultimi 50)
-        recent_logs = ConnectionLog.objects.select_related(
-            'mqtt_connection', 'mqtt_connection__site'
-        ).order_by('-timestamp')[:50]
-
-        # Sensori per sito
-        sites_with_sensors = {}
-        for conn in connections:
-            sensors = SensorDevice.objects.filter(site=conn.site).order_by('device_name')
-            sites_with_sensors[conn.site.id] = sensors
-
-        context.update({
-            'total_connections': total_connections,
-            'active_connections': active_connections,
-            'error_connections': error_connections,
-            'total_sensors': total_sensors,
-            'online_sensors': online_sensors,
-            'offline_sensors': offline_sensors,
-            'connections': connections,
-            'recent_logs': recent_logs,
-            'sites_with_sensors': sites_with_sensors,
-        })
-
-        return context
 
 
 class MqttConnectionControlView(View):
@@ -109,12 +55,6 @@ class MqttConnectionControlView(View):
                 connection.save()
                 message = f'Restarting connection for {connection.site.name}'
 
-            # Log action
-            ConnectionLog.objects.create(
-                mqtt_connection=connection,
-                event_type='connected' if action == 'start' else 'disconnected',
-                message=f'Manual {action} via dashboard'
-            )
 
             return JsonResponse({
                 'success': True,
@@ -129,53 +69,6 @@ class MqttConnectionControlView(View):
             }, status=500)
 
 
-@method_decorator(staff_member_required, name='dispatch')
-class MqttSiteDetailView(TemplateView):
-    """
-    Dettagli MQTT per un sito specifico
-    """
-    template_name = 'mqtt/site_detail.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        site_id = kwargs.get('site_id')
-
-        connection = get_object_or_404(
-            MqttConnection.objects.select_related('site'),
-            site_id=site_id
-        )
-
-        # Sensori del sito
-        sensors = SensorDevice.objects.filter(site_id=site_id).order_by('device_name')
-
-        # Dati recenti per ogni sensore
-        sensors_with_data = []
-        for sensor in sensors:
-            recent_data = SensorData.objects.filter(
-                sensor_device=sensor
-            ).order_by('-timestamp')[:3]  # Ultimi 3 record
-
-            sensors_with_data.append({
-                'sensor': sensor,
-                'data': recent_data
-            })
-
-        # Statistiche del sito
-        stats = MqttMessageParser.get_sensor_statistics(site_id)
-
-        # Log del sito (ultimi 20)
-        site_logs = ConnectionLog.objects.filter(
-            mqtt_connection=connection
-        ).order_by('-timestamp')[:20]
-
-        context.update({
-            'connection': connection,
-            'sensors_with_data': sensors_with_data,
-            'stats': stats,
-            'site_logs': site_logs,
-        })
-
-        return context
 
 
 class MqttApiStatusView(View):
@@ -186,7 +79,7 @@ class MqttApiStatusView(View):
     def get(self, request):
         # Status generale
         connections = MqttConnection.objects.select_related('site').values(
-            'id', 'site__name', 'site__code', 'status', 'last_connected_at',
+            'id', 'site_id', 'site__name', 'site__code', 'status', 'last_connected_at',
             'last_heartbeat_at', 'connection_errors', 'error_message'
         )
 
@@ -284,7 +177,9 @@ class MqttServiceStatusView(View):
                     'manager_status': manager_status,
                     'service_started': service_started,
                     'active_connections': manager_status['connected'],
-                    'total_connections': manager_status['total_configured']
+                    'total_connections': manager_status['total_configured'],
+                    'enabled_connections': manager_status.get('enabled_connections'),
+                    'disabled_connections': manager_status.get('disabled_connections')
                 })
 
             except Exception as e:
@@ -311,83 +206,6 @@ class MqttServiceStatusView(View):
             }, status=500)
 
 
-class MqttServiceLogsView(View):
-    """
-    API per ottenere log del servizio MQTT
-    """
-
-    def get(self, request):
-        try:
-            # Per ora, generiamo log simulati poiché è complesso accedere ai log del container dall'interno
-            # In alternativa si potrebbe usare Django logging per generare log MQTT locali
-
-            import logging
-
-            # Simuliamo alcuni log MQTT recenti
-            mqtt_logs = [
-                {
-                    'timestamp': '2025-10-15 12:30:15',
-                    'level': 'INFO',
-                    'message': 'MQTT service control panel initialized'
-                },
-                {
-                    'timestamp': '2025-10-15 12:30:16',
-                    'level': 'INFO',
-                    'message': 'Service status check requested'
-                }
-            ]
-
-            # Aggiungi log reali dal database ConnectionLog se disponibili
-            from .models import ConnectionLog
-            recent_logs = ConnectionLog.objects.order_by('-timestamp')[:50]
-
-            for log in recent_logs:
-                mqtt_logs.append({
-                    'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                    'level': 'INFO' if log.event_type == 'connected' else 'WARNING',
-                    'message': f"{log.mqtt_connection.site.name}: {log.message}"
-                })
-
-            # Mantieni solo ultimi 100 e ordina per timestamp
-            mqtt_logs = sorted(mqtt_logs, key=lambda x: x['timestamp'])[-100:]
-
-            return JsonResponse({
-                'logs': mqtt_logs,
-                'total_lines': len(mqtt_logs)
-            })
-
-        except Exception as e:
-            return JsonResponse({
-                'logs': [],
-                'error': str(e)
-            }, status=500)
-
-    def _parse_log_line(self, line):
-        """Parse una linea di log Django/MQTT"""
-        if not line.strip():
-            return None
-
-        # Pattern comune Django: [timestamp] LEVEL message
-        timestamp_match = re.search(r'\[([\d\-\s:,]+)\]', line)
-        level_match = re.search(r'(DEBUG|INFO|WARNING|ERROR|CRITICAL)', line)
-
-        timestamp = timestamp_match.group(1) if timestamp_match else "Unknown"
-        level = level_match.group(1) if level_match else "INFO"
-
-        # Rimuovi timestamp e level dal messaggio
-        message = line
-        if timestamp_match:
-            message = message.replace(timestamp_match.group(0), '', 1)
-        if level_match:
-            message = message.replace(level_match.group(0), '', 1)
-
-        message = message.strip(' -:')
-
-        return {
-            'timestamp': timestamp,
-            'level': level,
-            'message': message[:200]  # Limita lunghezza messaggio
-        }
 
 
 @method_decorator(csrf_exempt, name='dispatch')

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import MqttConnection, SensorDevice, SensorData, ConnectionLog, MqttTopic
+from .models import MqttConnection, SensorDevice, SensorData, MqttTopic
 
 
 class MqttTopicInline(admin.TabularInline):
@@ -13,10 +13,11 @@ class MqttTopicInline(admin.TabularInline):
 
 @admin.register(MqttConnection)
 class MqttConnectionAdmin(admin.ModelAdmin):
-    list_display = ['site', 'broker_host', 'broker_port', 'status', 'topics_count', 'last_connected_at', 'last_heartbeat_at', 'connection_errors']
-    list_filter = ['status', 'ssl_enabled', 'created_at']
+    list_display = ['site', 'is_enabled', 'broker_host', 'broker_port', 'status', 'topics_count', 'last_connected_at', 'last_heartbeat_at', 'connection_errors']
+    list_filter = ['is_enabled', 'status', 'ssl_enabled', 'created_at']
     search_fields = ['site__name', 'broker_host', 'client_id_prefix']
     readonly_fields = ['last_connected_at', 'last_heartbeat_at', 'connection_errors', 'created_at', 'updated_at']
+    list_editable = ['is_enabled']
     inlines = [MqttTopicInline]
 
     fieldsets = (
@@ -24,7 +25,7 @@ class MqttConnectionAdmin(admin.ModelAdmin):
             'fields': ('site',)
         }),
         ('Connection', {
-            'fields': ('broker_host', 'broker_port', 'client_id_prefix')
+            'fields': ('is_enabled', 'broker_host', 'broker_port', 'client_id_prefix')
         }),
         ('Authentication', {
             'fields': ('username', 'password'),
@@ -56,6 +57,7 @@ class MqttConnectionAdmin(admin.ModelAdmin):
         total_count = obj.topics.count()
         return f"{active_count}/{total_count}"
     topics_count.short_description = 'Topics (Active/Total)'
+
 
 
 @admin.register(SensorDevice)
@@ -131,30 +133,6 @@ class SensorDataAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False  # I dati vengono aggiunti automaticamente dal sistema MQTT
 
-
-@admin.register(ConnectionLog)
-class ConnectionLogAdmin(admin.ModelAdmin):
-    list_display = ['mqtt_connection', 'event_type', 'message_preview', 'timestamp']
-    list_filter = ['event_type', 'mqtt_connection__site', 'timestamp']
-    search_fields = ['mqtt_connection__site__name', 'message']
-    readonly_fields = ['mqtt_connection', 'event_type', 'message', 'timestamp']
-    date_hierarchy = 'timestamp'
-
-    def message_preview(self, obj):
-        return obj.message[:50] + '...' if len(obj.message) > 50 else obj.message
-    message_preview.short_description = 'Message'
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('mqtt_connection', 'mqtt_connection__site')
-
-    def has_add_permission(self, request):
-        return False  # I log vengono aggiunti automaticamente dal sistema
-
-    def has_change_permission(self, request, obj=None):
-        return False  # I log non possono essere modificati
-
-    def has_delete_permission(self, request, obj=None):
-        return request.user.is_superuser  # Solo i superuser possono eliminare i log
 
 
 @admin.register(MqttTopic)

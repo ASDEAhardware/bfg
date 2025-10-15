@@ -9,6 +9,7 @@ import { SensorCard } from "@/components/SensorCard";
 import { ContextualStatusBar, useContextualStatusBar } from "@/components/ContextualStatusBar";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { useGridStore } from "@/store/gridStore";
+import { useMqttConnectionStatus } from "@/hooks/useMqttStatus";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,6 +80,7 @@ export default function DataLoggerPage() {
   const { createCountItems, createFilterItems } = useContextualStatusBar();
   const { selectedSiteId } = useUnifiedSiteContext();
   const { isGridModeEnabled } = useGridStore();
+  const { connection: mqttConnection, isConnected: isMqttConnected } = useMqttConnectionStatus(selectedSiteId);
   const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +109,28 @@ export default function DataLoggerPage() {
 
   // Hook per rilevare la larghezza del container
   const [containerRef, { isMobile, width }] = useContainerWidth();
+
+  // Helper function to get MQTT status badge variant and text
+  const getMqttStatusBadge = () => {
+    if (!selectedSiteId) return null;
+
+    if (!mqttConnection) {
+      return { variant: "secondary" as const, text: "Non configurato", color: "text-muted-foreground" };
+    }
+
+    switch (mqttConnection.status) {
+      case 'connected':
+        return { variant: "default" as const, text: "MQTT Connesso", color: "text-green-600" };
+      case 'connecting':
+        return { variant: "secondary" as const, text: "MQTT Connessione...", color: "text-blue-600" };
+      case 'disconnected':
+        return { variant: "outline" as const, text: "MQTT Disconnesso", color: "text-orange-600" };
+      case 'error':
+        return { variant: "destructive" as const, text: "MQTT Errore", color: "text-red-600" };
+      default:
+        return { variant: "secondary" as const, text: "MQTT Sconosciuto", color: "text-muted-foreground" };
+    }
+  };
 
   // Fetch all dataloggers for the selected site
   useEffect(() => {
@@ -566,10 +590,18 @@ export default function DataLoggerPage() {
         <div className="flex flex-col">
           {/* Header row: Title + Controls - responsive */}
           <div className={`flex items-center ${width < 500 ? 'flex-col gap-2' : 'justify-between'}`}>
-            {/* Left section: Icon + Title */}
+            {/* Left section: Icon + Title + MQTT Status */}
             <div className="flex items-center gap-3">
               <Videotape className="h-5 w-5 text-muted-foreground shrink-0" />
               <h1 className="text-lg font-semibold">Datalogger</h1>
+              {(() => {
+                const status = getMqttStatusBadge();
+                return status && (
+                  <Badge variant={status.variant} className={`text-xs ${status.color}`}>
+                    {status.text}
+                  </Badge>
+                );
+              })()}
             </div>
 
             {/* Right section: All controls - responsive layout */}

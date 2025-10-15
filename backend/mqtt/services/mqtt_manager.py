@@ -6,7 +6,7 @@ import uuid
 from typing import Dict, Optional
 from django.utils import timezone
 from django.conf import settings
-from ..models import MqttConnection, ConnectionLog
+from ..models import MqttConnection
 from .message_parser import MqttMessageParser
 
 logger = logging.getLogger(__name__)
@@ -40,10 +40,10 @@ class MqttClientManager:
         self.initialized = True
 
     def start_all_connections(self):
-        """Avvia tutte le connessioni MQTT configurate"""
+        """Avvia tutte le connessioni MQTT configurate e abilitate"""
         with self._lock:
             connections = MqttConnection.objects.filter(
-                status__in=['disconnected', 'error']
+                is_enabled=True
             ).select_related('site')
 
             logger.info(f"Starting {connections.count()} MQTT connections...")
@@ -57,9 +57,14 @@ class MqttClientManager:
         try:
             conn = MqttConnection.objects.select_related('site').get(site_id=site_id)
 
-            if site_id in self.clients:
-                logger.warning(f"Connection already exists for site {site_id}")
+            # Controlla se la connessione è abilitata
+            if not conn.is_enabled:
+                logger.info(f"Skipping disabled connection for site {conn.site.name}")
                 return
+
+            if site_id in self.clients:
+                logger.warning(f"Connection already exists for site {site_id}, stopping existing client")
+                self.stop_connection(site_id)
 
             # Crea client MQTT con ID univoco
             unique_id = str(uuid.uuid4())[:8]
@@ -157,6 +162,7 @@ class MqttClientManager:
         try:
             # Controlla connessioni che dovrebbero essere attive ma non lo sono
             active_connections = MqttConnection.objects.filter(
+                is_enabled=True,
                 status='connected'
             ).exclude(site_id__in=self.clients.keys())
 
@@ -169,9 +175,10 @@ class MqttClientManager:
                     attempts = self.reconnect_attempts.get(conn.site.id, 0)
                     logger.debug(f"Skipping reconnection for {conn.site.name} (attempt {attempts}, backing off)")
 
-            # Controlla heartbeat timeout
+            # Controlla heartbeat timeout solo per connessioni abilitate
             timeout_threshold = timezone.now() - timezone.timedelta(minutes=5)
             timed_out_connections = MqttConnection.objects.filter(
+                is_enabled=True,
                 status='connected',
                 last_heartbeat_at__lt=timeout_threshold
             )
@@ -182,12 +189,6 @@ class MqttClientManager:
                 conn.error_message = 'Heartbeat timeout'
                 conn.save()
 
-                # Log timeout event
-                ConnectionLog.objects.create(
-                    mqtt_connection=conn,
-                    event_type='heartbeat_missed',
-                    message='Heartbeat timeout detected'
-                )
 
         except Exception as e:
             logger.error(f"Error during health check: {e}")
@@ -237,12 +238,6 @@ class MqttClientManager:
                         if result[0] != 0 and mqtt_topic.auto_retry:
                             logger.warning(f"Subscription failed for {full_topic}, will retry later")
 
-                # Log evento
-                ConnectionLog.objects.create(
-                    mqtt_connection=conn,
-                    event_type='connected',
-                    message=f'Connected to {conn.broker_host}:{conn.broker_port}'
-                )
 
                 logger.info(f"Successfully connected to MQTT for site {conn.site.name}")
 
@@ -263,12 +258,6 @@ class MqttClientManager:
                 conn.connection_errors += 1
                 conn.error_message = f'Unexpected disconnection, code: {rc}'
 
-                # Log evento
-                ConnectionLog.objects.create(
-                    mqtt_connection=conn,
-                    event_type='disconnected',
-                    message=f'Unexpected disconnection with code {rc}'
-                )
 
                 logger.warning(f"Unexpected disconnection for site {conn.site.name}, code: {rc}")
             else:
@@ -314,12 +303,6 @@ class MqttClientManager:
             conn.error_message = error_message
             conn.save()
 
-            # Log evento
-            ConnectionLog.objects.create(
-                mqtt_connection=conn,
-                event_type='error',
-                message=error_message
-            )
 
             logger.error(f"Connection error for site {conn.site.name}: {error_message}")
 
@@ -346,19 +329,35 @@ class MqttClientManager:
         self.reconnect_attempts.clear()
         self.last_attempt.clear()
 
+        # Disconnetti eventuali connessioni disabilitate
+        self._disconnect_disabled_connections()
+
         # Riavvia tutto
         self.start_all_connections()
 
         logger.info("All MQTT connections restarted")
 
+    def _disconnect_disabled_connections(self):
+        """Disconnetti connessioni che sono state disabilitate"""
+        disabled_connections = MqttConnection.objects.filter(is_enabled=False)
+        for conn in disabled_connections:
+            if conn.site.id in self.clients:
+                logger.info(f"Disconnecting disabled connection for site {conn.site.name}")
+                self.stop_connection(conn.site.id)
+                # Aggiorna status nel database
+                conn.status = 'disabled'
+                conn.save(update_fields=['status'])
+
     def get_connection_status(self):
         """Restituisce stato di tutte le connessioni"""
         status = {
             'total_configured': MqttConnection.objects.count(),
+            'enabled_connections': MqttConnection.objects.filter(is_enabled=True).count(),
+            'disabled_connections': MqttConnection.objects.filter(is_enabled=False).count(),
             'active_clients': len(self.clients),
-            'connected': MqttConnection.objects.filter(status='connected').count(),
-            'errors': MqttConnection.objects.filter(status='error').count(),
-            'disconnected': MqttConnection.objects.filter(status='disconnected').count(),
+            'connected': MqttConnection.objects.filter(is_enabled=True, status='connected').count(),
+            'errors': MqttConnection.objects.filter(is_enabled=True, status='error').count(),
+            'disconnected': MqttConnection.objects.filter(is_enabled=True, status='disconnected').count(),
             'running': self.running,
         }
         return status

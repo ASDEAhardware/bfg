@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { RefreshCw, RotateCcw, Terminal, Activity } from 'lucide-react'
+import { RefreshCw, RotateCcw, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface MqttServiceStatus {
@@ -12,22 +12,21 @@ interface MqttServiceStatus {
   process_count: number
   uptime?: string
   error?: string
+  active_connections?: number
+  total_connections?: number
+  service_started?: boolean
 }
 
-interface LogEntry {
-  timestamp: string
-  level: string
-  message: string
-}
 
 export default function MqttControlPage() {
   const [status, setStatus] = useState<MqttServiceStatus | null>(null)
-  const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [fetching, setFetching] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(false)
 
   // Fetch MQTT service status
   const fetchStatus = async () => {
+    setFetching(true)
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/mqtt/service/status/`)
       if (!response.ok) throw new Error('Failed to fetch status')
@@ -36,20 +35,11 @@ export default function MqttControlPage() {
     } catch (error) {
       console.error('Error fetching MQTT status:', error)
       setStatus({ is_running: false, process_count: 0, error: 'Connection error' })
+    } finally {
+      setFetching(false)
     }
   }
 
-  // Fetch logs
-  const fetchLogs = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/mqtt/service/logs/`)
-      if (!response.ok) throw new Error('Failed to fetch logs')
-      const data = await response.json()
-      setLogs(data.logs || [])
-    } catch (error) {
-      console.error('Error fetching logs:', error)
-    }
-  }
 
   // Service control actions
   const restartService = async () => {
@@ -79,12 +69,10 @@ export default function MqttControlPage() {
   // Auto-refresh effect
   useEffect(() => {
     fetchStatus()
-    fetchLogs()
 
     if (autoRefresh) {
       const interval = setInterval(() => {
         fetchStatus()
-        fetchLogs()
       }, 5000)
       return () => clearInterval(interval)
     }
@@ -102,15 +90,6 @@ export default function MqttControlPage() {
     return status.is_running ? 'Running (Auto-started)' : 'Starting...'
   }
 
-  const getLogLevelColor = (level: string) => {
-    switch (level.toLowerCase()) {
-      case 'error': return 'text-red-500'
-      case 'warning': return 'text-yellow-500'
-      case 'info': return 'text-blue-500'
-      case 'debug': return 'text-gray-500'
-      default: return 'text-gray-700'
-    }
-  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -131,12 +110,10 @@ export default function MqttControlPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              fetchStatus()
-              fetchLogs()
-            }}
+            onClick={fetchStatus}
+            disabled={fetching}
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className={`h-4 w-4 mr-2 ${fetching ? 'animate-spin' : ''}`} />
             Refresh Now
           </Button>
         </div>
@@ -189,43 +166,12 @@ export default function MqttControlPage() {
               Restart Service
             </Button>
             <div className="text-sm text-muted-foreground ml-4 flex items-center">
-              ℹ️ Service auto-starts with Django. Use restart to reload connections.
+              💡 Service auto-starts with Django. Use restart if needed.
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Logs Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Terminal className="h-5 w-5" />
-            Recent Logs
-          </CardTitle>
-          <CardDescription>
-            Last 100 lines from MQTT service logs (auto-refreshes every 5 seconds)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-gray-900 text-gray-100 p-4 rounded-md font-mono text-sm max-h-96 overflow-y-auto">
-            {logs.length === 0 ? (
-              <div className="text-gray-400 text-center py-4">
-                No logs available
-              </div>
-            ) : (
-              logs.map((log, index) => (
-                <div key={index} className="mb-1">
-                  <span className="text-gray-400">[{log.timestamp}]</span>
-                  <span className={`ml-2 ${getLogLevelColor(log.level)}`}>
-                    {log.level.toUpperCase()}
-                  </span>
-                  <span className="ml-2">{log.message}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
