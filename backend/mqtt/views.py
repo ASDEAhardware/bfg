@@ -1,217 +1,252 @@
-# mqtt/views.py
-
-import paho.mqtt.client as mqtt
-import ssl
-import json
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.conf import settings
-from .models import Device, DataloggerStatus, SubscriberStatus
-from django.views.decorators.cache import never_cache
+from django.views.generic import TemplateView
+from django.views import View
+from django.contrib.admin.views.decorators import staff_member_required
+from django.utils.decorators import method_decorator
+from django.db.models import Count, Q
+from django.utils import timezone
+from datetime import timedelta
+from .models import MqttConnection, SensorDevice, SensorData, ConnectionLog
+from .services.message_parser import MqttMessageParser
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def send_mqtt_command(request):
+
+@method_decorator(staff_member_required, name='dispatch')
+class MqttDashboardView(TemplateView):
     """
-    Accepts a POST request with a command and sends it to MQTT.
-    Example request body: {"command": "start"}
+    Dashboard principale MQTT con overview di tutte le connessioni
     """
-    try:
-        data = json.loads(request.body)
-        command = data.get('command')
+    template_name = 'mqtt/dashboard.html'
 
-        if command not in ['start', 'stop', 'status', 'start --detect']:
-            return JsonResponse({'status': 'error', 'message': 'Invalid command'}, status=400)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
 
-        client = mqtt.Client(
-            client_id=settings.MQTT_CONTROL_CLIENT_ID,
-            protocol=mqtt.MQTTv311,
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+        # Statistics generali
+        total_connections = MqttConnection.objects.count()
+        active_connections = MqttConnection.objects.filter(status='connected').count()
+        error_connections = MqttConnection.objects.filter(status='error').count()
+
+        total_sensors = SensorDevice.objects.count()
+        online_sensors = SensorDevice.objects.filter(is_online=True).count()
+        offline_sensors = SensorDevice.objects.filter(is_online=False).count()
+
+        # Connessioni con dettagli
+        connections = MqttConnection.objects.select_related('site').annotate(
+            sensor_count=Count('site__sensordevice'),
+            online_sensor_count=Count('site__sensordevice', filter=Q(site__sensordevice__is_online=True))
+        ).order_by('site__name')
+
+        # Log recenti (ultimi 50)
+        recent_logs = ConnectionLog.objects.select_related(
+            'mqtt_connection', 'mqtt_connection__site'
+        ).order_by('-timestamp')[:50]
+
+        # Sensori per sito
+        sites_with_sensors = {}
+        for conn in connections:
+            sensors = SensorDevice.objects.filter(site=conn.site).order_by('device_name')
+            sites_with_sensors[conn.site.id] = sensors
+
+        context.update({
+            'total_connections': total_connections,
+            'active_connections': active_connections,
+            'error_connections': error_connections,
+            'total_sensors': total_sensors,
+            'online_sensors': online_sensors,
+            'offline_sensors': offline_sensors,
+            'connections': connections,
+            'recent_logs': recent_logs,
+            'sites_with_sensors': sites_with_sensors,
+        })
+
+        return context
+
+
+class MqttConnectionControlView(View):
+    """
+    API per controllare connessioni MQTT (start/stop/restart)
+    """
+
+    def post(self, request, site_id):
+        action = request.POST.get('action')
+
+        if action not in ['start', 'stop', 'restart']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid action. Use: start, stop, restart'
+            }, status=400)
+
+        try:
+            connection = get_object_or_404(MqttConnection, site_id=site_id)
+
+            # TODO: Implementare controllo tramite manager globale
+            # Per ora solo update status nel database
+
+            if action == 'start':
+                if connection.status in ['disconnected', 'error']:
+                    connection.status = 'connecting'
+                    connection.save()
+                    message = f'Starting connection for {connection.site.name}'
+                else:
+                    message = f'Connection for {connection.site.name} already active'
+
+            elif action == 'stop':
+                if connection.status == 'connected':
+                    connection.status = 'disconnected'
+                    connection.save()
+                    message = f'Stopped connection for {connection.site.name}'
+                else:
+                    message = f'Connection for {connection.site.name} not active'
+
+            elif action == 'restart':
+                connection.status = 'connecting'
+                connection.error_message = ''
+                connection.connection_errors = 0
+                connection.save()
+                message = f'Restarting connection for {connection.site.name}'
+
+            # Log action
+            ConnectionLog.objects.create(
+                mqtt_connection=connection,
+                event_type='connected' if action == 'start' else 'disconnected',
+                message=f'Manual {action} via dashboard'
+            )
+
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'new_status': connection.status
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+
+@method_decorator(staff_member_required, name='dispatch')
+class MqttSiteDetailView(TemplateView):
+    """
+    Dettagli MQTT per un sito specifico
+    """
+    template_name = 'mqtt/site_detail.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        site_id = kwargs.get('site_id')
+
+        connection = get_object_or_404(
+            MqttConnection.objects.select_related('site'),
+            site_id=site_id
         )
-        client.username_pw_set(settings.MQTT_USERNAME, settings.MQTT_PASSWORD)
-        client.tls_set(ca_certs=None, cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLS_CLIENT)
-        # client.tls_insecure_set(True)
 
-        client.connect(settings.MQTT_BROKER, settings.MQTT_PORT, 60)
-        client.loop_start()
-        
-        result = client.publish(settings.MQTT_CONTROL_TOPIC, command, qos=1)
-        result.wait_for_publish() # Wait for send confirmation
-        
-        client.loop_stop()
-        client.disconnect()
+        # Sensori del sito
+        sensors = SensorDevice.objects.filter(site_id=site_id).order_by('device_name')
 
-        return JsonResponse({'status': 'success', 'message': f'Command "{command}" sent.'})
+        # Dati recenti per ogni sensore
+        sensors_with_data = []
+        for sensor in sensors:
+            recent_data = SensorData.objects.filter(
+                sensor_device=sensor
+            ).order_by('-timestamp')[:3]  # Ultimi 3 record
 
-    except json.JSONDecodeError:
-        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+            sensors_with_data.append({
+                'sensor': sensor,
+                'data': recent_data
+            })
+
+        # Statistiche del sito
+        stats = MqttMessageParser.get_sensor_statistics(site_id)
+
+        # Log del sito (ultimi 20)
+        site_logs = ConnectionLog.objects.filter(
+            mqtt_connection=connection
+        ).order_by('-timestamp')[:20]
+
+        context.update({
+            'connection': connection,
+            'sensors_with_data': sensors_with_data,
+            'stats': stats,
+            'site_logs': site_logs,
+        })
+
+        return context
 
 
-@csrf_exempt
-@never_cache
-@require_http_methods(["GET"])
-def get_datalogger_status(request):
+class MqttApiStatusView(View):
     """
-    Returns the current datalogger status.
+    API per status real-time (per AJAX polling)
     """
-    try:
-        status_obj = DataloggerStatus.objects.filter(pk=1).first()
-        if status_obj:
-            return JsonResponse({
-                'status': 'success',
-                'data': {
-                    'status': status_obj.status,
-                    'details': status_obj.details,
-                    'timestamp': status_obj.timestamp.isoformat()
+
+    def get(self, request):
+        # Status generale
+        connections = MqttConnection.objects.select_related('site').values(
+            'id', 'site__name', 'site__code', 'status', 'last_connected_at',
+            'last_heartbeat_at', 'connection_errors', 'error_message'
+        )
+
+        # Sensori online/offline per sito
+        sensor_stats = {}
+        for conn in MqttConnection.objects.all():
+            stats = MqttMessageParser.get_sensor_statistics(conn.site.id)
+            sensor_stats[conn.site.id] = stats
+
+        return JsonResponse({
+            'connections': list(connections),
+            'sensor_stats': sensor_stats,
+            'timestamp': timezone.now().isoformat()
+        })
+
+
+class MqttApiSensorDataView(View):
+    """
+    API per dati sensori real-time
+    """
+
+    def get(self, request, site_id):
+        try:
+            # Ultimi dati per tutti i sensori del sito
+            sensors = SensorDevice.objects.filter(site_id=site_id)
+
+            sensor_data = []
+            for sensor in sensors:
+                latest_data = SensorData.objects.filter(
+                    sensor_device=sensor
+                ).order_by('-timestamp').first()
+
+                sensor_info = {
+                    'device_name': sensor.device_name,
+                    'is_online': sensor.is_online,
+                    'last_seen_at': sensor.last_seen_at.isoformat() if sensor.last_seen_at else None,
+                    'total_messages': sensor.total_messages,
+                    'consecutive_misses': sensor.consecutive_misses,
                 }
-            })
-        else:
+
+                if latest_data:
+                    sensor_info.update({
+                        'timestamp': latest_data.timestamp.isoformat(),
+                        'acc_x': latest_data.acc_x,
+                        'acc_y': latest_data.acc_y,
+                        'acc_z': latest_data.acc_z,
+                        'incli_x': latest_data.incli_x,
+                        'incli_y': latest_data.incli_y,
+                        'mag_x': latest_data.mag_x,
+                        'mag_y': latest_data.mag_y,
+                        'mag_z': latest_data.mag_z,
+                        'gyro_x': latest_data.gyro_x,
+                        'gyro_y': latest_data.gyro_y,
+                        'gyro_z': latest_data.gyro_z,
+                    })
+
+                sensor_data.append(sensor_info)
+
             return JsonResponse({
-                'status': 'success',
-                'data': {
-                    'status': 'unknown',
-                    'details': 'No status information available',
-                    'timestamp': None
-                }
-            })
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-@require_http_methods(["GET"])
-def get_discovered_devices(request):
-    """
-    Returns all discovered devices.
-    """
-    try:
-        devices = Device.objects.all()
-        devices_data = []
-        for device in devices:
-            devices_data.append({
-                'serial_number': device.serial_number,
-                'ip_address': device.ip_address,
-                'software_version': device.software_version,
-                'last_seen': device.last_seen.isoformat()
+                'sensors': sensor_data,
+                'timestamp': timezone.now().isoformat()
             })
 
-        return JsonResponse({
-            'status': 'success',
-            'data': devices_data
-        })
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def start_subscriber(request):
-    """
-    Starts the MQTT subscriber process.
-    """
-    try:
-        import subprocess
-        import os
-
-        # Check if subscriber is already running
-        subscriber_status, created = SubscriberStatus.objects.get_or_create(pk=1)
-
-        if subscriber_status.status == 'connected':
-            return JsonResponse({'status': 'warning', 'message': 'Subscriber is already running'})
-
-        # Start the subscriber process
-        subscriber_status.status = 'connecting'
-        subscriber_status.error_message = None
-        subscriber_status.save()
-
-        # Start the management command in background
-        process = subprocess.Popen([
-            'python', 'manage.py', 'mqtt_subscriber'
-        ], cwd='/app', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        subscriber_status.process_id = process.pid
-        subscriber_status.status = 'connected'
-        subscriber_status.save()
-
-        return JsonResponse({
-            'status': 'success',
-            'message': 'MQTT subscriber started successfully',
-            'process_id': process.pid
-        })
-
-    except Exception as e:
-        if 'subscriber_status' in locals():
-            subscriber_status.status = 'error'
-            subscriber_status.error_message = str(e)
-            subscriber_status.save()
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def stop_subscriber(request):
-    """
-    Stops the MQTT subscriber process.
-    """
-    try:
-        import signal
-
-        subscriber_status = SubscriberStatus.objects.filter(pk=1).first()
-
-        if not subscriber_status or subscriber_status.status == 'disconnected':
-            return JsonResponse({'status': 'warning', 'message': 'Subscriber is not running'})
-
-        # Try to stop the process if we have a PID
-        if subscriber_status.process_id:
-            try:
-                os.kill(subscriber_status.process_id, signal.SIGTERM)
-            except ProcessLookupError:
-                pass  # Process already stopped
-
-        subscriber_status.status = 'disconnected'
-        subscriber_status.process_id = None
-        subscriber_status.error_message = None
-        subscriber_status.save()
-
-        return JsonResponse({
-            'status': 'success',
-            'message': 'MQTT subscriber stopped successfully'
-        })
-
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-@require_http_methods(["GET"])
-def get_subscriber_status(request):
-    """
-    Returns the current MQTT subscriber status.
-    """
-    try:
-        subscriber_status = SubscriberStatus.objects.filter(pk=1).first()
-
-        if not subscriber_status:
+        except Exception as e:
             return JsonResponse({
-                'status': 'success',
-                'data': {
-                    'status': 'disconnected',
-                    'last_heartbeat': None,
-                    'error_message': None,
-                    'process_id': None
-                }
-            })
-
-        return JsonResponse({
-            'status': 'success',
-            'data': {
-                'status': subscriber_status.status,
-                'last_heartbeat': subscriber_status.last_heartbeat.isoformat(),
-                'error_message': subscriber_status.error_message,
-                'process_id': subscriber_status.process_id
-            }
-        })
-
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+                'error': str(e)
+            }, status=500)
