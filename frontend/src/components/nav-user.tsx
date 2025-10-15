@@ -35,7 +35,6 @@ export function NavUser({
   user,
   isLoading,
   error,
-  tooltip
 }: {
   user?: User,
   isLoading?: boolean,
@@ -82,7 +81,7 @@ export function NavUser({
     return url;
   }
 
-  return (
+  const profile_section = (
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
@@ -120,6 +119,7 @@ export function NavUser({
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
+            alignOffset={isMobile ? 0 : 5}
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
@@ -152,4 +152,19 @@ export function NavUser({
       </SidebarMenuItem>
     </SidebarMenu>
   )
+
+  if (isCollapsed) {
+    return (
+      <Tooltip>
+          <TooltipTrigger asChild>
+              {profile_section}
+          </TooltipTrigger>
+          <TooltipContent side="right" align="center">
+              Profile
+          </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return profile_section
 }
