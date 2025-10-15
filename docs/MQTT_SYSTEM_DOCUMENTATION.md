@@ -47,8 +47,18 @@ Il sistema MQTT IoT di BFG consente il monitoraggio in tempo reale di sensori di
 
 ## 🖥️ Come Usare l'Interfaccia
 
-### 📍 Accesso alla Pagina MQTT
+### 📍 Accesso alle Interfacce MQTT
 
+#### **🎛️ Pannello di Controllo MQTT (NUOVO)**
+1. **Login**: Accedi come utente staff
+2. **Admin Panel**: Vai su `http://localhost:3000/mqtt-control`
+3. **Funzionalità**:
+   - 📊 **Status in tempo reale**: Vedi se il servizio MQTT è attivo
+   - 🔄 **Restart servizio**: Riavvia tutte le connessioni MQTT
+   - 📋 **Log viewer**: Ultimi eventi MQTT con auto-refresh
+   - 📈 **Statistiche**: Connessioni attive/totali per sito
+
+#### **📊 Dashboard Sensori**
 1. **Login**: Accedi come utente staff
 2. **Navigazione**: Vai su `http://localhost:3000/mqtt-datalogger`
 3. **Selezione Sito**: Usa il menu a tendina per selezionare il sito
@@ -120,33 +130,32 @@ frontend/src/
 
 ### 🚀 Avvio del Sistema
 
-#### **⚠️ IMPORTANTE: Il Subscriber MQTT NON si avvia automaticamente!**
+#### **✅ NOVITÀ: Il Subscriber MQTT si avvia automaticamente!**
 
-Il comando `podman-compose up` avvia solo:
-- Database PostgreSQL
-- Django web server
-- Next.js frontend
-- **NON avvia il subscriber MQTT**
+Il sistema MQTT è ora completamente integrato nel lifecycle di Django:
+- ✅ **Auto-start**: Si avvia automaticamente quando Django parte
+- ✅ **Auto-restart**: Si riavvia automaticamente in caso di problemi
+- ✅ **Health monitoring**: Controlla connessioni ogni 30 secondi
+- ✅ **Singleton pattern**: Un'unica istanza gestita centralmente
 
-#### **1. Avvio Container**
+#### **1. Avvio Container (Tutto automatico)**
 ```bash
-# Prima avvia tutti i container
+# Avvia tutti i container - MQTT incluso
 podman-compose up -d
 
-# Aspetta che i container siano pronti
-sleep 10
+# Aspetta che Django carichi completamente
+sleep 15
+
+# Verifica che MQTT sia partito automaticamente
+curl http://localhost:8000/api/v1/mqtt/service/status/ | jq
 ```
 
-#### **2. Avvio Manuale Subscriber MQTT**
+#### **2. ⚠️ Metodo Manuale (Legacy - Non più necessario)**
 ```bash
-# OBBLIGATORIO: Avvia il subscriber MQTT manualmente
-podman exec bfg_backend python manage.py run_mqtt
+# DEPRECATO: Non serve più lanciare manualmente
+# podman exec bfg_backend python manage.py run_mqtt
 
-# Con logging dettagliato (consigliato per debug)
-podman exec bfg_backend python manage.py run_mqtt --log-level DEBUG
-
-# In background (per produzione)
-podman exec -d bfg_backend python manage.py run_mqtt
+# Il servizio ora parte automaticamente via Django AppConfig
 ```
 
 #### **⚠️ RISOLUZIONE PROBLEMI COMUNI**
@@ -173,31 +182,67 @@ print([l for l in os.popen('ps aux').readlines() if 'run_mqtt' in l])
 "
 ```
 
-#### **3. Verifica che il Subscriber sia Attivo**
+#### **3. Controllo Status da Bash**
 ```bash
-# Controlla se il processo MQTT è running
-podman exec bfg_backend ps aux | grep run_mqtt
+# ✅ Status rapido del servizio MQTT
+curl http://localhost:8000/api/v1/mqtt/service/status/ | jq
 
-# Controlla connessioni tramite API
-curl http://localhost:8000/api/v1/mqtt/api/status/ | jq
+# ✅ Status completo tramite manager Django
+podman exec bfg_backend python manage.py shell -c "
+from mqtt.services.mqtt_manager import MqttClientManager
+manager = MqttClientManager.get_instance()
+status = manager.get_connection_status()
+print(f'Active: {status[\"active_clients\"]}/{status[\"total_configured\"]}')
+print(f'Connected: {status[\"connected\"]}, Errors: {status[\"errors\"]}')
+"
 
-# Controlla sensori sito specifico
-curl http://localhost:8000/api/v1/mqtt/api/sensors/6/ | jq
+# ✅ Verifica processi (fallback)
+podman exec bfg_backend python -c "
+import os
+processes = [line for line in os.popen('ps aux').readlines() if 'run_mqtt' in line]
+print(f'MQTT processes: {len(processes)}')
+"
 ```
 
-#### **4. Sequenza di Avvio Completa**
+#### **4. Controlli Manuali da Bash**
 ```bash
-# 1. Avvia container
+# 🔄 Restart servizio MQTT (consigliato)
+curl -X POST http://localhost:8000/api/v1/mqtt/service/control/ \
+  -H "Content-Type: application/json" \
+  -d '{"action": "restart"}'
+
+# 🔄 Restart tramite manager Django
+podman exec bfg_backend python manage.py shell -c "
+from mqtt.services.mqtt_manager import MqttClientManager
+manager = MqttClientManager.get_instance()
+manager.restart_all_connections()
+print('MQTT service restarted')
+"
+
+# ⚠️ Stop processo (sconsigliato - si riavvia automaticamente)
+podman exec bfg_backend python -c "
+import os
+for line in os.popen('ps aux').readlines():
+    if 'run_mqtt' in line and 'python' in line:
+        pid = line.split()[1]
+        os.system(f'kill {pid}')
+        print(f'Killed process {pid}')
+"
+```
+
+#### **5. Sequenza di Avvio Completa (Aggiornata)**
+```bash
+# 1. Avvia container (MQTT incluso automaticamente)
 podman-compose up -d
 
-# 2. Aspetta che siano tutti running
-sleep 10
+# 2. Aspetta che Django carichi
+sleep 15
 
-# 3. Avvia subscriber MQTT
-podman exec -d bfg_backend python manage.py run_mqtt
+# 3. Verifica tutto funzioni automaticamente
+curl http://localhost:8000/api/v1/mqtt/service/status/ | jq '.service_started, .active_connections'
 
-# 4. Verifica tutto funzioni
-curl http://localhost:8000/api/v1/mqtt/api/status/
+# 4. (Opzionale) Accedi al pannello di controllo
+echo "MQTT Control Panel: http://localhost:3000/mqtt-control"
 ```
 
 ### 🔧 Configurazione Nuovi Siti
@@ -262,7 +307,70 @@ sito_001/sys_info                # Info sistema (futuro)
 
 ## 🔧 API Reference
 
-### **Status Endpoint**
+### **🆕 Service Control APIs**
+
+#### **Service Status**
+```http
+GET /api/v1/mqtt/service/status/
+```
+**Response:**
+```json
+{
+  "is_running": true,
+  "process_count": 1,
+  "uptime": "Running via Django AppConfig",
+  "manager_status": {
+    "total_configured": 3,
+    "active_clients": 3,
+    "connected": 3,
+    "errors": 0,
+    "running": false
+  },
+  "service_started": true,
+  "active_connections": 3,
+  "total_connections": 3
+}
+```
+
+#### **Service Logs**
+```http
+GET /api/v1/mqtt/service/logs/
+```
+**Response:**
+```json
+{
+  "logs": [
+    {
+      "timestamp": "2025-10-15 12:30:15",
+      "level": "INFO",
+      "message": "Diga del Vajont: Connected to zionnode.ovh:8883"
+    }
+  ],
+  "total_lines": 52
+}
+```
+
+#### **Service Control**
+```http
+POST /api/v1/mqtt/service/control/
+Content-Type: application/json
+
+{
+  "action": "restart"
+}
+```
+**Response:**
+```json
+{
+  "success": true,
+  "message": "MQTT service restarted successfully",
+  "action": "restart"
+}
+```
+
+### **Dashboard APIs**
+
+#### **Connections Status**
 ```http
 GET /api/v1/mqtt/api/status/
 ```
@@ -293,7 +401,7 @@ GET /api/v1/mqtt/api/status/
 }
 ```
 
-### **Sensor Data Endpoint**
+#### **Sensor Data**
 ```http
 GET /api/v1/mqtt/api/sensors/{site_id}/
 ```
@@ -318,7 +426,7 @@ GET /api/v1/mqtt/api/sensors/{site_id}/
 }
 ```
 
-### **Connection Control Endpoint**
+#### **Legacy: Connection Control**
 ```http
 POST /api/v1/mqtt/connection/{site_id}/control/
 Content-Type: application/json
@@ -419,6 +527,31 @@ podman exec bfg_backend python manage.py shell
 
 ## 🚀 Changelog - Aggiornamenti Recenti
 
+### **v3.0 - Ottobre 2025** 🎉 **LATEST**
+- **🚀 Auto-Start MQTT**: Il servizio ora si avvia automaticamente con Django
+  - Implementato Django AppConfig per auto-start del servizio MQTT
+  - Singleton pattern per MqttClientManager thread-safe
+  - Health monitoring automatico ogni 30 secondi
+  - Zero configurazione manuale necessaria
+- **🎛️ Pannello di Controllo MQTT**: Nuova interfaccia admin completa
+  - Pagina `/mqtt-control` nel menu Staff Panel
+  - Status real-time del servizio e connessioni
+  - Restart service con un click
+  - Log viewer con auto-refresh ogni 5 secondi
+  - Statistiche dettagliate connessioni attive/totali
+- **🔧 API di Controllo**: Nuovi endpoint per gestione servizio
+  - `/api/v1/mqtt/service/status/` - Status completo servizio
+  - `/api/v1/mqtt/service/logs/` - Log eventi MQTT
+  - `/api/v1/mqtt/service/control/` - Restart servizio
+- **📋 Controlli Bash**: Comandi migliorati per controllo manuale
+  - Status tramite singleton manager Django
+  - Restart pulito delle connessioni
+  - Verifica processi e health check
+- **🏗️ Architettura Migliorata**: Sistema più robusto e manutenibile
+  - Eliminato avvio manuale `run_mqtt`
+  - Gestione errori e retry migliorata
+  - Integrazione completa con lifecycle Django
+
 ### **v2.1 - Ottobre 2025** ✅
 - **Fix API Communication**: Risolto errore "Failed to fetch MQTT status"
   - Configurato `NEXT_PUBLIC_API_URL` per comunicazione frontend-backend
@@ -442,34 +575,46 @@ podman exec bfg_backend python manage.py shell
 
 Per problemi o domande:
 
-### **🔧 Checklist Diagnostica Rapida**
+### **🔧 Checklist Diagnostica Rapida (v3.0)**
 ```bash
 # 1. Verifica container attivi
 podman ps
 
-# 2. Test API backend
-curl http://localhost:8000/api/v1/mqtt/api/status/
+# 2. Test servizio MQTT (nuovo endpoint)
+curl http://localhost:8000/api/v1/mqtt/service/status/ | jq
 
-# 3. Test frontend
+# 3. Test pannello di controllo
+curl http://localhost:3000/mqtt-control | head -5
+
+# 4. Test dashboard sensori
 curl http://localhost:3000/mqtt-datalogger | head -5
 
-# 4. Verifica subscriber MQTT
+# 5. Verifica auto-start MQTT
 podman exec bfg_backend python -c "
-import os
-print('MQTT processes:')
-for line in os.popen('ps aux').readlines():
-    if 'run_mqtt' in line: print(line.strip())
+from mqtt.services.mqtt_manager import MqttClientManager
+manager = MqttClientManager.get_instance()
+status = manager.get_connection_status()
+print(f'✅ MQTT Auto-Started: {status[\"active_clients\"]}/{status[\"total_configured\"]} connections')
 "
 ```
 
-### **📋 Sequenza Completa Avvio**
+### **📋 Sequenza Completa Avvio (v3.0 - Automatica)**
 ```bash
-# Avvio completo sistema MQTT
+# 🚀 Avvio automatico completo - Zero configurazione!
 podman-compose up -d
-sleep 10
-podman exec -d bfg_backend python manage.py run_mqtt
-curl http://localhost:8000/api/v1/mqtt/api/status/ | jq '.connections | length'
+sleep 15
+
+# ✅ Verifica tutto sia partito automaticamente
+curl http://localhost:8000/api/v1/mqtt/service/status/ | jq '.service_started, .active_connections'
+
+# 🎛️ Accedi al pannello di controllo
 echo "✅ Sistema MQTT operativo!"
+echo "🎛️ Pannello controllo: http://localhost:3000/mqtt-control"
+echo "📊 Dashboard sensori: http://localhost:3000/mqtt-datalogger"
+
+# 🔄 (Opzionale) Restart se necessario
+curl -X POST http://localhost:8000/api/v1/mqtt/service/control/ \
+  -H "Content-Type: application/json" -d '{"action": "restart"}'
 ```
 
 **Il sistema è ora completamente operativo e pronto per il monitoraggio IoT in tempo reale! 🚀**

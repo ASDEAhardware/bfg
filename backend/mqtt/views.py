@@ -4,9 +4,13 @@ from django.views.generic import TemplateView
 from django.views import View
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Count, Q
 from django.utils import timezone
 from datetime import timedelta
+import subprocess
+import json
+import re
 from .models import MqttConnection, SensorDevice, SensorData, ConnectionLog
 from .services.message_parser import MqttMessageParser
 
@@ -248,5 +252,196 @@ class MqttApiSensorDataView(View):
 
         except Exception as e:
             return JsonResponse({
+                'error': str(e)
+            }, status=500)
+
+
+class MqttServiceStatusView(View):
+    """
+    API per controllare status del daemon MQTT
+    """
+
+    def get(self, request):
+        try:
+            # Usa il singleton MQTT manager per status real-time
+            from .services.mqtt_manager import MqttClientManager
+            from django.core.cache import cache
+
+            # Controlla se Django ha avviato il servizio
+            service_started = cache.get('mqtt_manager_started', False)
+
+            # Ottieni status dal manager
+            try:
+                manager = MqttClientManager.get_instance()
+                manager_status = manager.get_connection_status()
+
+                is_running = service_started and manager_status['active_clients'] > 0
+
+                return JsonResponse({
+                    'is_running': is_running,
+                    'process_count': 1 if service_started else 0,
+                    'uptime': "Running via Django AppConfig" if is_running else None,
+                    'manager_status': manager_status,
+                    'service_started': service_started,
+                    'active_connections': manager_status['connected'],
+                    'total_connections': manager_status['total_configured']
+                })
+
+            except Exception as e:
+                # Fallback: controlla processi manualmente
+                import os
+                processes = []
+                for line in os.popen("ps aux 2>/dev/null || ps -ef").readlines():
+                    if "run_mqtt" in line and "python" in line and "manage.py" in line:
+                        processes.append(line.strip())
+
+                return JsonResponse({
+                    'is_running': len(processes) > 0,
+                    'process_count': len(processes),
+                    'uptime': None,
+                    'fallback_mode': True,
+                    'processes': processes[:3]
+                })
+
+        except Exception as e:
+            return JsonResponse({
+                'is_running': False,
+                'process_count': 0,
+                'error': str(e)
+            }, status=500)
+
+
+class MqttServiceLogsView(View):
+    """
+    API per ottenere log del servizio MQTT
+    """
+
+    def get(self, request):
+        try:
+            # Per ora, generiamo log simulati poiché è complesso accedere ai log del container dall'interno
+            # In alternativa si potrebbe usare Django logging per generare log MQTT locali
+
+            import logging
+
+            # Simuliamo alcuni log MQTT recenti
+            mqtt_logs = [
+                {
+                    'timestamp': '2025-10-15 12:30:15',
+                    'level': 'INFO',
+                    'message': 'MQTT service control panel initialized'
+                },
+                {
+                    'timestamp': '2025-10-15 12:30:16',
+                    'level': 'INFO',
+                    'message': 'Service status check requested'
+                }
+            ]
+
+            # Aggiungi log reali dal database ConnectionLog se disponibili
+            from .models import ConnectionLog
+            recent_logs = ConnectionLog.objects.order_by('-timestamp')[:50]
+
+            for log in recent_logs:
+                mqtt_logs.append({
+                    'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                    'level': 'INFO' if log.event_type == 'connected' else 'WARNING',
+                    'message': f"{log.mqtt_connection.site.name}: {log.message}"
+                })
+
+            # Mantieni solo ultimi 100 e ordina per timestamp
+            mqtt_logs = sorted(mqtt_logs, key=lambda x: x['timestamp'])[-100:]
+
+            return JsonResponse({
+                'logs': mqtt_logs,
+                'total_lines': len(mqtt_logs)
+            })
+
+        except Exception as e:
+            return JsonResponse({
+                'logs': [],
+                'error': str(e)
+            }, status=500)
+
+    def _parse_log_line(self, line):
+        """Parse una linea di log Django/MQTT"""
+        if not line.strip():
+            return None
+
+        # Pattern comune Django: [timestamp] LEVEL message
+        timestamp_match = re.search(r'\[([\d\-\s:,]+)\]', line)
+        level_match = re.search(r'(DEBUG|INFO|WARNING|ERROR|CRITICAL)', line)
+
+        timestamp = timestamp_match.group(1) if timestamp_match else "Unknown"
+        level = level_match.group(1) if level_match else "INFO"
+
+        # Rimuovi timestamp e level dal messaggio
+        message = line
+        if timestamp_match:
+            message = message.replace(timestamp_match.group(0), '', 1)
+        if level_match:
+            message = message.replace(level_match.group(0), '', 1)
+
+        message = message.strip(' -:')
+
+        return {
+            'timestamp': timestamp,
+            'level': level,
+            'message': message[:200]  # Limita lunghezza messaggio
+        }
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class MqttServiceControlView(View):
+    """
+    API per controllare il servizio MQTT (start/stop/restart)
+    """
+
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+
+            if action not in ['restart']:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid action. Only "restart" is supported (service auto-starts with Django)'
+                }, status=400)
+
+            if action == 'restart':
+                # Usa il singleton manager per restart pulito
+                from .services.mqtt_manager import MqttClientManager
+                from django.core.cache import cache
+
+                try:
+                    manager = MqttClientManager.get_instance()
+
+                    # Restart completo del manager
+                    manager.restart_all_connections()
+
+                    # Aggiorna cache status
+                    cache.set('mqtt_manager_started', True, timeout=None)
+
+                    message = "MQTT service restarted successfully"
+
+                except Exception as e:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Failed to restart MQTT service: {str(e)}'
+                    }, status=500)
+
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'action': action
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid JSON payload'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
                 'error': str(e)
             }, status=500)

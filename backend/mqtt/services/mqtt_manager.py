@@ -15,14 +15,29 @@ logger = logging.getLogger(__name__)
 class MqttClientManager:
     """
     Gestisce connessioni MQTT multiple per tutti i siti
+    Singleton pattern per accesso globale
     """
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
+        # Evita re-inizializzazione del singleton
+        if hasattr(self, 'initialized'):
+            return
+
         self.clients: Dict[int, mqtt.Client] = {}  # site_id -> client
         self.running = False
         self._lock = threading.Lock()
         self.reconnect_attempts: Dict[int, int] = {}  # site_id -> attempt count
         self.last_attempt: Dict[int, float] = {}  # site_id -> timestamp
+        self.initialized = True
 
     def start_all_connections(self):
         """Avvia tutte le connessioni MQTT configurate"""
@@ -316,6 +331,26 @@ class MqttClientManager:
         except Exception as e:
             logger.error(f"Error handling connection error for site {site_id}: {e}")
 
+    def restart_all_connections(self):
+        """Riavvia tutte le connessioni MQTT"""
+        logger.info("Restarting all MQTT connections...")
+
+        # Stop tutto
+        self.stop_all_connections()
+
+        # Aspetta un momento
+        import time
+        time.sleep(2)
+
+        # Reset stato riconnessioni
+        self.reconnect_attempts.clear()
+        self.last_attempt.clear()
+
+        # Riavvia tutto
+        self.start_all_connections()
+
+        logger.info("All MQTT connections restarted")
+
     def get_connection_status(self):
         """Restituisce stato di tutte le connessioni"""
         status = {
@@ -324,5 +359,11 @@ class MqttClientManager:
             'connected': MqttConnection.objects.filter(status='connected').count(),
             'errors': MqttConnection.objects.filter(status='error').count(),
             'disconnected': MqttConnection.objects.filter(status='disconnected').count(),
+            'running': self.running,
         }
         return status
+
+    @classmethod
+    def get_instance(cls):
+        """Ottieni istanza singleton del manager"""
+        return cls()
