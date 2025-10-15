@@ -38,6 +38,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { api } from "@/lib/axios";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,6 +88,15 @@ export default function DataLoggerPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSensorSearchOpen, setIsSensorSearchOpen] = useState(false);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 200); // Match transition duration
+    }
+  }, [isSearchOpen]);
 
   // Sensors states
   const [sensors, setSensors] = useState<Sensor[]>([]);
@@ -121,18 +131,10 @@ export default function DataLoggerPage() {
       setError(null);
 
       try {
-        const response = await fetch(`/api/v1/sites/dataloggers/?site_id=${selectedSiteId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          },
+        const response = await api.get('/v1/sites/dataloggers/', {
+          params: { site_id: selectedSiteId }
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch dataloggers');
-        }
-
-        const data = await response.json();
-        setDataloggers(data);
+        setDataloggers(response.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error occurred');
       } finally {
@@ -162,18 +164,8 @@ export default function DataLoggerPage() {
     setSensorsError(null);
 
     try {
-      const response = await fetch(`/api/v1/sites/sensors/by-datalogger/${datalogger.id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch sensors');
-      }
-
-      const data = await response.json();
-      setSensors(data);
+      const response = await api.get(`/v1/sites/sensors/by-datalogger/${datalogger.id}`);
+      setSensors(response.data);
     } catch (err) {
       setSensorsError(err instanceof Error ? err.message : 'Unknown error occurred');
       setSensors([]);
@@ -193,16 +185,10 @@ export default function DataLoggerPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/v1/sites/dataloggers/?site_id=${selectedSiteId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
+      const response = await api.get('/v1/sites/dataloggers/', {
+        params: { site_id: selectedSiteId }
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDataloggers(data);
-      }
+      setDataloggers(response.data);
     } catch (err) {
       console.error('Error refreshing dataloggers:', err);
     } finally {
@@ -657,11 +643,11 @@ export default function DataLoggerPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                ref={searchInputRef}
                 placeholder="Cerca datalogger..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
-                autoFocus={isSearchOpen}
               />
             </div>
           </div>

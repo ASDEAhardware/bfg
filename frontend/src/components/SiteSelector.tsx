@@ -29,18 +29,18 @@ export function SiteSelector() {
 
   if (isLoading) {
     return (
-      <Button variant="outline" className="min-w-[200px] justify-start" disabled>
-        <MapPin className="mr-2 h-4 w-4" />
-        Loading sites...
+      <Button variant="outline" className="w-full max-w-[200px] justify-start" disabled>
+        <MapPin className="mr-2 h-4 w-4 flex-shrink-0" />
+        <span className="truncate">Loading sites...</span>
       </Button>
     );
   }
 
   if (sites.length === 0) {
     return (
-      <Button variant="outline" className="min-w-[200px] justify-start" disabled>
-        <MapPin className="mr-2 h-4 w-4" />
-        No sites available
+      <Button variant="outline" className="w-full max-w-[200px] justify-start" disabled>
+        <MapPin className="mr-2 h-4 w-4 flex-shrink-0" />
+        <span className="truncate">No sites available</span>
       </Button>
     );
   }
@@ -48,12 +48,12 @@ export function SiteSelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="min-w-[200px] justify-between">
-          <div className="flex items-center">
-            <MapPin className="mr-2 h-4 w-4" />
-            <div className="text-left">
+        <Button variant="outline" className="w-full max-w-[200px] justify-between">
+          <div className="flex items-center min-w-0">
+            <MapPin className="mr-2 h-4 w-4 flex-shrink-0" />
+            <div className="text-left truncate">
               {selectedSite ? (
-                <div className="font-medium">{selectedSite.name}</div>
+                <div className="font-medium truncate">{selectedSite.name}</div>
               ) : (
                 "Select site..."
               )}

@@ -1,7 +1,8 @@
-from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
+from rest_framework import viewsets, permissions, status #type: ignore
+from rest_framework.decorators import action #type: ignore
+from rest_framework.response import Response #type: ignore
 from django.db.models import Q
+from django.contrib.auth import get_user_model
 from .models import Site, UserSiteAccess, Datalogger, Sensor
 from .serializers import (
     SiteSerializer,
@@ -56,7 +57,6 @@ class SiteViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            from django.contrib.auth import get_user_model
             User = get_user_model()
             user = User.objects.get(id=user_id)
 

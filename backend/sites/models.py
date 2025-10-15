@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -26,7 +27,7 @@ class Site(models.Model):
     latitude = models.DecimalField(
         max_digits=17,
         decimal_places=12,
-        default=42.445341640630,
+        default=Decimal(42.445341640630),
         validators=[
             MinValueValidator(-90.0),
             MaxValueValidator(90.0)
@@ -36,7 +37,7 @@ class Site(models.Model):
     longitude = models.DecimalField(
         max_digits=17,
         decimal_places=12,
-        default=14.198652738540,
+        default=Decimal(14.198652738540),
         validators=[
             MinValueValidator(-180.0),
             MaxValueValidator(180.0)
@@ -178,13 +179,13 @@ class Sensor(models.Model):
     calibration_factor = models.DecimalField(
         max_digits=15,
         decimal_places=6,
-        default=1.0,
+        default=Decimal(1.0),
         help_text="Calibration factor to apply to raw values"
     )
     calibration_offset = models.DecimalField(
         max_digits=15,
         decimal_places=6,
-        default=0.0,
+        default=Decimal(0.0),
         help_text="Calibration offset to apply to raw values"
     )
     status = models.CharField(

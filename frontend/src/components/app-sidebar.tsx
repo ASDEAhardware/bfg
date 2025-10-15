@@ -49,16 +49,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-hidden">
           <Image
-            src="/images/logo.jpg"
+            src="/images/logo_test.webp"
             alt="Logo"
             width={34}
             height={34}
             className="rounded-full"
             priority
           />
-          <span className="font-semibold group-data-[state=collapsed]:hidden">Big Features GUI</span>
+          <span className="font-semibold whitespace-nowrap group-data-[state=collapsed]:hidden">
+            Big Features GUI
+          </span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -70,7 +72,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={userData} tooltip="Profile" isLoading={isLoading} error={errorMessage} />
+        <NavUser user={userData} isLoading={isLoading} error={errorMessage} />
         <div className="bg-sidebar border-t border-sidebar-border px-2 py-1">
           {state === "collapsed" ? (
             // Collapsed: Versione abbreviata centrata
