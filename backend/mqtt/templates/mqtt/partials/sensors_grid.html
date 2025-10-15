@@ -1,0 +1,131 @@
+{% if sensors_with_data %}
+<div class="row">
+    {% for item in sensors_with_data %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card sensor-card {% if item.sensor.is_online %}sensor-online{% else %}sensor-offline{% endif %}"
+             data-device="{{ item.sensor.device_name }}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">{{ item.sensor.device_name }}</h6>
+                <span class="badge sensor-status {% if item.sensor.is_online %}bg-success{% else %}bg-danger{% endif %}">
+                    {% if item.sensor.is_online %}Online{% else %}Offline{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="sensor-data">
+                    {% if item.data %}
+                        {% with latest=item.data.0 %}
+                        <small class="text-muted d-block mb-2">
+                            Last Update: {{ latest.timestamp|date:"M d, H:i:s" }}
+                        </small>
+
+                        <div class="row">
+                            {% if latest.acc_x is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Acc X</small><br>
+                                <strong>{{ latest.acc_x|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.acc_y is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Acc Y</small><br>
+                                <strong>{{ latest.acc_y|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.acc_z is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Acc Z</small><br>
+                                <strong>{{ latest.acc_z|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.incli_x is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Incli X</small><br>
+                                <strong>{{ latest.incli_x|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.incli_y is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Incli Y</small><br>
+                                <strong>{{ latest.incli_y|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.mag_x is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Mag X</small><br>
+                                <strong>{{ latest.mag_x|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.mag_y is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Mag Y</small><br>
+                                <strong>{{ latest.mag_y|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.mag_z is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Mag Z</small><br>
+                                <strong>{{ latest.mag_z|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.gyro_x is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Gyro X</small><br>
+                                <strong>{{ latest.gyro_x|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.gyro_y is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Gyro Y</small><br>
+                                <strong>{{ latest.gyro_y|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if latest.gyro_z is not None %}
+                            <div class="col-6">
+                                <small class="text-muted">Gyro Z</small><br>
+                                <strong>{{ latest.gyro_z|floatformat:3 }}</strong>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endwith %}
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="fas fa-exclamation-circle"></i><br>
+                            No data available
+                        </div>
+                    {% endif %}
+                </div>
+
+                <hr>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="fas fa-envelope"></i>
+                        Messages: <span class="message-count">{{ item.sensor.total_messages }}</span>
+                    </small>
+                    {% if item.sensor.consecutive_misses > 0 %}
+                    <small class="text-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {{ item.sensor.consecutive_misses }} miss{{ item.sensor.consecutive_misses|pluralize:"es" }}
+                    </small>
+                    {% endif %}
+                </div>
+
+                {% if item.sensor.last_seen_at %}
+                <small class="text-muted d-block mt-1">
+                    <i class="fas fa-clock"></i>
+                    Last seen: {{ item.sensor.last_seen_at|date:"M d, H:i:s" }}
+                </small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+    <i class="fas fa-sensor fa-3x mb-3"></i>
+    <h5>No Sensors Detected</h5>
+    <p>No sensors have been discovered for this site yet.<br>
+    Make sure the MQTT connection is active and heartbeat messages are being received.</p>
+</div>
+{% endif %}

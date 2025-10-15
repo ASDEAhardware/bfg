@@ -1,18 +1,17 @@
-# mqtt/urls.py
-
 from django.urls import path
-from .views import send_mqtt_command, get_datalogger_status, get_discovered_devices, start_subscriber, stop_subscriber, get_subscriber_status
+from . import views
 
 app_name = 'mqtt'
 
 urlpatterns = [
-    # Datalogger operations
-    path('datalogger/control/', send_mqtt_command, name='datalogger-control'),
-    path('datalogger/status/', get_datalogger_status, name='datalogger-status'),
-    path('datalogger/devices/', get_discovered_devices, name='datalogger-devices'),
+    # Dashboard views
+    path('dashboard/', views.MqttDashboardView.as_view(), name='dashboard'),
+    path('site/<int:site_id>/', views.MqttSiteDetailView.as_view(), name='site_detail'),
 
-    # Subscriber management
-    path('subscriber/start/', start_subscriber, name='subscriber-start'),
-    path('subscriber/stop/', stop_subscriber, name='subscriber-stop'),
-    path('subscriber/status/', get_subscriber_status, name='subscriber-status'),
+    # Control API
+    path('connection/<int:site_id>/control/', views.MqttConnectionControlView.as_view(), name='connection_control'),
+
+    # Real-time API
+    path('api/status/', views.MqttApiStatusView.as_view(), name='api_status'),
+    path('api/sensors/<int:site_id>/', views.MqttApiSensorDataView.as_view(), name='api_sensors'),
 ]

@@ -1,0 +1,281 @@
+{% extends 'mqtt/base.html' %}
+
+{% block title %}{{ connection.site.name }} - MQTT Detail{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'mqtt:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active">{{ connection.site.name }}</li>
+    </ol>
+</nav>
+
+<!-- Site Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h4>{{ connection.site.name }}</h4>
+                        <p class="text-muted mb-2">{{ connection.site.get_site_type_display }} - {{ connection.site.customer_name }}</p>
+                        <p class="mb-0">
+                            <strong>MQTT Topic Prefix:</strong> <code>{{ connection.site.code }}</code><br>
+                            <strong>Broker:</strong> {{ connection.broker_host }}:{{ connection.broker_port }}
+                            {% if connection.ssl_enabled %}<i class="fas fa-lock text-success ms-1" title="SSL Enabled"></i>{% endif %}
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="mb-2">
+                            Status:
+                            <span class="badge bg-{% if connection.status == 'connected' %}success{% elif connection.status == 'connecting' %}warning{% elif connection.status == 'error' %}danger{% else %}secondary{% endif %} fs-6">
+                                {{ connection.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="btn-group">
+                            {% if connection.status != 'connected' %}
+                            <button class="btn btn-success control-btn" data-action="start" data-site-id="{{ connection.site.id }}">
+                                <i class="fas fa-play"></i> Start
+                            </button>
+                            {% endif %}
+                            {% if connection.status == 'connected' %}
+                            <button class="btn btn-danger control-btn" data-action="stop" data-site-id="{{ connection.site.id }}">
+                                <i class="fas fa-stop"></i> Stop
+                            </button>
+                            {% endif %}
+                            <button class="btn btn-warning control-btn" data-action="restart" data-site-id="{{ connection.site.id }}">
+                                <i class="fas fa-redo"></i> Restart
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Row -->
+{% if stats %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">{{ stats.total_sensors }}</h5>
+                <p class="card-text text-muted">Total Sensors</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-success">{{ stats.online_sensors }}</h5>
+                <p class="card-text text-muted">Online</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-danger">{{ stats.offline_sensors }}</h5>
+                <p class="card-text text-muted">Offline</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">{{ stats.total_messages|default:0 }}</h5>
+                <p class="card-text text-muted">Total Messages</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Sensors Real-time Data -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Sensors Real-time Data</h6>
+                <div>
+                    <button id="refresh-sensors" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <div class="form-check form-switch d-inline-block ms-2">
+                        <input class="form-check-input" type="checkbox" id="auto-refresh-sensors" checked>
+                        <label class="form-check-label" for="auto-refresh-sensors">
+                            Auto (5s)
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body" id="sensors-container">
+                {% include 'mqtt/partials/sensors_grid.html' %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Connection Timeline -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Connection Timeline</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in site_logs %}
+                            <tr>
+                                <td>{{ log.timestamp|date:"M d, H:i:s" }}</td>
+                                <td>
+                                    <span class="badge bg-{% if log.event_type == 'connected' %}success{% elif log.event_type == 'disconnected' %}warning{% elif log.event_type == 'error' %}danger{% else %}info{% endif %}">
+                                        {{ log.get_event_type_display }}
+                                    </span>
+                                </td>
+                                <td>{{ log.message }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">No connection logs available</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    const siteId = {{ connection.site.id }};
+    let autoRefreshInterval;
+
+    // Refresh sensor data
+    function refreshSensorData() {
+        $.get(`/api/v1/mqtt/api/sensors/${siteId}/`)
+            .done(function(data) {
+                updateSensorsGrid(data.sensors);
+                console.log('Sensor data refreshed:', data.timestamp);
+            })
+            .fail(function() {
+                console.error('Failed to refresh sensor data');
+            });
+    }
+
+    // Update sensors grid
+    function updateSensorsGrid(sensors) {
+        sensors.forEach(function(sensor) {
+            const card = $(`.sensor-card[data-device="${sensor.device_name}"]`);
+            if (card.length) {
+                // Update online status
+                card.removeClass('sensor-online sensor-offline');
+                card.addClass(sensor.is_online ? 'sensor-online' : 'sensor-offline');
+
+                // Update status badge
+                const statusBadge = card.find('.sensor-status');
+                statusBadge.removeClass('bg-success bg-danger')
+                    .addClass(sensor.is_online ? 'bg-success' : 'bg-danger')
+                    .text(sensor.is_online ? 'Online' : 'Offline');
+
+                // Update data if available
+                if (sensor.timestamp) {
+                    const dataContainer = card.find('.sensor-data');
+                    dataContainer.html(`
+                        <small class="text-muted d-block">Last Update: ${new Date(sensor.timestamp).toLocaleString()}</small>
+                        ${sensor.acc_x !== undefined ? `<div>Acc X: <strong>${sensor.acc_x.toFixed(3)}</strong></div>` : ''}
+                        ${sensor.acc_y !== undefined ? `<div>Acc Y: <strong>${sensor.acc_y.toFixed(3)}</strong></div>` : ''}
+                        ${sensor.acc_z !== undefined ? `<div>Acc Z: <strong>${sensor.acc_z.toFixed(3)}</strong></div>` : ''}
+                        ${sensor.incli_x !== undefined ? `<div>Incli X: <strong>${sensor.incli_x.toFixed(3)}</strong></div>` : ''}
+                        ${sensor.incli_y !== undefined ? `<div>Incli Y: <strong>${sensor.incli_y.toFixed(3)}</strong></div>` : ''}
+                    `);
+                }
+
+                // Update message count
+                card.find('.message-count').text(sensor.total_messages);
+            }
+        });
+    }
+
+    // Control buttons
+    $('.control-btn').click(function() {
+        const button = $(this);
+        const action = button.data('action');
+        const siteId = button.data('site-id');
+        const originalHtml = button.html();
+
+        button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+
+        $.post(`/api/v1/mqtt/connection/${siteId}/control/`, {
+            action: action,
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+        })
+        .done(function(response) {
+            if (response.success) {
+                showAlert('success', response.message);
+                // Reload page after action
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showAlert('danger', response.error);
+            }
+        })
+        .fail(function() {
+            showAlert('danger', 'Failed to execute action');
+        })
+        .always(function() {
+            button.prop('disabled', false).html(originalHtml);
+        });
+    });
+
+    // Manual refresh
+    $('#refresh-sensors').click(function() {
+        refreshSensorData();
+    });
+
+    // Auto refresh toggle
+    $('#auto-refresh-sensors').change(function() {
+        if ($(this).is(':checked')) {
+            autoRefreshInterval = setInterval(refreshSensorData, 5000);
+        } else {
+            clearInterval(autoRefreshInterval);
+        }
+    });
+
+    // Start auto refresh
+    autoRefreshInterval = setInterval(refreshSensorData, 5000);
+
+    // Alert helper
+    function showAlert(type, message) {
+        const alert = $(`
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+
+        $('.container').prepend(alert);
+
+        setTimeout(function() {
+            alert.alert('close');
+        }, 5000);
+    }
+});
+</script>
+
+{% csrf_token %}
+{% endblock %}

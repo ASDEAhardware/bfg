@@ -241,25 +241,40 @@ dice a Django di usare il sito con ID 1 nella tabella django_site come sito corr
 
     !!!!Per modificare il link di reset password, puoi andare in tuo-sito/admin/sites/site/ e 
     modificare il campo "Domain name" per il sito con ID 1. (Questo avviene sempre per la possibilità di avere più siti, in 
-    un'istanza Django, ognuno con il proprio dominio e configurazione.)	
+    un'istanza Django, ognuno con il proprio dominio e configurazione.)
 
 '''
 
-# MQTT Configuration
-MQTT_BROKER = os.environ.get('MQTT_BROKER', 'zionnode.ovh')
-MQTT_PORT = int(os.environ.get('MQTT_PORT', 8883))
-MQTT_USERNAME = os.environ.get('MQTT_USERNAME', 'msapp_dev')
-MQTT_PASSWORD = os.environ.get('MQTT_PASSWORD', 'KJHdsfgb86!')
+# MQTT Settings
+MQTT_SETTINGS = {
+    'HEARTBEAT_TIMEOUT': 30,  # secondi
+    'MAX_CONSECUTIVE_MISSES': 3,
+    'DEFAULT_QOS': 0,
+    'RECONNECT_DELAY': 5,
+    'MAX_RECONNECT_DELAY': 300,
+    'SENSOR_DATA_RETENTION': 3,  # numero record da mantenere
+}
 
-# MQTT Topics
-MQTT_CONTROL_TOPIC = os.environ.get('MQTT_CONTROL_TOPIC', 'acquisition24/control')
-MQTT_OUTPUT_TOPIC = os.environ.get('MQTT_OUTPUT_TOPIC', 'acquisition24/output')
-MQTT_ERROR_TOPIC = os.environ.get('MQTT_ERROR_TOPIC', 'acquisition24/error')
+# Logging configuration for MQTT
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'mqtt.log',
+        },
+    },
+    'loggers': {
+        'mqtt': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
-# MQTT Client IDs
-MQTT_CLIENT_ID = os.environ.get('MQTT_CLIENT_ID', 'msapp_output_sub')
-MQTT_DATALOG_CLIENT_ID = os.environ.get('MQTT_DATALOG_CLIENT_ID', 'msapp_dev_python')
-MQTT_OUTPUT_CLIENT_ID = os.environ.get('MQTT_OUTPUT_CLIENT_ID', 'msapp_output_sub')
-MQTT_CONTROL_CLIENT_ID = os.environ.get('MQTT_CONTROL_CLIENT_ID', 'msapp_control_sub')
-MQTT_ERROR_CLIENT_ID = os.environ.get('MQTT_ERROR_CLIENT_ID', 'msapp_error_sub')
 
