@@ -7,11 +7,15 @@ from django.utils import timezone
 import subprocess
 import json
 import re
+import logging
 from .models import MqttConnection, SensorDevice, SensorData
 from .services.message_parser import MqttMessageParser
 
+logger = logging.getLogger(__name__)
 
 
+
+@method_decorator(csrf_exempt, name='dispatch')
 class MqttConnectionControlView(View):
     """
     API per controllare connessioni MQTT (start/stop/restart)
@@ -27,46 +31,154 @@ class MqttConnectionControlView(View):
             }, status=400)
 
         try:
+            # Get connection and manager instance
             connection = get_object_or_404(MqttConnection, site_id=site_id)
+            from .services.mqtt_manager import MqttClientManager
+            manager = MqttClientManager.get_instance()
 
-            # TODO: Implementare controllo tramite manager globale
-            # Per ora solo update status nel database
+            # Get current real state from manager (source of truth)
+            is_client_active = site_id in manager.clients
+            is_client_connected = is_client_active and manager.clients[site_id].is_connected()
 
+            # Execute action with transaction-based logic
             if action == 'start':
-                if connection.status in ['disconnected', 'error']:
-                    connection.status = 'connecting'
-                    connection.save()
-                    message = f'Starting connection for {connection.site.name}'
-                else:
-                    message = f'Connection for {connection.site.name} already active'
-
+                result = self._handle_start_connection(connection, manager, site_id, is_client_active)
             elif action == 'stop':
-                if connection.status == 'connected':
-                    connection.status = 'disconnected'
-                    connection.save()
-                    message = f'Stopped connection for {connection.site.name}'
-                else:
-                    message = f'Connection for {connection.site.name} not active'
-
+                result = self._handle_stop_connection(connection, manager, site_id, is_client_active)
             elif action == 'restart':
-                connection.status = 'connecting'
-                connection.error_message = ''
-                connection.connection_errors = 0
-                connection.save()
-                message = f'Restarting connection for {connection.site.name}'
-
+                result = self._handle_restart_connection(connection, manager, site_id)
 
             return JsonResponse({
                 'success': True,
-                'message': message,
-                'new_status': connection.status
+                'message': result['message'],
+                'new_status': result['new_status'],
+                'actual_state': {
+                    'client_active': site_id in manager.clients,
+                    'client_connected': site_id in manager.clients and manager.clients[site_id].is_connected() if site_id in manager.clients else False
+                }
             })
 
         except Exception as e:
+            logger.error(f"Error controlling MQTT connection for site {site_id}: {e}")
             return JsonResponse({
                 'success': False,
                 'error': str(e)
             }, status=500)
+
+    def _handle_start_connection(self, connection, manager, site_id, is_client_active):
+        """Handle START action with proper state validation"""
+        site_name = connection.site.name
+
+        # Validate current state
+        if is_client_active:
+            client = manager.clients[site_id]
+            if client.is_connected():
+                return {
+                    'message': f'Connection for {site_name} is already active',
+                    'new_status': 'connected'
+                }
+
+        # Attempt to start connection
+        try:
+            # Set status to connecting BEFORE attempting connection
+            connection.status = 'connecting'
+            connection.error_message = ''
+            connection.save(update_fields=['status', 'error_message'])
+
+            # Try to start via manager
+            success = manager.start_connection(site_id)
+
+            if success:
+                # Manager should update DB status, but let's be sure
+                connection.refresh_from_db()
+                return {
+                    'message': f'Successfully started connection for {site_name}',
+                    'new_status': connection.status
+                }
+            else:
+                # Connection failed, update status
+                connection.status = 'error'
+                connection.error_message = 'Failed to start connection'
+                connection.save(update_fields=['status', 'error_message'])
+
+                return {
+                    'message': f'Failed to start connection for {site_name}',
+                    'new_status': 'error'
+                }
+
+        except Exception as e:
+            # Rollback on error
+            connection.status = 'error'
+            connection.error_message = str(e)
+            connection.save(update_fields=['status', 'error_message'])
+            raise
+
+    def _handle_stop_connection(self, connection, manager, site_id, is_client_active):
+        """Handle STOP action with proper state validation"""
+        site_name = connection.site.name
+
+        # Validate current state
+        if not is_client_active:
+            return {
+                'message': f'Connection for {site_name} is already stopped',
+                'new_status': 'disconnected'
+            }
+
+        # Attempt to stop connection
+        try:
+            # Stop via manager first
+            manager.stop_connection(site_id)
+
+            # Update DB status
+            connection.status = 'disconnected'
+            connection.error_message = ''
+            connection.save(update_fields=['status', 'error_message'])
+
+            return {
+                'message': f'Successfully stopped connection for {site_name}',
+                'new_status': 'disconnected'
+            }
+
+        except Exception as e:
+            # Don't rollback stop operations - if manager failed, at least try to update DB
+            connection.status = 'error'
+            connection.error_message = f'Stop operation failed: {str(e)}'
+            connection.save(update_fields=['status', 'error_message'])
+            raise
+
+    def _handle_restart_connection(self, connection, manager, site_id):
+        """Handle RESTART action with proper state validation"""
+        site_name = connection.site.name
+
+        try:
+            # Set status to connecting
+            connection.status = 'connecting'
+            connection.error_message = ''
+            connection.save(update_fields=['status', 'error_message'])
+
+            # Execute restart via manager (this should handle everything)
+            success = manager.restart_connection(site_id)
+
+            # Get updated status from DB (manager should have updated it)
+            connection.refresh_from_db()
+
+            if success or connection.status == 'connected':
+                return {
+                    'message': f'Successfully restarted connection for {site_name}',
+                    'new_status': connection.status
+                }
+            else:
+                return {
+                    'message': f'Restart initiated for {site_name} - check status',
+                    'new_status': connection.status
+                }
+
+        except Exception as e:
+            # Update error state
+            connection.status = 'error'
+            connection.error_message = str(e)
+            connection.save(update_fields=['status', 'error_message'])
+            raise
 
 
 

@@ -34,13 +34,14 @@ class MqttConfig(AppConfig):
                 logger.info("Starting MQTT Client Manager from Django AppConfig...")
 
                 try:
-                    manager = MqttClientManager()
+                    # USA IL SINGLETON invece di creare nuova istanza
+                    manager = MqttClientManager.get_instance()
                     manager.start_all_connections()
 
                     # Segna come avviato
                     cache.set('mqtt_manager_started', True, timeout=None)
 
-                    logger.info("MQTT Client Manager started successfully")
+                    logger.info("MQTT Client Manager (singleton) started successfully")
 
                     # Mantieni il thread attivo per health checks
                     while True:

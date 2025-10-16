@@ -52,7 +52,7 @@ class MqttClientManager:
                 self.start_connection(conn.site.id)
                 time.sleep(1)  # Evita connessioni simultanee
 
-    def start_connection(self, site_id: int):
+    def start_connection(self, site_id: int) -> bool:
         """Avvia connessione MQTT per un sito specifico"""
         try:
             conn = MqttConnection.objects.select_related('site').get(site_id=site_id)
@@ -60,11 +60,20 @@ class MqttClientManager:
             # Controlla se la connessione è abilitata
             if not conn.is_enabled:
                 logger.info(f"Skipping disabled connection for site {conn.site.name}")
-                return
+                # Update DB to reflect disabled state
+                conn.status = 'disabled'
+                conn.save(update_fields=['status'])
+                return False
 
+            # Check if already connected and working
             if site_id in self.clients:
-                logger.warning(f"Connection already exists for site {site_id}, stopping existing client")
-                self.stop_connection(site_id)
+                existing_client = self.clients[site_id]
+                if existing_client.is_connected():
+                    logger.info(f"Connection already active for site {conn.site.name}")
+                    return True
+                else:
+                    logger.warning(f"Removing stale client for site {site_id}")
+                    self.stop_connection(site_id)
 
             # Crea client MQTT con ID univoco
             unique_id = str(uuid.uuid4())[:8]
@@ -87,30 +96,67 @@ class MqttClientManager:
                 else:
                     client.tls_set()  # Use default system CA
 
-            # Update status
+            # Update status to connecting
             conn.status = 'connecting'
-            conn.save(update_fields=['status'])
+            conn.error_message = ''
+            conn.save(update_fields=['status', 'error_message'])
 
-            # Connect
+            # Attempt connection
             logger.info(f"Connecting to {conn.broker_host}:{conn.broker_port} for site {conn.site.name}")
-            client.connect(conn.broker_host, conn.broker_port, conn.keep_alive_interval)
-            client.loop_start()
 
-            self.clients[site_id] = client
+            try:
+                client.connect(conn.broker_host, conn.broker_port, conn.keep_alive_interval)
+                client.loop_start()
 
+                # Store client immediately - callbacks will update status
+                self.clients[site_id] = client
+
+                # Connection initiated successfully
+                logger.info(f"Connection initiated for site {conn.site.name}")
+                return True
+
+            except Exception as connect_error:
+                logger.error(f"Failed to connect for site {conn.site.name}: {connect_error}")
+                self._handle_connection_error(site_id, str(connect_error))
+                return False
+
+        except MqttConnection.DoesNotExist:
+            logger.error(f"MQTT connection not configured for site {site_id}")
+            return False
         except Exception as e:
             logger.error(f"Error starting connection for site {site_id}: {e}")
             self._handle_connection_error(site_id, str(e))
+            return False
 
-    def stop_connection(self, site_id: int):
+    def stop_connection(self, site_id: int) -> bool:
         """Ferma connessione MQTT per un sito specifico"""
-        with self._lock:
-            if site_id in self.clients:
-                client = self.clients[site_id]
-                client.loop_stop()
-                client.disconnect()
-                del self.clients[site_id]
-                logger.info(f"Stopped MQTT connection for site {site_id}")
+        try:
+            with self._lock:
+                if site_id in self.clients:
+                    client = self.clients[site_id]
+                    try:
+                        client.loop_stop()
+                        client.disconnect()
+                    except Exception as e:
+                        logger.warning(f"Error during client disconnect for site {site_id}: {e}")
+
+                    del self.clients[site_id]
+                    logger.info(f"Stopped MQTT connection for site {site_id}")
+
+            # Update DB status
+            try:
+                conn = MqttConnection.objects.get(site_id=site_id)
+                conn.status = 'disconnected'
+                conn.error_message = ''
+                conn.save(update_fields=['status', 'error_message'])
+            except MqttConnection.DoesNotExist:
+                logger.warning(f"MQTT connection config not found for site {site_id}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error stopping connection for site {site_id}: {e}")
+            return False
 
     def stop_all_connections(self):
         """Ferma tutte le connessioni MQTT"""
@@ -315,27 +361,93 @@ class MqttClientManager:
             logger.error(f"Error handling connection error for site {site_id}: {e}")
 
     def restart_all_connections(self):
-        """Riavvia tutte le connessioni MQTT"""
-        logger.info("Restarting all MQTT connections...")
+        """Riavvia tutte le connessioni MQTT forzando disconnessione completa"""
+        logger.info("=== RESTARTING ALL MQTT CONNECTIONS ===")
 
-        # Stop tutto
-        self.stop_all_connections()
+        with self._lock:
+            # 1. Forza disconnessione di tutti i client esistenti
+            logger.info("Forcing disconnect of all existing clients...")
+            for site_id, client in list(self.clients.items()):
+                try:
+                    logger.info(f"Force disconnecting site {site_id}")
+                    client.loop_stop()
+                    client.disconnect()
+                    # Aggiorna status nel DB immediatamente
+                    try:
+                        conn = MqttConnection.objects.get(site_id=site_id)
+                        conn.status = 'disconnected'
+                        conn.save(update_fields=['status'])
+                        logger.info(f"Updated DB status to disconnected for site {site_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to update DB status for site {site_id}: {e}")
+                except Exception as e:
+                    logger.error(f"Error disconnecting client for site {site_id}: {e}")
 
-        # Aspetta un momento
+            # 2. Pulisci tutto lo stato interno
+            self.clients.clear()
+            self.reconnect_attempts.clear()
+            self.last_attempt.clear()
+            self.running = False
+            logger.info("Cleared all internal state")
+
+        # 3. Aspetta per assicurarsi che le disconnessioni siano completate
         import time
-        time.sleep(2)
+        logger.info("Waiting for disconnections to complete...")
+        time.sleep(3)
 
-        # Reset stato riconnessioni
-        self.reconnect_attempts.clear()
-        self.last_attempt.clear()
-
-        # Disconnetti eventuali connessioni disabilitate
+        # 4. Disconnetti eventuali connessioni disabilitate nel DB
         self._disconnect_disabled_connections()
 
-        # Riavvia tutto
+        # 5. Ricarica tutte le connessioni dal database (credenziali fresche)
+        logger.info("Reloading all connections from database...")
+        self.running = True
         self.start_all_connections()
 
-        logger.info("All MQTT connections restarted")
+        logger.info("=== ALL MQTT CONNECTIONS RESTARTED SUCCESSFULLY ===")
+
+    def restart_connection(self, site_id: int) -> bool:
+        """Riavvia una singola connessione MQTT forzando disconnessione completa"""
+        logger.info(f"=== RESTARTING MQTT CONNECTION FOR SITE {site_id} ===")
+
+        try:
+            # 1. Stop existing connection (this also updates DB)
+            stop_success = self.stop_connection(site_id)
+            if not stop_success:
+                logger.warning(f"Stop operation failed for site {site_id}, continuing with restart anyway")
+
+            # 2. Reset reconnection state for clean start
+            with self._lock:
+                if site_id in self.reconnect_attempts:
+                    del self.reconnect_attempts[site_id]
+                if site_id in self.last_attempt:
+                    del self.last_attempt[site_id]
+
+            # 3. Wait briefly for cleanup
+            import time
+            time.sleep(1)
+
+            # 4. Start connection with fresh credentials from DB
+            logger.info(f"Starting fresh connection for site {site_id}...")
+            start_success = self.start_connection(site_id)
+
+            if start_success:
+                logger.info(f"=== MQTT CONNECTION FOR SITE {site_id} RESTARTED SUCCESSFULLY ===")
+                return True
+            else:
+                logger.error(f"=== FAILED TO RESTART MQTT CONNECTION FOR SITE {site_id} ===")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error during restart for site {site_id}: {e}")
+            # Update DB to error state
+            try:
+                conn = MqttConnection.objects.get(site_id=site_id)
+                conn.status = 'error'
+                conn.error_message = f'Restart failed: {str(e)}'
+                conn.save(update_fields=['status', 'error_message'])
+            except Exception as db_error:
+                logger.error(f"Failed to update DB after restart error for site {site_id}: {db_error}")
+            return False
 
     def _disconnect_disabled_connections(self):
         """Disconnetti connessioni che sono state disabilitate"""

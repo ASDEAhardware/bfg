@@ -157,16 +157,17 @@ export default function MqttControlPage() {
 
           <div className="flex gap-2">
             <Button
-              variant="outline"
+              variant="destructive"
               onClick={restartService}
               disabled={loading}
               size="sm"
+              className="relative"
             >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Restart Service
+              <RotateCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Restarting...' : 'Restart All Connections'}
             </Button>
             <div className="text-sm text-muted-foreground ml-4 flex items-center">
-              💡 Service auto-starts with Django. Use restart if needed.
+              ⚡ Forces reconnection with fresh credentials from database
             </div>
           </div>
         </CardContent>

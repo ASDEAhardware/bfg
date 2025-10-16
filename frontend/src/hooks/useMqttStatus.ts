@@ -158,7 +158,7 @@ export function useMqttSensorData(siteId: string | number | null, refreshInterva
  * Hook to get connection status for a specific site
  */
 export function useMqttConnectionStatus(siteId: string | number | null) {
-  const { statusData } = useMqttStatus();
+  const { statusData, refetch } = useMqttStatus();
 
   const connectionStatus = statusData?.connections.find(
     conn => conn.site_id === Number(siteId)
@@ -171,7 +171,8 @@ export function useMqttConnectionStatus(siteId: string | number | null) {
     stats: siteStats,
     isConnected: connectionStatus?.status === 'connected',
     hasError: connectionStatus?.status === 'error',
-    lastHeartbeat: connectionStatus?.last_heartbeat_at
+    lastHeartbeat: connectionStatus?.last_heartbeat_at,
+    refresh: refetch // Expose refresh function
   };
 }
 
@@ -198,7 +199,6 @@ export function useMqttControl() {
         },
         body: new URLSearchParams({
           action,
-          csrfmiddlewaretoken: '', // In produzione serve il CSRF token
         }),
       });
 
@@ -220,6 +220,52 @@ export function useMqttControl() {
 
   return {
     controlConnection,
+    loading,
+    error
+  };
+}
+
+/**
+ * Hook for controlling the global MQTT service (restart)
+ */
+export function useMqttServiceControl() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const restartService = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/v1/mqtt/service/control/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'restart'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to restart MQTT service');
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return {
+    restartService,
     loading,
     error
   };

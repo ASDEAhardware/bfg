@@ -9,7 +9,7 @@ import { SensorCard } from "@/components/SensorCard";
 import { ContextualStatusBar, useContextualStatusBar } from "@/components/ContextualStatusBar";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { useGridStore } from "@/store/gridStore";
-import { useMqttConnectionStatus } from "@/hooks/useMqttStatus";
+import { useMqttConnectionStatus, useMqttControl } from "@/hooks/useMqttStatus";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +34,8 @@ import {
   Activity,
   Gauge,
   MoreHorizontal,
-  ArrowLeft
+  ArrowLeft,
+  RotateCw
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -81,7 +82,8 @@ export default function DataLoggerPage() {
   const { createCountItems, createFilterItems } = useContextualStatusBar();
   const { selectedSiteId } = useUnifiedSiteContext();
   const { isGridModeEnabled } = useGridStore();
-  const { connection: mqttConnection, isConnected: isMqttConnected } = useMqttConnectionStatus(selectedSiteId);
+  const { connection: mqttConnection, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
+  const { controlConnection, loading: mqttControlLoading } = useMqttControl();
   const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,20 +127,20 @@ export default function DataLoggerPage() {
     if (!selectedSiteId) return null;
 
     if (!mqttConnection) {
-      return { variant: "secondary" as const, text: "Non configurato", color: "text-muted-foreground" };
+      return { variant: "secondary" as const, text: "Non configurato", className: "bg-muted text-muted-foreground" };
     }
 
     switch (mqttConnection.status) {
       case 'connected':
-        return { variant: "default" as const, text: "MQTT Connesso", color: "text-green-600" };
+        return { variant: "default" as const, text: "MQTT Connesso", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" };
       case 'connecting':
-        return { variant: "secondary" as const, text: "MQTT Connessione...", color: "text-blue-600" };
+        return { variant: "secondary" as const, text: "MQTT Connessione...", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" };
       case 'disconnected':
-        return { variant: "outline" as const, text: "MQTT Disconnesso", color: "text-orange-600" };
+        return { variant: "outline" as const, text: "MQTT Disconnesso", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100" };
       case 'error':
-        return { variant: "destructive" as const, text: "MQTT Errore", color: "text-red-600" };
+        return { variant: "outline" as const, text: "MQTT Errore", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" };
       default:
-        return { variant: "secondary" as const, text: "MQTT Sconosciuto", color: "text-muted-foreground" };
+        return { variant: "secondary" as const, text: "MQTT Sconosciuto", className: "bg-muted text-muted-foreground" };
     }
   };
 
@@ -290,6 +292,49 @@ export default function DataLoggerPage() {
   const handleScheduleSave = (schedule: any) => {
     console.log("Schedule saved:", schedule);
     // Qui andrà la logica per salvare la pianificazione
+  };
+
+  // Handle MQTT connection actions
+  const handleMqttStart = async () => {
+    if (!selectedSiteId) return;
+    try {
+      const result = await controlConnection(selectedSiteId, 'start');
+      console.log('MQTT connection start result:', result);
+      // Force immediate refresh of MQTT status
+      await refreshMqttStatus();
+    } catch (error) {
+      console.error('Failed to start MQTT connection:', error);
+      // Refresh even on error to get updated status
+      await refreshMqttStatus();
+    }
+  };
+
+  const handleMqttStop = async () => {
+    if (!selectedSiteId) return;
+    try {
+      const result = await controlConnection(selectedSiteId, 'stop');
+      console.log('MQTT connection stop result:', result);
+      // Force immediate refresh of MQTT status
+      await refreshMqttStatus();
+    } catch (error) {
+      console.error('Failed to stop MQTT connection:', error);
+      // Refresh even on error to get updated status
+      await refreshMqttStatus();
+    }
+  };
+
+  const handleMqttRestart = async () => {
+    if (!selectedSiteId) return;
+    try {
+      const result = await controlConnection(selectedSiteId, 'restart');
+      console.log('MQTT connection restart result:', result);
+      // Force immediate refresh of MQTT status
+      await refreshMqttStatus();
+    } catch (error) {
+      console.error('Failed to restart MQTT connection:', error);
+      // Refresh even on error to get updated status
+      await refreshMqttStatus();
+    }
   };
 
   // Show legacy connected view when a datalogger is connected
@@ -583,9 +628,51 @@ export default function DataLoggerPage() {
               {(() => {
                 const status = getMqttStatusBadge();
                 return status && (
-                  <Badge variant={status.variant} className={`text-xs ${status.color}`}>
-                    {status.text}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={status.variant} className={`text-xs ${status.className}`}>
+                      {status.text}
+                    </Badge>
+                    {/* MQTT Control Buttons */}
+                    {selectedSiteId && (
+                      <div className="flex items-center gap-1">
+                        {/* Start Button */}
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={handleMqttStart}
+                          disabled={mqttControlLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting'}
+                          className={`h-6 w-6 p-0 ${!(mqttControlLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                          title={`Start MQTT connection (status: ${mqttConnection?.status}, loading: ${mqttControlLoading})`}
+                        >
+                          <Play className="h-3 w-3" />
+                        </Button>
+
+                        {/* Stop Button */}
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleMqttStop}
+                          disabled={mqttControlLoading || mqttConnection?.status !== 'connected'}
+                          className={`h-6 w-6 p-0 ${!(mqttControlLoading || mqttConnection?.status !== 'connected') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                          title="Stop MQTT connection"
+                        >
+                          <Square className="h-3 w-3" />
+                        </Button>
+
+                        {/* Restart Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleMqttRestart}
+                          disabled={mqttControlLoading}
+                          className={`h-6 w-6 p-0 ${!mqttControlLoading ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                          title="Restart MQTT connection"
+                        >
+                          <RotateCw className={`h-3 w-3 ${mqttControlLoading ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 );
               })()}
             </div>
