@@ -140,6 +140,109 @@ class SensorData(models.Model):
         return f"{self.sensor_device.device_name} - {self.timestamp}"
 
 
+class SystemInfo(models.Model):
+    """
+    System information received via MQTT sys_info topic
+    """
+    site = models.OneToOneField(
+        'sites.Site',
+        on_delete=models.CASCADE,
+        related_name='system_info'
+    )
+
+    # System hardware info
+    hostname = models.CharField(max_length=255, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    mac_address = models.CharField(max_length=17, blank=True)  # Format: XX:XX:XX:XX:XX:XX
+
+    # Hardware specs
+    cpu_model = models.CharField(max_length=255, blank=True)
+    cpu_cores = models.IntegerField(null=True, blank=True)
+    cpu_frequency = models.FloatField(null=True, blank=True)  # MHz
+    total_memory = models.BigIntegerField(null=True, blank=True)  # bytes
+
+    # Storage info
+    total_storage = models.BigIntegerField(null=True, blank=True)  # bytes
+    used_storage = models.BigIntegerField(null=True, blank=True)  # bytes
+    available_storage = models.BigIntegerField(null=True, blank=True)  # bytes
+
+    # Operating system
+    os_name = models.CharField(max_length=100, blank=True)
+    os_version = models.CharField(max_length=100, blank=True)
+    kernel_version = models.CharField(max_length=100, blank=True)
+
+    # System status
+    uptime_seconds = models.BigIntegerField(null=True, blank=True)
+    boot_time = models.DateTimeField(null=True, blank=True)
+
+    # Performance metrics
+    cpu_usage_percent = models.FloatField(null=True, blank=True)
+    memory_usage_percent = models.FloatField(null=True, blank=True)
+    disk_usage_percent = models.FloatField(null=True, blank=True)
+
+    # Network info
+    network_interfaces = models.JSONField(default=dict, blank=True)
+
+    # Temperature and hardware sensors
+    cpu_temperature = models.FloatField(null=True, blank=True)  # Celsius
+    system_sensors = models.JSONField(default=dict, blank=True)
+
+    # Software info
+    python_version = models.CharField(max_length=50, blank=True)
+    installed_packages = models.JSONField(default=list, blank=True)
+
+    # Raw MQTT payload for debugging
+    raw_data = models.JSONField(default=dict, blank=True)
+
+    # Metadata
+    last_updated = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "System Information"
+        verbose_name_plural = "System Information"
+        ordering = ['-last_updated']
+
+    def __str__(self):
+        return f"{self.site.name} - {self.hostname or 'Unknown Host'}"
+
+    def get_uptime_display(self):
+        """Return human-readable uptime"""
+        if not self.uptime_seconds:
+            return "Unknown"
+
+        days = self.uptime_seconds // 86400
+        hours = (self.uptime_seconds % 86400) // 3600
+        minutes = (self.uptime_seconds % 3600) // 60
+
+        if days > 0:
+            return f"{days}d {hours}h {minutes}m"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
+
+    def get_memory_display(self):
+        """Return human-readable memory info"""
+        if not self.total_memory:
+            return "Unknown"
+
+        total_gb = self.total_memory / (1024**3)
+        used_percent = self.memory_usage_percent or 0
+
+        return f"{used_percent:.1f}% of {total_gb:.1f}GB"
+
+    def get_storage_display(self):
+        """Return human-readable storage info"""
+        if not self.total_storage:
+            return "Unknown"
+
+        total_gb = self.total_storage / (1024**3)
+        used_percent = self.disk_usage_percent or 0
+
+        return f"{used_percent:.1f}% of {total_gb:.1f}GB"
+
+
 class MqttTopic(models.Model):
     """
     Topic MQTT configurabili per ogni connessione

@@ -9,7 +9,7 @@ import { SensorCard } from "@/components/SensorCard";
 import { ContextualStatusBar, useContextualStatusBar } from "@/components/ContextualStatusBar";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { useGridStore } from "@/store/gridStore";
-import { useMqttConnectionStatus, useMqttControl } from "@/hooks/useMqttStatus";
+import { useMqttConnectionStatus, useMqttControl, useSystemInfo } from "@/hooks/useMqttStatus";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +35,8 @@ import {
   Gauge,
   MoreHorizontal,
   ArrowLeft,
-  RotateCw
+  RotateCw,
+  Info
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +48,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Datalogger {
   id: string;
@@ -84,6 +92,7 @@ export default function DataLoggerPage() {
   const { isGridModeEnabled } = useGridStore();
   const { connection: mqttConnection, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
   const { controlConnection, loading: mqttControlLoading } = useMqttControl();
+  const { systemInfo } = useSystemInfo(selectedSiteId);
   const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +101,7 @@ export default function DataLoggerPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSensorSearchOpen, setIsSensorSearchOpen] = useState(false);
+  const [showSystemInfoModal, setShowSystemInfoModal] = useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -419,6 +429,19 @@ export default function DataLoggerPage() {
                   <Search className="h-4 w-4" />
                 </Button>
 
+                {/* System Info Button */}
+                {systemInfo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSystemInfoModal(true)}
+                    className="h-8 w-8 p-0"
+                    title="System Information"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                )}
+
                 {/* More menu for hidden controls on very small screens */}
                 {width < 500 && (
                   <DropdownMenu>
@@ -730,6 +753,19 @@ export default function DataLoggerPage() {
                 {width >= 350 && !isMobile && <span className="ml-2">Aggiorna</span>}
               </Button>
 
+              {/* System Info Button */}
+              {systemInfo && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSystemInfoModal(true)}
+                  className="h-8 w-8 p-0"
+                  title="System Information"
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
+              )}
+
               {/* More menu for hidden controls on very small screens */}
               {width < 400 && (
                 <DropdownMenu>
@@ -855,9 +891,236 @@ export default function DataLoggerPage() {
             dataloggers.filter(d => d.status === 'active').length,
             dataloggers.filter(d => d.status !== 'active').length
           )}
-          rightItems={createFilterItems(filteredDataloggers.length, searchTerm)}
+          rightItems={[
+            ...createFilterItems(filteredDataloggers.length, searchTerm),
+            // Add system info to the right side if available
+            ...(systemInfo ? [
+              {
+                label: systemInfo.os_version || 'System',
+                icon: Activity,
+                className: "text-muted-foreground"
+              },
+              ...(systemInfo.cpu_usage_percent !== undefined && systemInfo.cpu_usage_percent !== null ? [{
+                label: `CPU ${systemInfo.cpu_usage_percent.toFixed(1)}%`,
+                className: "text-muted-foreground"
+              }] : []),
+              ...(systemInfo.memory_usage_percent !== undefined && systemInfo.memory_usage_percent !== null ? [{
+                label: `RAM ${systemInfo.memory_usage_percent.toFixed(1)}%`,
+                className: "text-muted-foreground"
+              }] : []),
+              ...(systemInfo.disk_usage_percent !== undefined && systemInfo.disk_usage_percent !== null ? [{
+                label: `Disk ${systemInfo.disk_usage_percent.toFixed(1)}%`,
+                className: "text-muted-foreground"
+              }] : []),
+              {
+                label: `Updated ${new Date(systemInfo.last_updated).toLocaleTimeString()}`,
+                className: "text-xs text-muted-foreground/70"
+              }
+            ] : [])
+          ]}
         />
       )}
+
+      {/* System Info Modal */}
+      <Dialog open={showSystemInfoModal} onOpenChange={setShowSystemInfoModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              System Information - {systemInfo?.hostname}
+            </DialogTitle>
+            <DialogDescription>
+              Complete system details and performance metrics
+            </DialogDescription>
+          </DialogHeader>
+
+          {systemInfo && (
+            <div className="space-y-6">
+              {/* System Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold">System Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Hostname:</span>
+                      <span className="font-mono">{systemInfo.hostname}</span>
+                    </div>
+                    {systemInfo.ip_address && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">IP Address:</span>
+                        <span className="font-mono">{systemInfo.ip_address}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">MAC Address:</span>
+                      <span className="font-mono">{systemInfo.mac_address}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">OS:</span>
+                      <span>{systemInfo.os_name} {systemInfo.os_version}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Kernel:</span>
+                      <span className="font-mono">{systemInfo.kernel_version}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Python:</span>
+                      <span className="font-mono">{systemInfo.python_version}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold">Hardware</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">CPU:</span>
+                      <span>{systemInfo.cpu_model}</span>
+                    </div>
+                    {systemInfo.cpu_cores && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cores:</span>
+                        <span>{systemInfo.cpu_cores}</span>
+                      </div>
+                    )}
+                    {systemInfo.cpu_frequency && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Frequency:</span>
+                        <span>{systemInfo.cpu_frequency.toFixed(0)} MHz</span>
+                      </div>
+                    )}
+                    {systemInfo.total_memory && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Memory:</span>
+                        <span>{(systemInfo.total_memory / (1024**3)).toFixed(2)} GB</span>
+                      </div>
+                    )}
+                    {systemInfo.total_storage && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Storage:</span>
+                        <span>{(systemInfo.total_storage / (1024**3)).toFixed(2)} GB</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Metrics */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Performance Metrics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {systemInfo.cpu_usage_percent !== undefined && systemInfo.cpu_usage_percent !== null && (
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <div className="text-sm text-muted-foreground mb-1">CPU Usage</div>
+                      <div className="text-2xl font-semibold">{systemInfo.cpu_usage_percent.toFixed(1)}%</div>
+                      <div className="w-full bg-background rounded-full h-2 mt-2">
+                        <div
+                          className="bg-primary h-2 rounded-full"
+                          style={{ width: `${Math.min(systemInfo.cpu_usage_percent, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {systemInfo.memory_usage_percent !== undefined && systemInfo.memory_usage_percent !== null && (
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <div className="text-sm text-muted-foreground mb-1">Memory Usage</div>
+                      <div className="text-2xl font-semibold">{systemInfo.memory_usage_percent.toFixed(1)}%</div>
+                      <div className="w-full bg-background rounded-full h-2 mt-2">
+                        <div
+                          className="bg-blue-500 h-2 rounded-full"
+                          style={{ width: `${Math.min(systemInfo.memory_usage_percent, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {systemInfo.disk_usage_percent !== undefined && systemInfo.disk_usage_percent !== null && (
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <div className="text-sm text-muted-foreground mb-1">Disk Usage</div>
+                      <div className="text-2xl font-semibold">{systemInfo.disk_usage_percent.toFixed(1)}%</div>
+                      <div className="w-full bg-background rounded-full h-2 mt-2">
+                        <div
+                          className="bg-orange-500 h-2 rounded-full"
+                          style={{ width: `${Math.min(systemInfo.disk_usage_percent, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Uptime and Temperature */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {systemInfo.uptime_seconds && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold">Uptime</h3>
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <div className="text-2xl font-semibold">
+                        {(() => {
+                          const days = Math.floor(systemInfo.uptime_seconds / 86400);
+                          const hours = Math.floor((systemInfo.uptime_seconds % 86400) / 3600);
+                          const minutes = Math.floor((systemInfo.uptime_seconds % 3600) / 60);
+
+                          if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+                          if (hours > 0) return `${hours}h ${minutes}m`;
+                          return `${minutes}m`;
+                        })()}
+                      </div>
+                      {systemInfo.boot_time && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Boot time: {new Date(systemInfo.boot_time).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {systemInfo.cpu_temperature && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold">Temperature</h3>
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <div className="text-2xl font-semibold">{systemInfo.cpu_temperature.toFixed(1)}°C</div>
+                      <div className="text-sm text-muted-foreground">CPU Temperature</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Network Interfaces */}
+              {Object.keys(systemInfo.network_interfaces).length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold">Network Interfaces</h3>
+                  <div className="bg-muted/30 rounded-lg p-3">
+                    <pre className="text-xs overflow-x-auto">
+                      {JSON.stringify(systemInfo.network_interfaces, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Installed Packages */}
+              {systemInfo.installed_packages.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold">Installed Packages ({systemInfo.installed_packages.length})</h3>
+                  <div className="bg-muted/30 rounded-lg p-3 max-h-40 overflow-y-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1 text-xs font-mono">
+                      {systemInfo.installed_packages.map((pkg, index) => (
+                        <div key={index}>{pkg}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Last Updated */}
+              <div className="text-xs text-muted-foreground text-center pt-4 border-t">
+                Last updated: {new Date(systemInfo.last_updated).toLocaleString()}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

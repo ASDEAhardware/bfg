@@ -34,6 +34,37 @@ export interface MqttConnectionStatus {
   error_message: string;
 }
 
+export interface SystemInfo {
+  id: number;
+  site_id: number;
+  hostname: string;
+  ip_address?: string;
+  mac_address: string;
+  cpu_model: string;
+  cpu_cores?: number;
+  cpu_frequency?: number;
+  total_memory?: number;
+  total_storage?: number;
+  used_storage?: number;
+  available_storage?: number;
+  os_name: string;
+  os_version: string;
+  kernel_version: string;
+  uptime_seconds?: number;
+  boot_time?: string;
+  cpu_usage_percent?: number;
+  memory_usage_percent?: number;
+  disk_usage_percent?: number;
+  network_interfaces: Record<string, any>;
+  cpu_temperature?: number;
+  system_sensors: Record<string, any>;
+  python_version: string;
+  installed_packages: string[];
+  raw_data: Record<string, any>;
+  last_updated: string;
+  created_at: string;
+}
+
 export interface MqttStatusData {
   connections: MqttConnectionStatus[];
   sensor_stats: Record<string, {
@@ -268,5 +299,67 @@ export function useMqttServiceControl() {
     restartService,
     loading,
     error
+  };
+}
+
+/**
+ * Hook for fetching system info for a specific site
+ */
+export function useSystemInfo(siteId: string | number | null, refreshInterval: number = 30000) {
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  const fetchSystemInfo = useCallback(async () => {
+    if (!siteId) {
+      setSystemInfo(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/v1/mqtt/api/system-info/${siteId}/`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // No system info available yet
+          setSystemInfo(null);
+          setError(null);
+          return;
+        }
+        throw new Error('Failed to fetch system info');
+      }
+
+      const data: SystemInfo = await response.json();
+      setSystemInfo(data);
+      setLastUpdate(new Date());
+      setError(null);
+    } catch (err) {
+      console.error('System info fetch error:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }, [siteId]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchSystemInfo();
+
+    if (!siteId) return;
+
+    const interval = setInterval(fetchSystemInfo, refreshInterval);
+
+    return () => clearInterval(interval);
+  }, [fetchSystemInfo, refreshInterval, siteId]);
+
+  return {
+    systemInfo,
+    loading,
+    error,
+    lastUpdate,
+    refetch: fetchSystemInfo
   };
 }

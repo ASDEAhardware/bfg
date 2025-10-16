@@ -8,7 +8,7 @@ import subprocess
 import json
 import re
 import logging
-from .models import MqttConnection, SensorDevice, SensorData
+from .models import MqttConnection, SensorDevice, SensorData, SystemInfo
 from .services.message_parser import MqttMessageParser
 
 logger = logging.getLogger(__name__)
@@ -373,5 +373,56 @@ class MqttServiceControlView(View):
         except Exception as e:
             return JsonResponse({
                 'success': False,
+                'error': str(e)
+            }, status=500)
+
+
+class MqttApiSystemInfoView(View):
+    """
+    API per system info di un sito specifico
+    """
+
+    def get(self, request, site_id):
+        try:
+            # Get system info for the site
+            system_info = SystemInfo.objects.get(site_id=site_id)
+
+            return JsonResponse({
+                'id': system_info.id,
+                'site_id': system_info.site_id,
+                'hostname': system_info.hostname,
+                'ip_address': system_info.ip_address,
+                'mac_address': system_info.mac_address,
+                'cpu_model': system_info.cpu_model,
+                'cpu_cores': system_info.cpu_cores,
+                'cpu_frequency': system_info.cpu_frequency,
+                'total_memory': system_info.total_memory,
+                'total_storage': system_info.total_storage,
+                'used_storage': system_info.used_storage,
+                'available_storage': system_info.available_storage,
+                'os_name': system_info.os_name,
+                'os_version': system_info.os_version,
+                'kernel_version': system_info.kernel_version,
+                'uptime_seconds': system_info.uptime_seconds,
+                'boot_time': system_info.boot_time.isoformat() if system_info.boot_time else None,
+                'cpu_usage_percent': system_info.cpu_usage_percent,
+                'memory_usage_percent': system_info.memory_usage_percent,
+                'disk_usage_percent': system_info.disk_usage_percent,
+                'network_interfaces': system_info.network_interfaces,
+                'cpu_temperature': system_info.cpu_temperature,
+                'system_sensors': system_info.system_sensors,
+                'python_version': system_info.python_version,
+                'installed_packages': system_info.installed_packages,
+                'raw_data': system_info.raw_data,
+                'last_updated': system_info.last_updated.isoformat(),
+                'created_at': system_info.created_at.isoformat(),
+            })
+
+        except SystemInfo.DoesNotExist:
+            return JsonResponse({
+                'error': 'System info not found for this site'
+            }, status=404)
+        except Exception as e:
+            return JsonResponse({
                 'error': str(e)
             }, status=500)

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import MqttConnection, SensorDevice, SensorData, MqttTopic
+from .models import MqttConnection, SensorDevice, SensorData, MqttTopic, SystemInfo
 
 
 class MqttTopicInline(admin.TabularInline):
@@ -176,6 +176,77 @@ class MqttTopicAdmin(admin.ModelAdmin):
     def description_preview(self, obj):
         return obj.description[:50] + '...' if len(obj.description) > 50 else obj.description
     description_preview.short_description = 'Description'
+
+
+@admin.register(SystemInfo)
+class SystemInfoAdmin(admin.ModelAdmin):
+    list_display = ['site', 'hostname', 'os_version', 'cpu_usage_percent', 'memory_usage_percent', 'disk_usage_percent', 'uptime_display', 'last_updated']
+    list_filter = ['os_name', 'site', 'last_updated', 'created_at']
+    search_fields = ['site__name', 'hostname', 'ip_address', 'mac_address', 'os_version']
+    readonly_fields = ['last_updated', 'created_at', 'uptime_display', 'memory_display', 'storage_display']
+
+    fieldsets = (
+        ('Site Information', {
+            'fields': ('site', 'hostname', 'ip_address', 'mac_address')
+        }),
+        ('Hardware', {
+            'fields': ('cpu_model', 'cpu_cores', 'cpu_frequency', 'total_memory', 'memory_display'),
+            'classes': ('wide',)
+        }),
+        ('Storage', {
+            'fields': ('total_storage', 'used_storage', 'available_storage', 'storage_display'),
+            'classes': ('wide',)
+        }),
+        ('Operating System', {
+            'fields': ('os_name', 'os_version', 'kernel_version', 'python_version'),
+            'classes': ('wide',)
+        }),
+        ('Performance Metrics', {
+            'fields': ('cpu_usage_percent', 'memory_usage_percent', 'disk_usage_percent', 'cpu_temperature'),
+            'classes': ('wide',)
+        }),
+        ('System Status', {
+            'fields': ('uptime_seconds', 'uptime_display', 'boot_time'),
+            'classes': ('wide',)
+        }),
+        ('Network & Sensors', {
+            'fields': ('network_interfaces', 'system_sensors'),
+            'classes': ('collapse',)
+        }),
+        ('Software', {
+            'fields': ('installed_packages',),
+            'classes': ('collapse',)
+        }),
+        ('Raw Data', {
+            'fields': ('raw_data',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'last_updated'),
+            'classes': ('collapse',)
+        })
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('site')
+
+    def uptime_display(self, obj):
+        return obj.get_uptime_display()
+    uptime_display.short_description = 'Uptime (Human)'
+
+    def memory_display(self, obj):
+        return obj.get_memory_display()
+    memory_display.short_description = 'Memory Usage'
+
+    def storage_display(self, obj):
+        return obj.get_storage_display()
+    storage_display.short_description = 'Storage Usage'
+
+    def has_add_permission(self, request):
+        return False  # I dati vengono aggiunti automaticamente dal sistema MQTT
+
+    def has_delete_permission(self, request, obj=None):
+        return True  # Permettiamo di eliminare per cleanup
 
 
 # Personalizzazione dell'admin site
