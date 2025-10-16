@@ -1,6 +1,7 @@
 "use client"
 import React from 'react'
 import { GridSection as GridSectionType, useGridStore } from '@/store/gridStore'
+import { useSettingsStore } from '@/store/settingsStore' // Importa il nuovo store
 import { GridSection } from '@/components/GridSection'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 
@@ -18,6 +19,7 @@ export function RecursiveGridSection({
   canRemove
 }: RecursiveGridSectionProps) {
   const { activeSectionId, currentLayout } = useGridStore()
+  const { showResizeHandle } = useSettingsStore() // Leggi lo stato dallo store
 
   // Calcola se questa sezione può essere rimossa nel contesto ricorsivo
   const canRemoveSection = () => {
@@ -60,7 +62,7 @@ export function RecursiveGridSection({
               canRemove={true} // I children possono sempre essere rimossi
             />
           </ResizablePanel>
-          {index < section.children!.length - 1 && <ResizableHandle withHandle />}
+          {index < section.children!.length - 1 && <ResizableHandle withHandle={showResizeHandle} />}
         </React.Fragment>
       ))}
     </ResizablePanelGroup>

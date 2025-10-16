@@ -13,7 +13,7 @@ export const useSaveTheme = () => {
     mutationFn: async (newTheme: ThemeOption) => {
       try {
         // La chiamata punta all'endpoint del BFF di Next.js
-        await api.put("theme/", { theme: newTheme });
+        await api.patch("theme/", { theme: newTheme });
       } catch (err) {
         console.error("Errore nel salvataggio del tema nel backend:", err);
         // Lancia nuovamente l'errore per permettere al chiamante di gestirlo se necessario

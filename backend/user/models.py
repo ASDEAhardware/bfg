@@ -31,8 +31,44 @@ class UserPreferences(models.Model):
         ('dark', 'Dark'),
         ('system', 'System'),
     ]
+    RESIZE_HANDLE_CHOICES = [
+        ('show', 'Show'),
+        ('hide', 'Hide'),
+    ]
+    ACCELEROMETER_UNIT_CHOICES = [
+        ('ms2', 'm/s²'),
+        ('g', 'g'),
+    ]
+    INCLINOMETER_UNIT_CHOICES = [
+        ('deg', 'Degrees'),
+        ('rad', 'Radians'),
+    ]
+
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     theme = models.CharField(max_length=10, choices=THEME_CHOICES, default='system')
+    show_resize_handle = models.CharField(max_length=4, choices=RESIZE_HANDLE_CHOICES, default='show')
+    accelerometer_unit = models.CharField(max_length=3, choices=ACCELEROMETER_UNIT_CHOICES, default='ms2')
+    inclinometer_unit = models.CharField(max_length=3, choices=INCLINOMETER_UNIT_CHOICES, default='deg')
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(theme__in=['light', 'dark', 'system']),
+                name='theme_must_be_valid_choice'
+            ),
+            models.CheckConstraint(
+                check=models.Q(show_resize_handle__in=['show', 'hide']),
+                name='resize_handle_must_be_valid_choice'
+            ),
+            models.CheckConstraint(
+                check=models.Q(accelerometer_unit__in=['ms2', 'g']),
+                name='accelerometer_unit_must_be_valid_choice'
+            ),
+            models.CheckConstraint(
+                check=models.Q(inclinometer_unit__in=['deg', 'rad']),
+                name='inclinometer_unit_must_be_valid_choice'
+            ),
+        ]
 
     def __str__(self):
-        return f"User Preferences for {self.user.username}, theme: {self.theme}"
+        return f"Preferences for {self.user.username} (Theme: {self.theme}, Resize: {self.show_resize_handle}, Accel: {self.accelerometer_unit}, Incl: {self.inclinometer_unit})"

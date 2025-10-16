@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { User, Lock, Settings, Bell, Shield, Palette, Loader2 } from "lucide-react"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { User, Lock, Settings, Bell, Shield, Palette, Loader2, Sun, Moon, Monitor, CircleGauge, TriangleRight, GripVertical } from "lucide-react"
 import { useChangePassword } from '@/hooks/useAuth';
 import { Toaster, toast } from "sonner";
 import { useUserInfo } from "@/hooks/useAuth"
@@ -15,6 +16,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQueryClient, useMutation } from "@tanstack/react-query"
 import { api } from "@/lib/axios"
 import axios from "axios"
+import { useUserPreferences, useUpdateUserPreferences } from "@/hooks/useUserPreferences";
+import { useSettingsStore } from "@/store/settingsStore"
+import { useTheme } from "next-themes";
 
 const settingsNavigation = [
     {
@@ -27,6 +31,11 @@ const settingsNavigation = [
         name: "Password",
         icon: Lock,
     },
+    {
+        id: "appearance",
+        name: "Appearance",
+        icon: Palette,
+    },
     //{
     //     id: "notifications",
     //     name: "Notifiche",
@@ -36,11 +45,6 @@ const settingsNavigation = [
     //     id: "privacy",
     //     name: "Privacy",
     //     icon: Shield,
-    // },
-    // {
-    //     id: "appearance",
-    //     name: "Aspetto",
-    //     icon: Palette,
     // },
 ]
 
@@ -440,23 +444,233 @@ function PrivacySection() {
     )
 }
 
+
 function AppearanceSection() {
+    const { theme: globalTheme, setTheme: setGlobalTheme } = useTheme();
+    const { showResizeHandle: globalShowResizeHandle } = useSettingsStore();
+
+    // Local states for staging changes
+    const [localTheme, setLocalTheme] = useState(globalTheme);
+    const [accelerometerUnit, setAccelerometerUnit] = useState("ms2");
+    const [inclinometerUnit, setInclinometerUnit] = useState("deg");
+    const [localShowResizeHandle, setLocalShowResizeHandle] = useState(globalShowResizeHandle ? 'show' : 'hide');
+
+    const queryClient = useQueryClient();
+    const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
+    const mutation = useUpdateUserPreferences();
+
+    // Initialize local states from preferences on first load
+    const isInitialized = useRef(false);
+    useEffect(() => {
+        if (preferences && !isInitialized.current) {
+            setLocalTheme(preferences.theme);
+            setAccelerometerUnit(preferences.accelerometer_unit);
+            setInclinometerUnit(preferences.inclinometer_unit);
+            setLocalShowResizeHandle(preferences.show_resize_handle);
+            isInitialized.current = true;
+        }
+    }, [preferences]);
+
+    const handleSaveAppearanceSettings = () => {
+        if (!localTheme) return;
+        mutation.mutate({
+            theme: localTheme,
+            accelerometer_unit: accelerometerUnit,
+            inclinometer_unit: inclinometerUnit,
+            show_resize_handle: localShowResizeHandle,
+        });
+    };
+
+    if (isLoadingPreferences) {
+        return (
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold">Appearance</h1>
+                    <p className="text-muted-foreground">Customize the appearance of the interface.</p>
+                </div>
+                <Card className="border border-border">
+                    <CardHeader>
+                        <Skeleton className="h-8 w-1/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </CardContent>
+                </Card>
+            </div>
+        )
+    }
+
+    if (isError) {
+        return (
+            <div className="flex flex-col items-center h-40 justify-center">
+                <span className="text-red-500 mb-2">
+                    Error loading appearance settings.
+                </span>
+                <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['userPreferences'] })}>Try Again</Button>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Aspect</h1>
-                <p className="text-muted-foreground">Customize the aspect of the interface.</p>
+                <h1 className="text-2xl font-bold">Appearance</h1>
+                <p className="text-muted-foreground">Customize the appearance of the interface.</p>
             </div>
 
+            {/* Theme selection card */}
             <Card className="border border-border">
                 <CardHeader>
                     <CardTitle>Theme</CardTitle>
-                    <CardDescription>Choose how you want the interface to appear.</CardDescription>
+                    <CardDescription>Select the theme for your interface.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">Section under development...</p>
+                <CardContent className="space-y-4">
+                    <RadioGroup value={localTheme || 'system'} onValueChange={setLocalTheme} className="space-y-3">
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="light" id="light" />
+                            <Label htmlFor="light" className="flex items-center gap-3 cursor-pointer flex-1">
+                                <Sun className="h-5 w-5 text-muted-foreground" />
+                                <div>
+                                    <div className="font-medium">Light</div>
+                                    <div className="text-sm text-muted-foreground">Light theme for the interface</div>
+                                </div>
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="dark" id="dark" />
+                            <Label htmlFor="dark" className="flex items-center gap-3 cursor-pointer flex-1">
+                                <Moon className="h-5 w-5 text-muted-foreground" />
+                                <div>
+                                    <div className="font-medium">Dark</div>
+                                    <div className="text-sm text-muted-foreground">Dark theme for the interface</div>
+                                </div>
+                            </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="system" id="system" />
+                            <Label htmlFor="system" className="flex items-center gap-3 cursor-pointer flex-1">
+                                <Monitor className="h-5 w-5 text-muted-foreground" />
+                                <div>
+                                    <div className="font-medium">System</div>
+                                    <div className="text-sm text-muted-foreground">Use system settings</div>
+                                </div>
+                            </Label>
+                        </div>
+                    </RadioGroup>
                 </CardContent>
             </Card>
+
+            {/* Grid Layout settings card */}
+            <Card className="border border-border">
+                <CardHeader>
+                    <CardTitle>Grid Layout</CardTitle>
+                    <CardDescription>Customize the grid mode behavior.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <RadioGroup
+                        value={localShowResizeHandle}
+                        onValueChange={setLocalShowResizeHandle}
+                        className="space-y-3"
+                    >
+                        <Label className="text-base font-medium"> <GripVertical /> Resize Handle</Label>
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="show" id="show-handle" />
+                            <Label htmlFor="show-handle" className="cursor-pointer flex-1">
+                                <div>
+                                    <div className="font-medium">Show</div>
+                                    <div className="text-sm text-muted-foreground">Display a visual handle for resizing sections.</div>
+                                </div>
+                            </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="hide" id="hide-handle" />
+                            <Label htmlFor="hide-handle" className="cursor-pointer flex-1">
+                                <div>
+                                    <div className="font-medium">Hide</div>
+                                    <div className="text-sm text-muted-foreground">Hide the visual handle for a cleaner interface.</div>
+                                </div>
+                            </Label>
+                        </div>
+                    </RadioGroup>
+                </CardContent>
+            </Card>
+
+            {/* Measurement unit selection card */}
+            <Card className="border border-border">
+                <CardHeader>
+                    <CardTitle>Unit of Measurement</CardTitle>
+                    <CardDescription>Choose which unit of measurement to display in the application.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+
+                    {/* Accelerometer unit selection */}
+                    <div className="space-y-3">
+                        <Label className="text-base font-medium"> <CircleGauge /> Accelerometers</Label>
+                        <RadioGroup value={accelerometerUnit} onValueChange={setAccelerometerUnit} className="space-y-3">
+                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                <RadioGroupItem value="ms2" id="ms2" />
+                                <Label htmlFor="ms2" className="cursor-pointer flex-1">
+                                    <div>
+                                        <div className="font-medium">m/s²</div>
+                                        <div className="text-sm text-muted-foreground">Meters per second squared</div>
+                                    </div>
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                <RadioGroupItem value="g" id="g" />
+                                <Label htmlFor="g" className="cursor-pointer flex-1">
+                                    <div>
+                                        <div className="font-medium">g</div>
+                                        <div className="text-sm text-muted-foreground">Acceleration due to gravity (9.81 m/s²)</div>
+                                    </div>
+                                </Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
+
+                    <Separator />
+
+                    {/* Inclinometer unit selection */}
+                    <div className="space-y-3">
+                        <Label className="text-base font-medium"> <TriangleRight /> Inclinometers</Label>
+                        <RadioGroup value={inclinometerUnit} onValueChange={setInclinometerUnit} className="space-y-3">
+                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                <RadioGroupItem value="deg" id="deg" />
+                                <Label htmlFor="deg" className="cursor-pointer flex-1">
+                                    <div>
+                                        <div className="font-medium">deg (°)</div>
+                                        <div className="text-sm text-muted-foreground">Degrees (0° - 360°)</div>
+                                    </div>
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                <RadioGroupItem value="rad" id="rad" />
+                                <Label htmlFor="rad" className="cursor-pointer flex-1">
+                                    <div>
+                                        <div className="font-medium">rad</div>
+                                        <div className="text-sm text-muted-foreground">Radiant (0 - 2π)</div>
+                                    </div>
+                                </Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Unified Save Button */}
+            <div className="flex justify-end pt-4">
+                <Button onClick={handleSaveAppearanceSettings} disabled={mutation.isPending}>
+                    {mutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Save All Preferences
+                </Button>
+            </div>
         </div>
     )
 }
