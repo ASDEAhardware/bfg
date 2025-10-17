@@ -5,14 +5,14 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTheme } from 'next-themes';
+import * as userPreferencesService from '@/services/userPreferences.service'
 
 export function useUserPreferences() {
     return useQuery({
         queryKey: ['userPreferences'],
-        queryFn: async () => {
-            const response = await api.get('preferences/');
-            return response.data;
-        },
+        staleTime: 1000 * 60 * 5,
+        retry: 3,
+        queryFn: userPreferencesService.getUserPreferences,
     });
 }
 
@@ -22,15 +22,7 @@ export function useUpdateUserPreferences() {
     const { setTheme } = useTheme();
 
     return useMutation({
-        mutationFn: async (newPreferences: {
-            theme: string;
-            accelerometer_unit: string;
-            inclinometer_unit: string;
-            show_resize_handle: string;
-        }) => {
-            const response = await api.patch('preferences/', newPreferences);
-            return response.data;
-        },
+        mutationFn: userPreferencesService.updateUserPreferences,
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['userPreferences'] });
             queryClient.invalidateQueries({ queryKey: ['userInfo'] });

@@ -446,28 +446,23 @@ function PrivacySection() {
 
 
 function AppearanceSection() {
-    const { theme: globalTheme, setTheme: setGlobalTheme } = useTheme();
-    const { showResizeHandle: globalShowResizeHandle } = useSettingsStore();
-
-    // Local states for staging changes
-    const [localTheme, setLocalTheme] = useState(globalTheme);
-    const [accelerometerUnit, setAccelerometerUnit] = useState("ms2");
-    const [inclinometerUnit, setInclinometerUnit] = useState("deg");
-    const [localShowResizeHandle, setLocalShowResizeHandle] = useState(globalShowResizeHandle ? 'show' : 'hide');
-
     const queryClient = useQueryClient();
     const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
     const mutation = useUpdateUserPreferences();
 
-    // Initialize local states from preferences on first load
-    const isInitialized = useRef(false);
+    // Initialize local states for the form
+    const [localTheme, setLocalTheme] = useState(preferences?.theme || 'system');
+    const [accelerometerUnit, setAccelerometerUnit] = useState(preferences?.accelerometer_unit || 'ms2');
+    const [inclinometerUnit, setInclinometerUnit] = useState(preferences?.inclinometer_unit || 'deg');
+    const [localShowResizeHandle, setLocalShowResizeHandle] = useState(preferences?.show_resize_handle || 'show');
+
+    // Sync local form state with remote data from the query
     useEffect(() => {
-        if (preferences && !isInitialized.current) {
+        if (preferences) {
             setLocalTheme(preferences.theme);
             setAccelerometerUnit(preferences.accelerometer_unit);
             setInclinometerUnit(preferences.inclinometer_unit);
             setLocalShowResizeHandle(preferences.show_resize_handle);
-            isInitialized.current = true;
         }
     }, [preferences]);
 
