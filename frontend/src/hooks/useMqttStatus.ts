@@ -219,7 +219,8 @@ export function useMqttConnectionStatus(siteId: string | number | null) {
 }
 
 /**
- * Hook for controlling MQTT connections (start/stop/restart)
+ * Hook for manual MQTT control (superuser only)
+ * Bypassa backoff exponential per controllo immediato
  */
 export function useMqttControl() {
   const [loading, setLoading] = useState(false);
@@ -232,29 +233,35 @@ export function useMqttControl() {
     setLoading(true);
     setError(null);
 
+    console.log(`🔧 MQTT Control: Initiating ${action} for site ${siteId}`);
+
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/v1/mqtt/connection/${siteId}/control/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          action,
-        }),
+      // Import axios API instance inside the callback to avoid SSR issues
+      const { api } = await import('@/lib/axios');
+
+      const response = await api.post(`/v1/mqtt/sites/${siteId}/connection/`, {
+        action
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to control connection');
-      }
+      const result = response.data;
 
-      const result = await response.json();
+      // Enhanced console feedback
+      console.log(`✅ MQTT Control Success:`, {
+        action: result.action,
+        site: result.site_name,
+        status: result.new_status,
+        operation_success: result.operation_success,
+        client_active: result.real_time_state?.client_active,
+        manager_clients: result.real_time_state?.manager_clients_count,
+        timestamp: result.timestamp
+      });
+
       return result;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.error || err?.message || 'Unknown error';
+      console.error(`❌ MQTT Control Error (${action}):`, errorMessage);
       setError(errorMessage);
-      throw err;
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -262,52 +269,6 @@ export function useMqttControl() {
 
   return {
     controlConnection,
-    loading,
-    error
-  };
-}
-
-/**
- * Hook for controlling the global MQTT service (restart)
- */
-export function useMqttServiceControl() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const restartService = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/v1/mqtt/service/control/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'restart'
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to restart MQTT service');
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return {
-    restartService,
     loading,
     error
   };

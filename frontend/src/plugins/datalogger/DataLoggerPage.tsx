@@ -4,11 +4,13 @@ import { useContainerWidth } from "@/hooks/useContainerWidth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SchedulerModal } from "@/components/SchedulerModal";
+import { toast } from "sonner";
 import { DataloggerCard } from "@/components/DataloggerCard";
 import { SensorCard } from "@/components/SensorCard";
 import { ContextualStatusBar, useContextualStatusBar } from "@/components/ContextualStatusBar";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { useGridStore } from "@/store/gridStore";
+import { useUserInfo } from "@/hooks/useAuth";
 import { useMqttConnectionStatus, useMqttControl, useSystemInfo } from "@/hooks/useMqttStatus";
 import {
   AlertDialog,
@@ -35,7 +37,6 @@ import {
   Gauge,
   MoreHorizontal,
   ArrowLeft,
-  RotateCw,
   Info
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,7 @@ export default function DataLoggerPage() {
   const { createCountItems, createFilterItems } = useContextualStatusBar();
   const { selectedSiteId } = useUnifiedSiteContext();
   const { isGridModeEnabled } = useGridStore();
+  const { data: userData } = useUserInfo();
   const { connection: mqttConnection, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
   const { controlConnection, loading: mqttControlLoading } = useMqttControl();
   const { systemInfo } = useSystemInfo(selectedSiteId);
@@ -329,44 +331,77 @@ export default function DataLoggerPage() {
     // Qui andrà la logica per salvare la pianificazione
   };
 
-  // Handle MQTT connection actions
+  // MQTT Control Functions (superuser only)
   const handleMqttStart = async () => {
-    if (!selectedSiteId) return;
+    if (!selectedSiteId || !userData?.is_superuser) return;
+
+    toast.loading("Starting MQTT connection...", { id: "mqtt-control" });
+
     try {
       const result = await controlConnection(selectedSiteId, 'start');
-      console.log('MQTT connection start result:', result);
+
+      toast.success(`✅ ${result.message}`, {
+        id: "mqtt-control",
+        description: `Status: ${result.new_status} | Client Active: ${result.real_time_state?.client_active}`
+      });
+
       // Force immediate refresh of MQTT status
       await refreshMqttStatus();
     } catch (error) {
-      console.error('Failed to start MQTT connection:', error);
+      toast.error(`❌ Failed to start MQTT connection`, {
+        id: "mqtt-control",
+        description: error instanceof Error ? error.message : 'Unknown error'
+      });
       // Refresh even on error to get updated status
       await refreshMqttStatus();
     }
   };
 
   const handleMqttStop = async () => {
-    if (!selectedSiteId) return;
+    if (!selectedSiteId || !userData?.is_superuser) return;
+
+    toast.loading("Stopping MQTT connection...", { id: "mqtt-control" });
+
     try {
       const result = await controlConnection(selectedSiteId, 'stop');
-      console.log('MQTT connection stop result:', result);
+
+      toast.success(`🛑 ${result.message}`, {
+        id: "mqtt-control",
+        description: `Status: ${result.new_status} | Client Active: ${result.real_time_state?.client_active}`
+      });
+
       // Force immediate refresh of MQTT status
       await refreshMqttStatus();
     } catch (error) {
-      console.error('Failed to stop MQTT connection:', error);
+      toast.error(`❌ Failed to stop MQTT connection`, {
+        id: "mqtt-control",
+        description: error instanceof Error ? error.message : 'Unknown error'
+      });
       // Refresh even on error to get updated status
       await refreshMqttStatus();
     }
   };
 
   const handleMqttRestart = async () => {
-    if (!selectedSiteId) return;
+    if (!selectedSiteId || !userData?.is_superuser) return;
+
+    toast.loading("Restarting MQTT connection (bypassing backoff)...", { id: "mqtt-control" });
+
     try {
       const result = await controlConnection(selectedSiteId, 'restart');
-      console.log('MQTT connection restart result:', result);
+
+      toast.success(`🔄 ${result.message}`, {
+        id: "mqtt-control",
+        description: `Status: ${result.new_status} | Operation Success: ${result.operation_success}`
+      });
+
       // Force immediate refresh of MQTT status
       await refreshMqttStatus();
     } catch (error) {
-      console.error('Failed to restart MQTT connection:', error);
+      toast.error(`❌ Failed to restart MQTT connection`, {
+        id: "mqtt-control",
+        description: error instanceof Error ? error.message : 'Unknown error'
+      });
       // Refresh even on error to get updated status
       await refreshMqttStatus();
     }
@@ -696,8 +731,8 @@ export default function DataLoggerPage() {
                     <Badge variant={status.variant} className={`text-xs ${status.className}`}>
                       {status.text}
                     </Badge>
-                    {/* MQTT Control Buttons */}
-                    {selectedSiteId && (
+                    {/* MQTT Control Buttons (superuser only) */}
+                    {userData?.is_superuser && selectedSiteId && (
                       <div className="flex items-center gap-1">
                         {/* Start Button */}
                         <Button
@@ -730,9 +765,9 @@ export default function DataLoggerPage() {
                           onClick={handleMqttRestart}
                           disabled={mqttControlLoading}
                           className={`h-6 w-6 p-0 ${!mqttControlLoading ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          title="Restart MQTT connection"
+                          title="Restart MQTT connection (bypass backoff)"
                         >
-                          <RotateCw className={`h-3 w-3 ${mqttControlLoading ? 'animate-spin' : ''}`} />
+                          <RefreshCw className={`h-3 w-3 ${mqttControlLoading ? 'animate-spin' : ''}`} />
                         </Button>
                       </div>
                     )}

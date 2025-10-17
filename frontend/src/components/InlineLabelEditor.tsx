@@ -154,7 +154,8 @@ export function InlineLabelEditor({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 group cursor-pointer rounded px-2 py-1 hover:bg-gray-50",
+        "flex items-center gap-2 group cursor-pointer rounded px-2 py-1 hover:bg-muted/50",
+        "dark:hover:bg-muted/50",
         disabled && "cursor-not-allowed opacity-50",
         className
       )}

@@ -3,7 +3,6 @@ import * as React from "react"
 import {
   MonitorCog,
   Shield,
-  Settings,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -40,8 +39,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const staffItems = userData?.is_staff
     ? [
-        { title: "Admin Panel", url: "/staff-admin", icon: Shield },
-        { title: "MQTT Control", url: "/mqtt-control", icon: Settings }
+        { title: "Admin Panel", url: "/staff-admin", icon: Shield }
       ]
     : []
 

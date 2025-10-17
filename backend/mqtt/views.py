@@ -18,186 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class MqttConnectionControlView(View):
-    """
-    API per controllare connessioni MQTT (start/stop/restart)
-    """
-
-    def post(self, request, site_id):
-        # Validazione input di sicurezza
-        try:
-            site_id = int(site_id)
-        except (ValueError, TypeError):
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid site_id format'
-            }, status=400)
-
-        action = request.POST.get('action', '').strip()
-
-        # Sanitizza input
-        if not action or not re.match(r'^[a-z]+$', action):
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid action format'
-            }, status=400)
-
-        if action not in ['start', 'stop', 'restart']:
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid action. Use: start, stop, restart'
-            }, status=400)
-
-        try:
-            # Get connection and manager instance
-            connection = get_object_or_404(MqttConnection, site_id=site_id)
-            from .services.mqtt_manager import MqttClientManager
-            manager = MqttClientManager.get_instance()
-
-            # Get current real state from manager (source of truth)
-            is_client_active = site_id in manager.clients
-            is_client_connected = is_client_active and manager.clients[site_id].is_connected()
-
-            # Execute action with transaction-based logic
-            if action == 'start':
-                result = self._handle_start_connection(connection, manager, site_id, is_client_active)
-            elif action == 'stop':
-                result = self._handle_stop_connection(connection, manager, site_id, is_client_active)
-            elif action == 'restart':
-                result = self._handle_restart_connection(connection, manager, site_id)
-
-            return JsonResponse({
-                'success': True,
-                'message': result['message'],
-                'new_status': result['new_status'],
-                'actual_state': {
-                    'client_active': site_id in manager.clients,
-                    'client_connected': site_id in manager.clients and manager.clients[site_id].is_connected() if site_id in manager.clients else False
-                }
-            })
-
-        except Exception as e:
-            logger.error(f"Error controlling MQTT connection for site {site_id}: {e}")
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            }, status=500)
-
-    def _handle_start_connection(self, connection, manager, site_id, is_client_active):
-        """Handle START action with proper state validation"""
-        site_name = connection.site.name
-
-        # Validate current state
-        if is_client_active:
-            client = manager.clients[site_id]
-            if client.is_connected():
-                return {
-                    'message': f'Connection for {site_name} is already active',
-                    'new_status': 'connected'
-                }
-
-        # Attempt to start connection
-        try:
-            # Set status to connecting BEFORE attempting connection
-            connection.status = 'connecting'
-            connection.error_message = ''
-            connection.save(update_fields=['status', 'error_message'])
-
-            # Try to start via manager
-            success = manager.start_connection(site_id)
-
-            if success:
-                # Manager should update DB status, but let's be sure
-                connection.refresh_from_db()
-                return {
-                    'message': f'Successfully started connection for {site_name}',
-                    'new_status': connection.status
-                }
-            else:
-                # Connection failed, update status
-                connection.status = 'error'
-                connection.error_message = 'Failed to start connection'
-                connection.save(update_fields=['status', 'error_message'])
-
-                return {
-                    'message': f'Failed to start connection for {site_name}',
-                    'new_status': 'error'
-                }
-
-        except Exception as e:
-            # Rollback on error
-            connection.status = 'error'
-            connection.error_message = str(e)
-            connection.save(update_fields=['status', 'error_message'])
-            raise
-
-    def _handle_stop_connection(self, connection, manager, site_id, is_client_active):
-        """Handle STOP action with proper state validation"""
-        site_name = connection.site.name
-
-        # Validate current state
-        if not is_client_active:
-            return {
-                'message': f'Connection for {site_name} is already stopped',
-                'new_status': 'disconnected'
-            }
-
-        # Attempt to stop connection
-        try:
-            # Stop via manager first
-            manager.stop_connection(site_id)
-
-            # Update DB status
-            connection.status = 'disconnected'
-            connection.error_message = ''
-            connection.save(update_fields=['status', 'error_message'])
-
-            return {
-                'message': f'Successfully stopped connection for {site_name}',
-                'new_status': 'disconnected'
-            }
-
-        except Exception as e:
-            # Don't rollback stop operations - if manager failed, at least try to update DB
-            connection.status = 'error'
-            connection.error_message = f'Stop operation failed: {str(e)}'
-            connection.save(update_fields=['status', 'error_message'])
-            raise
-
-    def _handle_restart_connection(self, connection, manager, site_id):
-        """Handle RESTART action with proper state validation"""
-        site_name = connection.site.name
-
-        try:
-            # Set status to connecting
-            connection.status = 'connecting'
-            connection.error_message = ''
-            connection.save(update_fields=['status', 'error_message'])
-
-            # Execute restart via manager (this should handle everything)
-            success = manager.restart_connection(site_id)
-
-            # Get updated status from DB (manager should have updated it)
-            connection.refresh_from_db()
-
-            if success or connection.status == 'connected':
-                return {
-                    'message': f'Successfully restarted connection for {site_name}',
-                    'new_status': connection.status
-                }
-            else:
-                return {
-                    'message': f'Restart initiated for {site_name} - check status',
-                    'new_status': connection.status
-                }
-
-        except Exception as e:
-            # Update error state
-            connection.status = 'error'
-            connection.error_message = str(e)
-            connection.save(update_fields=['status', 'error_message'])
-            raise
 
 
 
@@ -292,120 +112,10 @@ class MqttApiSensorDataView(View):
             }, status=500)
 
 
-class MqttServiceStatusView(View):
-    """
-    API per controllare status del daemon MQTT
-    """
-
-    def get(self, request):
-        try:
-            # Usa il singleton MQTT manager per status real-time
-            from .services.mqtt_manager import MqttClientManager
-            from django.core.cache import cache
-
-            # Controlla se Django ha avviato il servizio
-            service_started = cache.get('mqtt_manager_started', False)
-
-            # Ottieni status dal manager
-            try:
-                manager = MqttClientManager.get_instance()
-                manager_status = manager.get_connection_status()
-
-                is_running = service_started and manager_status['active_clients'] > 0
-
-                return JsonResponse({
-                    'is_running': is_running,
-                    'process_count': 1 if service_started else 0,
-                    'uptime': "Running via Django AppConfig" if is_running else None,
-                    'manager_status': manager_status,
-                    'service_started': service_started,
-                    'active_connections': manager_status['connected'],
-                    'total_connections': manager_status['total_configured'],
-                    'enabled_connections': manager_status.get('enabled_connections'),
-                    'disabled_connections': manager_status.get('disabled_connections')
-                })
-
-            except Exception as e:
-                # Fallback: controlla processi manualmente
-                import os
-                processes = []
-                for line in os.popen("ps aux 2>/dev/null || ps -ef").readlines():
-                    if "run_mqtt" in line and "python" in line and "manage.py" in line:
-                        processes.append(line.strip())
-
-                return JsonResponse({
-                    'is_running': len(processes) > 0,
-                    'process_count': len(processes),
-                    'uptime': None,
-                    'fallback_mode': True,
-                    'processes': processes[:3]
-                })
-
-        except Exception as e:
-            return JsonResponse({
-                'is_running': False,
-                'process_count': 0,
-                'error': str(e)
-            }, status=500)
 
 
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class MqttServiceControlView(View):
-    """
-    API per controllare il servizio MQTT (start/stop/restart)
-    """
-
-    def post(self, request):
-        try:
-            data = json.loads(request.body)
-            action = data.get('action')
-
-            if action not in ['restart']:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Invalid action. Only "restart" is supported (service auto-starts with Django)'
-                }, status=400)
-
-            if action == 'restart':
-                # Usa il singleton manager per restart pulito
-                from .services.mqtt_manager import MqttClientManager
-                from django.core.cache import cache
-
-                try:
-                    manager = MqttClientManager.get_instance()
-
-                    # Restart completo del manager
-                    manager.restart_all_connections()
-
-                    # Aggiorna cache status
-                    cache.set('mqtt_manager_started', True, timeout=None)
-
-                    message = "MQTT service restarted successfully"
-
-                except Exception as e:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Failed to restart MQTT service: {str(e)}'
-                    }, status=500)
-
-            return JsonResponse({
-                'success': True,
-                'message': message,
-                'action': action
-            })
-
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid JSON payload'
-            }, status=400)
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            }, status=500)
 
 
 class MqttApiSystemInfoView(View):
@@ -453,6 +163,106 @@ class MqttApiSystemInfoView(View):
         except Exception as e:
             return JsonResponse({
                 'error': str(e)
+            }, status=500)
+
+
+# ============================================================================
+# MQTT MANUAL CONTROL API - PER SUPERUSER
+# ============================================================================
+
+@method_decorator(csrf_exempt, name='dispatch')
+class MqttConnectionManualControlView(View):
+    """
+    API per controllo manuale connessioni MQTT (solo superuser)
+    Bypassa backoff exponential per controllo immediato
+    """
+
+    def post(self, request, site_id):
+        # Verifica permessi superuser
+        if not request.user.is_superuser:
+            return JsonResponse({
+                'success': False,
+                'error': 'Access denied: superuser privileges required'
+            }, status=403)
+
+        # Validazione input
+        try:
+            site_id = int(site_id)
+        except (ValueError, TypeError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid site_id format'
+            }, status=400)
+
+        try:
+            data = json.loads(request.body)
+            action = data.get('action', '').strip().lower()
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid JSON payload'
+            }, status=400)
+
+        # Validazione azione
+        if action not in ['start', 'stop', 'restart']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid action. Must be: start, stop, restart'
+            }, status=400)
+
+        try:
+            # Verifica che il sito esista e abbia configurazione MQTT
+            connection = get_object_or_404(MqttConnection, site_id=site_id)
+            site_name = connection.site.name
+
+            # Get manager instance
+            from .services.mqtt_manager import MqttClientManager
+            manager = MqttClientManager.get_instance()
+
+            # Esegui azione con metodi force (bypass backoff)
+            if action == 'start':
+                success = manager.force_start_connection(site_id)
+                message = f"Force start initiated for {site_name}"
+            elif action == 'stop':
+                success = manager.force_stop_connection(site_id)
+                message = f"Force stop completed for {site_name}"
+            elif action == 'restart':
+                success = manager.force_restart_connection(site_id)
+                message = f"Force restart completed for {site_name}"
+
+            # Refresh status dal database
+            connection.refresh_from_db()
+
+            # Get real-time state dal manager
+            is_client_active = site_id in manager.clients
+
+            response_data = {
+                'success': True,
+                'action': action,
+                'message': message,
+                'operation_success': success,
+                'site_name': site_name,
+                'new_status': connection.status,
+                'real_time_state': {
+                    'client_active': is_client_active,
+                    'manager_clients_count': len(manager.clients)
+                },
+                'timestamp': timezone.now().isoformat()
+            }
+
+            # Log per debugging
+            logger.info(f"MANUAL CONTROL: User {request.user.username} executed {action} on site {site_id} - Success: {success}")
+
+            return JsonResponse(response_data)
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"MANUAL CONTROL ERROR: {action} on site {site_id} - {error_msg}")
+
+            return JsonResponse({
+                'success': False,
+                'error': error_msg,
+                'action': action
             }, status=500)
 
 

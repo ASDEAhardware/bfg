@@ -203,6 +203,67 @@ class MqttClientManager:
         if site_id in self.last_attempt:
             del self.last_attempt[site_id]
 
+    def force_restart_connection(self, site_id: int) -> bool:
+        """
+        Forza restart connessione MQTT bypassando backoff exponential
+        Per controllo manuale - reset completo stato retry
+        """
+        logger.info(f"FORCE RESTART: Forcing restart for site {site_id} (bypassing backoff)")
+
+        # Reset completo stato retry
+        self._reset_reconnection_state(site_id)
+
+        try:
+            # Stop connessione esistente
+            self.stop_connection(site_id)
+
+            # Piccola pausa per cleanup
+            time.sleep(0.5)
+
+            # Start con stato pulito
+            success = self.start_connection(site_id)
+
+            if success:
+                logger.info(f"FORCE RESTART: Successfully restarted connection for site {site_id}")
+            else:
+                logger.warning(f"FORCE RESTART: Failed to restart connection for site {site_id}")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"FORCE RESTART: Error during force restart for site {site_id}: {e}")
+            return False
+
+    def force_start_connection(self, site_id: int) -> bool:
+        """
+        Forza start connessione MQTT bypassando backoff exponential
+        Per controllo manuale
+        """
+        logger.info(f"FORCE START: Forcing start for site {site_id} (bypassing backoff)")
+
+        # Reset stato retry
+        self._reset_reconnection_state(site_id)
+
+        # Se già connesso, non fare nulla
+        if site_id in self.clients:
+            logger.info(f"FORCE START: Site {site_id} already has active connection")
+            return True
+
+        # Start normale con stato pulito
+        return self.start_connection(site_id)
+
+    def force_stop_connection(self, site_id: int) -> bool:
+        """
+        Forza stop connessione MQTT
+        Per controllo manuale
+        """
+        logger.info(f"FORCE STOP: Forcing stop for site {site_id}")
+
+        # Reset stato retry per evitare auto-reconnect
+        self._reset_reconnection_state(site_id)
+
+        return self.stop_connection(site_id)
+
     def health_check(self):
         """Controlla salute delle connessioni e riconnette se necessario"""
         try:
