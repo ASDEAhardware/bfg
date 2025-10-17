@@ -56,8 +56,8 @@ export default function SettingsPage() {
             <Toaster position="top-center" duration={3000} />
             <div className="flex max-w-7xl w-full">
                 {/* Settings Sidebar - Hidden on mobile */}
-                <div className="hidden md:block w-56 lg:w-64">
-                    <div className="p-4 md:p-6">
+                <div className="hidden md:block w-56 lg:w-64 fixed top-[calc(4rem+1px)] h-[calc(100vh-3rem-1px)]">
+                    <div className="p-4 md:p-4">
                         <div className="flex items-center gap-2 mb-6">
                             <Settings className="h-5 w-5" />
                             <h2 className="text-lg font-semibold">Settings</h2>
@@ -84,7 +84,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 overflow-auto">
+                <div className="flex-1 overflow-auto md:ml-56 lg:ml-64">
                     <div className="md:hidden border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                         <div className="p-4">
                             <div className="flex items-center gap-2 mb-3">
