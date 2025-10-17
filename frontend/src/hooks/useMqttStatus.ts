@@ -35,34 +35,45 @@ export interface MqttConnectionStatus {
 }
 
 export interface SystemInfo {
+  // Gateway info (nuova struttura)
   id: number;
   site_id: number;
-  hostname: string;
+  serial_number: string;
+  label: string;
+  hostname?: string;
   ip_address?: string;
-  mac_address: string;
-  cpu_model: string;
+  firmware_version?: string;
+  is_online: boolean;
+  last_heartbeat?: string;
+  last_communication?: string;
+  cpu_usage_percent?: number;
+  memory_usage_percent?: number;
+  disk_usage_percent?: number;
+  uptime_seconds?: number;
+  raw_metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+
+  // Campi legacy per compatibilità (opzionali)
+  mac_address?: string;
+  cpu_model?: string;
   cpu_cores?: number;
   cpu_frequency?: number;
   total_memory?: number;
   total_storage?: number;
   used_storage?: number;
   available_storage?: number;
-  os_name: string;
-  os_version: string;
-  kernel_version: string;
-  uptime_seconds?: number;
+  os_name?: string;
+  os_version?: string;
+  kernel_version?: string;
   boot_time?: string;
-  cpu_usage_percent?: number;
-  memory_usage_percent?: number;
-  disk_usage_percent?: number;
-  network_interfaces: Record<string, any>;
+  network_interfaces?: Record<string, any>;
   cpu_temperature?: number;
-  system_sensors: Record<string, any>;
-  python_version: string;
-  installed_packages: string[];
-  raw_data: Record<string, any>;
-  last_updated: string;
-  created_at: string;
+  system_sensors?: Record<string, any>;
+  python_version?: string;
+  installed_packages?: string[];
+  raw_data?: Record<string, any>;
+  last_updated?: string;
 }
 
 export interface MqttStatusData {

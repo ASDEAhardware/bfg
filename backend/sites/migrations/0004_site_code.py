@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sites', '0003_datalogger_sensor_and_more'),
+        ('sites', '0002_alter_site_latitude_alter_site_longitude'),
     ]
 
     operations = [

@@ -1,6 +1,10 @@
 from django.contrib import admin
-from .models import MqttConnection, SensorDevice, SensorData, MqttTopic, SystemInfo
+from .models import MqttConnection, MqttTopic, Gateway, Datalogger, Sensor
 
+
+# ============================================================================
+# MQTT SECTION
+# ============================================================================
 
 class MqttTopicInline(admin.TabularInline):
     """Inline per gestire i topic MQTT direttamente dalla connessione"""
@@ -59,82 +63,6 @@ class MqttConnectionAdmin(admin.ModelAdmin):
     topics_count.short_description = 'Topics (Active/Total)'
 
 
-
-@admin.register(SensorDevice)
-class SensorDeviceAdmin(admin.ModelAdmin):
-    list_display = ['device_name', 'site', 'device_type', 'is_active', 'is_online', 'last_seen_at', 'total_messages', 'uptime_percentage']
-    list_filter = ['is_active', 'is_online', 'device_type', 'site', 'created_at']
-    search_fields = ['device_name', 'site__name', 'device_type']
-    readonly_fields = ['last_seen_at', 'consecutive_misses', 'total_messages', 'uptime_percentage', 'created_at', 'updated_at']
-
-    fieldsets = (
-        ('Device Info', {
-            'fields': ('site', 'device_name', 'device_type', 'is_active')
-        }),
-        ('Status', {
-            'fields': ('is_online', 'last_seen_at', 'consecutive_misses'),
-            'classes': ('wide',)
-        }),
-        ('Statistics', {
-            'fields': ('total_messages', 'uptime_percentage'),
-            'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        })
-    )
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('site')
-
-
-@admin.register(SensorData)
-class SensorDataAdmin(admin.ModelAdmin):
-    list_display = ['sensor_device', 'timestamp', 'acc_x', 'acc_y', 'acc_z', 'incli_x', 'incli_y', 'received_at']
-    list_filter = ['sensor_device__site', 'sensor_device__device_name', 'timestamp', 'received_at']
-    search_fields = ['sensor_device__device_name', 'sensor_device__site__name']
-    readonly_fields = ['received_at']
-    date_hierarchy = 'timestamp'
-
-    fieldsets = (
-        ('Sensor', {
-            'fields': ('sensor_device', 'timestamp')
-        }),
-        ('Accelerometer', {
-            'fields': ('acc_x', 'acc_y', 'acc_z'),
-            'classes': ('wide',)
-        }),
-        ('Inclinometer', {
-            'fields': ('incli_x', 'incli_y'),
-            'classes': ('wide',)
-        }),
-        ('Magnetometer', {
-            'fields': ('mag_x', 'mag_y', 'mag_z'),
-            'classes': ('collapse',)
-        }),
-        ('Gyroscope', {
-            'fields': ('gyro_x', 'gyro_y', 'gyro_z'),
-            'classes': ('collapse',)
-        }),
-        ('Raw Data', {
-            'fields': ('raw_data',),
-            'classes': ('collapse',)
-        }),
-        ('Metadata', {
-            'fields': ('received_at',),
-            'classes': ('collapse',)
-        })
-    )
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('sensor_device', 'sensor_device__site')
-
-    def has_add_permission(self, request):
-        return False  # I dati vengono aggiunti automaticamente dal sistema MQTT
-
-
-
 @admin.register(MqttTopic)
 class MqttTopicAdmin(admin.ModelAdmin):
     list_display = ['get_full_topic', 'mqtt_connection_site', 'is_active', 'qos_level', 'priority', 'description_preview']
@@ -178,51 +106,36 @@ class MqttTopicAdmin(admin.ModelAdmin):
     description_preview.short_description = 'Description'
 
 
-@admin.register(SystemInfo)
-class SystemInfoAdmin(admin.ModelAdmin):
-    list_display = ['site', 'hostname', 'os_version', 'cpu_usage_percent', 'memory_usage_percent', 'disk_usage_percent', 'uptime_display', 'last_updated']
-    list_filter = ['os_name', 'site', 'last_updated', 'created_at']
-    search_fields = ['site__name', 'hostname', 'ip_address', 'mac_address', 'os_version']
-    readonly_fields = ['last_updated', 'created_at', 'uptime_display', 'memory_display', 'storage_display']
+# ============================================================================
+# MONITORING SYSTEM SECTION
+# ============================================================================
+
+@admin.register(Gateway)
+class GatewayAdmin(admin.ModelAdmin):
+    """Admin per Gateway (ex SystemInfo)"""
+    list_display = ['label', 'site', 'serial_number', 'hostname', 'is_online', 'cpu_usage_percent', 'memory_usage_percent', 'disk_usage_percent', 'uptime_display', 'last_heartbeat']
+    list_filter = ['is_online', 'site', 'last_heartbeat', 'created_at']
+    search_fields = ['label', 'serial_number', 'site__name', 'hostname', 'ip_address']
+    readonly_fields = ['last_heartbeat', 'last_communication', 'created_at', 'updated_at', 'uptime_display']
 
     fieldsets = (
-        ('Site Information', {
-            'fields': ('site', 'hostname', 'ip_address', 'mac_address')
+        ('Gateway Information', {
+            'fields': ('site', 'serial_number', 'label', 'hostname', 'ip_address', 'firmware_version')
         }),
-        ('Hardware', {
-            'fields': ('cpu_model', 'cpu_cores', 'cpu_frequency', 'total_memory', 'memory_display'),
-            'classes': ('wide',)
-        }),
-        ('Storage', {
-            'fields': ('total_storage', 'used_storage', 'available_storage', 'storage_display'),
-            'classes': ('wide',)
-        }),
-        ('Operating System', {
-            'fields': ('os_name', 'os_version', 'kernel_version', 'python_version'),
+        ('Status', {
+            'fields': ('is_online', 'last_heartbeat', 'last_communication'),
             'classes': ('wide',)
         }),
         ('Performance Metrics', {
-            'fields': ('cpu_usage_percent', 'memory_usage_percent', 'disk_usage_percent', 'cpu_temperature'),
+            'fields': ('cpu_usage_percent', 'memory_usage_percent', 'disk_usage_percent', 'uptime_seconds', 'uptime_display'),
             'classes': ('wide',)
-        }),
-        ('System Status', {
-            'fields': ('uptime_seconds', 'uptime_display', 'boot_time'),
-            'classes': ('wide',)
-        }),
-        ('Network & Sensors', {
-            'fields': ('network_interfaces', 'system_sensors'),
-            'classes': ('collapse',)
-        }),
-        ('Software', {
-            'fields': ('installed_packages',),
-            'classes': ('collapse',)
         }),
         ('Raw Data', {
-            'fields': ('raw_data',),
+            'fields': ('raw_metadata',),
             'classes': ('collapse',)
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'last_updated'),
+            'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         })
     )
@@ -231,25 +144,154 @@ class SystemInfoAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related('site')
 
     def uptime_display(self, obj):
-        return obj.get_uptime_display()
-    uptime_display.short_description = 'Uptime (Human)'
+        """Human-readable uptime"""
+        if not obj.uptime_seconds:
+            return "Unknown"
 
-    def memory_display(self, obj):
-        return obj.get_memory_display()
-    memory_display.short_description = 'Memory Usage'
+        days = obj.uptime_seconds // 86400
+        hours = (obj.uptime_seconds % 86400) // 3600
+        minutes = (obj.uptime_seconds % 3600) // 60
 
-    def storage_display(self, obj):
-        return obj.get_storage_display()
-    storage_display.short_description = 'Storage Usage'
+        if days > 0:
+            return f"{days}d {hours}h {minutes}m"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
+    uptime_display.short_description = 'Uptime'
 
     def has_add_permission(self, request):
-        return False  # I dati vengono aggiunti automaticamente dal sistema MQTT
+        return False  # Auto-discovered via MQTT
 
     def has_delete_permission(self, request, obj=None):
-        return True  # Permettiamo di eliminare per cleanup
+        return True  # Permettiamo cleanup manuale
 
 
-# Personalizzazione dell'admin site
+class SensorInline(admin.TabularInline):
+    """Inline per visualizzare sensori del datalogger"""
+    model = Sensor
+    extra = 0
+    fields = ['label', 'serial_number', 'sensor_type', 'is_online', 'total_readings', 'uptime_percentage']
+    readonly_fields = ['serial_number', 'total_readings', 'uptime_percentage', 'last_reading']
+    classes = ['collapse']
+
+
+@admin.register(Datalogger)
+class DataloggerAdmin(admin.ModelAdmin):
+    """Admin per Datalogger auto-discovered"""
+    list_display = ['label', 'site', 'datalogger_type', 'instance_number', 'serial_number', 'is_online', 'sensors_count', 'uptime_percentage', 'last_heartbeat']
+    list_filter = ['is_online', 'datalogger_type', 'site', 'last_heartbeat', 'created_at']
+    search_fields = ['label', 'serial_number', 'site__name', 'datalogger_type']
+    readonly_fields = ['serial_number', 'datalogger_type', 'instance_number', 'last_heartbeat', 'last_communication', 'total_heartbeats', 'missed_heartbeats', 'created_at', 'updated_at']
+    inlines = [SensorInline]
+
+    fieldsets = (
+        ('Datalogger Information', {
+            'fields': ('site', 'serial_number', 'label', 'datalogger_type', 'instance_number')
+        }),
+        ('Connection', {
+            'fields': ('is_online', 'last_heartbeat', 'last_communication', 'firmware_version', 'ip_address'),
+            'classes': ('wide',)
+        }),
+        ('Statistics', {
+            'fields': ('total_heartbeats', 'missed_heartbeats', 'uptime_percentage', 'last_downtime_start'),
+            'classes': ('wide',)
+        }),
+        ('Raw Data', {
+            'fields': ('raw_metadata',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('site').prefetch_related('sensors')
+
+    def sensors_count(self, obj):
+        online_count = obj.sensors.filter(is_online=True).count()
+        total_count = obj.sensors.count()
+        return f"{online_count}/{total_count}"
+    sensors_count.short_description = 'Sensors (Online/Total)'
+
+    def has_add_permission(self, request):
+        return False  # Auto-discovered via MQTT
+
+    def has_delete_permission(self, request, obj=None):
+        return True  # Permettiamo cleanup manuale
+
+
+@admin.register(Sensor)
+class SensorAdmin(admin.ModelAdmin):
+    """Admin per Sensor con dati near real-time integrati"""
+    list_display = ['label', 'datalogger', 'sensor_type', 'serial_number', 'is_online', 'last_reading', 'total_readings', 'uptime_percentage', 'min_max_display']
+    list_filter = ['is_online', 'sensor_type', 'datalogger__site', 'datalogger__datalogger_type', 'last_reading', 'created_at']
+    search_fields = ['label', 'serial_number', 'datalogger__label', 'datalogger__site__name', 'sensor_type']
+    readonly_fields = [
+        'serial_number', 'last_reading', 'total_messages', 'total_readings',
+        'min_value_ever', 'max_value_ever', 'min_recorded_at', 'max_recorded_at',
+        'first_seen_at', 'last_seen_at', 'consecutive_misses',
+        'last_timestamp_1', 'last_data_1', 'last_timestamp_2', 'last_data_2', 'last_timestamp_3', 'last_data_3',
+        'created_at', 'updated_at'
+    ]
+
+    fieldsets = (
+        ('Sensor Information', {
+            'fields': ('datalogger', 'serial_number', 'label', 'sensor_type', 'unit_of_measure')
+        }),
+        ('Status', {
+            'fields': ('is_online', 'last_reading', 'consecutive_misses'),
+            'classes': ('wide',)
+        }),
+        ('Statistics', {
+            'fields': ('total_messages', 'total_readings', 'uptime_percentage', 'first_seen_at', 'last_seen_at'),
+            'classes': ('wide',)
+        }),
+        ('Min/Max Records', {
+            'fields': ('min_value_ever', 'min_recorded_at', 'max_value_ever', 'max_recorded_at'),
+            'classes': ('wide',)
+        }),
+        ('Near Real-Time Data (Last 3 Readings)', {
+            'fields': (
+                ('last_timestamp_1', 'last_data_1'),
+                ('last_timestamp_2', 'last_data_2'),
+                ('last_timestamp_3', 'last_data_3'),
+            ),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('datalogger', 'datalogger__site')
+
+    def min_max_display(self, obj):
+        """Display min/max values"""
+        if obj.min_value_ever is not None and obj.max_value_ever is not None:
+            return f"Min: {obj.min_value_ever:.2f} | Max: {obj.max_value_ever:.2f}"
+        return "No data"
+    min_max_display.short_description = 'Min/Max Values'
+
+    def has_add_permission(self, request):
+        return False  # Auto-discovered via MQTT
+
+    def has_delete_permission(self, request, obj=None):
+        return True  # Permettiamo cleanup manuale
+
+
+# ============================================================================
+# Admin Site Configuration
+# ============================================================================
+
+# Personalizzazione dell'admin site con la nuova struttura
 admin.site.site_header = "BFG MQTT Administration"
 admin.site.site_title = "BFG MQTT Admin"
-admin.site.index_title = "MQTT System Management"
+admin.site.index_title = "MQTT Auto-Discovery System Management"
+
+# Riorganizzazione menu tramite app_list_filter se necessario
+# Per ora utilizziamo la struttura standard di Django con verbose_name nei modelli

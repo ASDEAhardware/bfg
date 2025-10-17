@@ -17,7 +17,7 @@ async function forwardRequest(request: NextRequest, datalogger_id: string) {
 
     const response = await apiServer({
       method: 'GET',
-      url: `/api/v1/site/sensors/by-datalogger/${datalogger_id}`,
+      url: `/api/v1/mqtt/sensors/by_datalogger/?datalogger_id=${datalogger_id}`,
       headers,
     });
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { apiServer } from '@/lib/axios-server';
 import { cookies } from 'next/headers';
 
-async function forwardRequest(request: NextRequest, endpoint: string) {
+async function updateDataloggerLabel(request: NextRequest, id: string) {
   try {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get('access_token');
@@ -15,25 +15,18 @@ async function forwardRequest(request: NextRequest, endpoint: string) {
       headers['Authorization'] = `Bearer ${accessToken.value}`;
     }
 
-    const url = new URL(request.url);
-    const searchParams = url.searchParams.toString();
-    const fullEndpoint = searchParams ? `${endpoint}?${searchParams}` : endpoint;
-
-    let body;
-    if (request.method !== 'GET' && request.method !== 'DELETE') {
-      body = await request.text();
-    }
+    const body = await request.text();
 
     const response = await apiServer({
-      method: request.method,
-      url: `/api/v1/mqtt/dataloggers/${fullEndpoint}`,
+      method: 'PATCH',
+      url: `/api/v1/mqtt/dataloggers/${id}/update_label/`,
       headers,
       data: body,
     });
 
     return NextResponse.json(response.data, { status: response.status });
   } catch (error: any) {
-    console.error('Dataloggers API Error:', error);
+    console.error('Update Datalogger Label API Error:', error);
 
     if (error.response) {
       return NextResponse.json(
@@ -49,18 +42,10 @@ async function forwardRequest(request: NextRequest, endpoint: string) {
   }
 }
 
-export async function GET(request: NextRequest) {
-  return forwardRequest(request, '');
-}
-
-export async function POST(request: NextRequest) {
-  return forwardRequest(request, '');
-}
-
-export async function PATCH(request: NextRequest) {
-  return forwardRequest(request, '');
-}
-
-export async function DELETE(request: NextRequest) {
-  return forwardRequest(request, '');
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  return updateDataloggerLabel(request, id);
 }

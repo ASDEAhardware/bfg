@@ -1,9 +1,19 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+
+# Router per nuove API ViewSets
+router = DefaultRouter()
+router.register('gateways', views.GatewayViewSet, basename='gateway')
+router.register('dataloggers', views.DataloggerViewSet, basename='datalogger')
+router.register('sensors', views.SensorViewSet, basename='sensor')
 
 app_name = 'mqtt'
 
 urlpatterns = [
+    # Nuove API auto-discovery (DRF ViewSets)
+    path('', include(router.urls)),
+
     # Control API (legacy)
     path('connection/<int:site_id>/control/', views.MqttConnectionControlView.as_view(), name='connection_control'),
 

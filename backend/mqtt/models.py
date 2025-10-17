@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
 
 
 class MqttConnection(models.Model):
@@ -67,180 +68,6 @@ class MqttConnection(models.Model):
         status_icon = "✅" if self.is_enabled else "❌"
         return f"{status_icon} MQTT {self.site.name} - {self.broker_host}"
 
-
-class SensorDevice(models.Model):
-    """
-    Registro di tutti i sensori per ogni sito
-    """
-    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE)
-    device_name = models.CharField(max_length=100)  # es: "MNA00542"
-
-    # Metadata
-    device_type = models.CharField(max_length=50, blank=True)
-    is_active = models.BooleanField(default=True)
-
-    # Status tracking
-    last_seen_at = models.DateTimeField(null=True, blank=True)
-    is_online = models.BooleanField(default=False)
-    consecutive_misses = models.IntegerField(default=0)
-
-    # Stats per benchmark
-    total_messages = models.IntegerField(default=0)
-    uptime_percentage = models.FloatField(default=100.0)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('site', 'device_name')
-        verbose_name = "Sensor Device"
-        verbose_name_plural = "Sensor Devices"
-        ordering = ['site', 'device_name']
-
-    def __str__(self):
-        return f"{self.device_name} ({self.site.name})"
-
-
-class SensorData(models.Model):
-    """
-    Dati dei sensori (rolling 3 record per sensore)
-    """
-    sensor_device = models.ForeignKey(SensorDevice, on_delete=models.CASCADE)
-
-    # Raw data dal JSON
-    timestamp = models.DateTimeField()  # dal campo "ts"
-    raw_data = models.JSONField()  # tutto il payload del sensore
-
-    # Parsed common fields
-    acc_x = models.FloatField(null=True, blank=True)
-    acc_y = models.FloatField(null=True, blank=True)
-    acc_z = models.FloatField(null=True, blank=True)
-    incli_x = models.FloatField(null=True, blank=True)
-    incli_y = models.FloatField(null=True, blank=True)
-
-    # Optional fields (solo per alcuni sensori)
-    mag_x = models.FloatField(null=True, blank=True)
-    mag_y = models.FloatField(null=True, blank=True)
-    mag_z = models.FloatField(null=True, blank=True)
-    gyro_x = models.FloatField(null=True, blank=True)
-    gyro_y = models.FloatField(null=True, blank=True)
-    gyro_z = models.FloatField(null=True, blank=True)
-
-    received_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-timestamp']
-        indexes = [
-            models.Index(fields=['sensor_device', '-timestamp']),
-        ]
-        verbose_name = "Sensor Data"
-        verbose_name_plural = "Sensor Data"
-
-    def __str__(self):
-        return f"{self.sensor_device.device_name} - {self.timestamp}"
-
-
-class SystemInfo(models.Model):
-    """
-    System information received via MQTT sys_info topic
-    """
-    site = models.OneToOneField(
-        'sites.Site',
-        on_delete=models.CASCADE,
-        related_name='system_info'
-    )
-
-    # System hardware info
-    hostname = models.CharField(max_length=255, blank=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    mac_address = models.CharField(max_length=17, blank=True)  # Format: XX:XX:XX:XX:XX:XX
-
-    # Hardware specs
-    cpu_model = models.CharField(max_length=255, blank=True)
-    cpu_cores = models.IntegerField(null=True, blank=True)
-    cpu_frequency = models.FloatField(null=True, blank=True)  # MHz
-    total_memory = models.BigIntegerField(null=True, blank=True)  # bytes
-
-    # Storage info
-    total_storage = models.BigIntegerField(null=True, blank=True)  # bytes
-    used_storage = models.BigIntegerField(null=True, blank=True)  # bytes
-    available_storage = models.BigIntegerField(null=True, blank=True)  # bytes
-
-    # Operating system
-    os_name = models.CharField(max_length=100, blank=True)
-    os_version = models.CharField(max_length=100, blank=True)
-    kernel_version = models.CharField(max_length=100, blank=True)
-
-    # System status
-    uptime_seconds = models.BigIntegerField(null=True, blank=True)
-    boot_time = models.DateTimeField(null=True, blank=True)
-
-    # Performance metrics
-    cpu_usage_percent = models.FloatField(null=True, blank=True)
-    memory_usage_percent = models.FloatField(null=True, blank=True)
-    disk_usage_percent = models.FloatField(null=True, blank=True)
-
-    # Network info
-    network_interfaces = models.JSONField(default=dict, blank=True)
-
-    # Temperature and hardware sensors
-    cpu_temperature = models.FloatField(null=True, blank=True)  # Celsius
-    system_sensors = models.JSONField(default=dict, blank=True)
-
-    # Software info
-    python_version = models.CharField(max_length=50, blank=True)
-    installed_packages = models.JSONField(default=list, blank=True)
-
-    # Raw MQTT payload for debugging
-    raw_data = models.JSONField(default=dict, blank=True)
-
-    # Metadata
-    last_updated = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = "System Information"
-        verbose_name_plural = "System Information"
-        ordering = ['-last_updated']
-
-    def __str__(self):
-        return f"{self.site.name} - {self.hostname or 'Unknown Host'}"
-
-    def get_uptime_display(self):
-        """Return human-readable uptime"""
-        if not self.uptime_seconds:
-            return "Unknown"
-
-        days = self.uptime_seconds // 86400
-        hours = (self.uptime_seconds % 86400) // 3600
-        minutes = (self.uptime_seconds % 3600) // 60
-
-        if days > 0:
-            return f"{days}d {hours}h {minutes}m"
-        elif hours > 0:
-            return f"{hours}h {minutes}m"
-        else:
-            return f"{minutes}m"
-
-    def get_memory_display(self):
-        """Return human-readable memory info"""
-        if not self.total_memory:
-            return "Unknown"
-
-        total_gb = self.total_memory / (1024**3)
-        used_percent = self.memory_usage_percent or 0
-
-        return f"{used_percent:.1f}% of {total_gb:.1f}GB"
-
-    def get_storage_display(self):
-        """Return human-readable storage info"""
-        if not self.total_storage:
-            return "Unknown"
-
-        total_gb = self.total_storage / (1024**3)
-        used_percent = self.disk_usage_percent or 0
-
-        return f"{used_percent:.1f}% of {total_gb:.1f}GB"
 
 
 class MqttTopic(models.Model):
@@ -322,5 +149,383 @@ class MqttTopic(models.Model):
     def __str__(self):
         status = "✅" if self.is_active else "❌"
         return f"{status} {self.get_full_topic()} (QoS {self.qos_level})"
+
+
+# ============================================================================
+# NUOVI MODELLI PER AUTO-DISCOVERY MQTT - REFACTORING
+# ============================================================================
+
+class Gateway(models.Model):
+    """
+    Gateway/Sistema principale del sito (evoluzione di SystemInfo)
+    Gestisce informazioni sistema generale ricevute via gateway/heartbeat
+    """
+    site = models.OneToOneField('sites.Site', on_delete=models.CASCADE, related_name='gateway')
+    serial_number = models.CharField(
+        max_length=100,
+        unique=True,
+        validators=[
+            RegexValidator(
+                regex=r'^[a-zA-Z0-9_-]+$',
+                message='Serial number può contenere solo lettere, numeri, underscore e trattini'
+            )
+        ]
+    )
+    label = models.CharField(
+        max_length=255,
+        help_text="Nome editabile dall'utente, default=serial_number",
+        validators=[
+            RegexValidator(
+                regex=r'^[^<>\"\'&]+$',
+                message='Label non può contenere caratteri HTML pericolosi'
+            )
+        ]
+    )
+
+    # System info
+    hostname = models.CharField(max_length=255, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    firmware_version = models.CharField(max_length=50, blank=True)
+
+    # Status tracking
+    is_online = models.BooleanField(default=False)
+    last_heartbeat = models.DateTimeField(null=True, blank=True)
+    last_communication = models.DateTimeField(null=True, blank=True)
+
+    # Performance metrics
+    cpu_usage_percent = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
+    )
+    memory_usage_percent = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
+    )
+    disk_usage_percent = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
+    )
+    uptime_seconds = models.BigIntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0)]
+    )
+
+    # Raw MQTT payload for debugging
+    raw_metadata = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Gateway"
+        verbose_name_plural = "Gateways"
+        ordering = ['site__name']
+
+    def __str__(self):
+        return f"{self.label} ({self.site.name})"
+
+    def clean(self):
+        super().clean()
+        # Validazioni custom per Gateway
+        if self.cpu_usage_percent is not None and self.cpu_usage_percent < 0:
+            raise ValidationError("CPU usage cannot be negative")
+        if self.memory_usage_percent is not None and self.memory_usage_percent < 0:
+            raise ValidationError("Memory usage cannot be negative")
+        if self.disk_usage_percent is not None and self.disk_usage_percent < 0:
+            raise ValidationError("Disk usage cannot be negative")
+
+    def save(self, *args, **kwargs):
+        # Default label = serial_number se non specificato
+        if not self.label and self.serial_number:
+            self.label = self.serial_number
+        self.full_clean()  # Chiama clean() e validatori
+        super().save(*args, **kwargs)
+
+
+class Datalogger(models.Model):
+    """
+    Datalogger auto-discovered via MQTT heartbeat
+    Ogni datalogger ha serial_number univoco + label editabile
+    """
+    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE, related_name='mqtt_dataloggers')
+    serial_number = models.CharField(
+        max_length=100,
+        validators=[
+            RegexValidator(
+                regex=r'^[a-zA-Z0-9_-]+$',
+                message='Serial number può contenere solo lettere, numeri, underscore e trattini'
+            )
+        ]
+    )
+    label = models.CharField(
+        max_length=255,
+        help_text="Nome editabile dall'utente, default=serial_number",
+        validators=[
+            RegexValidator(
+                regex=r'^[^<>\"\'&]+$',
+                message='Label non può contenere caratteri HTML pericolosi'
+            )
+        ]
+    )
+
+    # Auto-discovery info dal topic
+    datalogger_type = models.CharField(max_length=50, help_text="monstro, adaq, etc.")
+    instance_number = models.PositiveIntegerField(help_text="Numero istanza dal topic (1, 2, 3...)")
+
+    # Status e comunicazione
+    is_online = models.BooleanField(default=False)
+    last_heartbeat = models.DateTimeField(null=True, blank=True)
+    last_communication = models.DateTimeField(null=True, blank=True)
+
+    # Metadata dal payload
+    firmware_version = models.CharField(max_length=50, blank=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    raw_metadata = models.JSONField(default=dict, blank=True)
+
+    # Statistiche per benchmark continuità servizio
+    total_heartbeats = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0)]
+    )
+    missed_heartbeats = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0)]
+    )
+    uptime_percentage = models.FloatField(
+        default=100.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
+    )
+    last_downtime_start = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('site', 'serial_number')
+        indexes = [
+            models.Index(fields=['site', 'datalogger_type', 'instance_number']),
+            models.Index(fields=['serial_number']),
+            models.Index(fields=['is_online']),
+            models.Index(fields=['last_heartbeat']),
+        ]
+        verbose_name = "Datalogger"
+        verbose_name_plural = "Dataloggers"
+        ordering = ['site__name', 'datalogger_type', 'instance_number']
+
+    def __str__(self):
+        return f"{self.label} ({self.datalogger_type}/{self.instance_number} - {self.site.name})"
+
+    def clean(self):
+        super().clean()
+        # Validazione custom
+        if self.missed_heartbeats > self.total_heartbeats:
+            raise ValidationError("Missed heartbeats cannot exceed total heartbeats")
+
+        # Ricalcola uptime percentage se necessario
+        if self.total_heartbeats > 0:
+            calculated_uptime = ((self.total_heartbeats - self.missed_heartbeats) / self.total_heartbeats) * 100
+            if abs(self.uptime_percentage - calculated_uptime) > 1.0:  # Tolleranza 1%
+                self.uptime_percentage = calculated_uptime
+
+    def save(self, *args, **kwargs):
+        # Default label = serial_number se non specificato
+        if not self.label and self.serial_number:
+            self.label = self.serial_number
+        self.full_clean()  # Chiama clean() e validatori
+        super().save(*args, **kwargs)
+
+
+class Sensor(models.Model):
+    """
+    Sensori auto-discovered con dati near real-time integrati
+    Ogni sensore ha serial_number + label editabile + ultimi 3 dati + statistiche
+    """
+    datalogger = models.ForeignKey(Datalogger, on_delete=models.CASCADE, related_name='sensors')
+    serial_number = models.CharField(
+        max_length=100,
+        help_text="device_name dal payload",
+        validators=[
+            RegexValidator(
+                regex=r'^[a-zA-Z0-9_.-]+$',
+                message='Serial number può contenere solo lettere, numeri, underscore, punti e trattini'
+            )
+        ]
+    )
+    label = models.CharField(
+        max_length=255,
+        help_text="Nome editabile dall'utente, default=serial_number",
+        validators=[
+            RegexValidator(
+                regex=r'^[^<>\"\'&]+$',
+                message='Label non può contenere caratteri HTML pericolosi'
+            )
+        ]
+    )
+
+    # Metadata sensore
+    sensor_type = models.CharField(max_length=50, blank=True)
+    unit_of_measure = models.CharField(max_length=50, blank=True)
+
+    # Status tracking
+    is_online = models.BooleanField(default=False)
+    last_reading = models.DateTimeField(null=True, blank=True)
+
+    # === DATI NEAR REAL-TIME (ultimi 3 valori) ===
+    # Ultimo dato (più recente)
+    last_timestamp_1 = models.DateTimeField(null=True, blank=True)
+    last_data_1 = models.JSONField(default=dict, blank=True)
+
+    # Penultimo dato
+    last_timestamp_2 = models.DateTimeField(null=True, blank=True)
+    last_data_2 = models.JSONField(default=dict, blank=True)
+
+    # Terzultimo dato
+    last_timestamp_3 = models.DateTimeField(null=True, blank=True)
+    last_data_3 = models.JSONField(default=dict, blank=True)
+
+    # === STATISTICHE AGGREGATE ===
+    # Contatori
+    total_messages = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0)]
+    )
+    total_readings = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0)]
+    )
+
+    # Valori min/max da sempre registrati
+    min_value_ever = models.FloatField(null=True, blank=True)
+    max_value_ever = models.FloatField(null=True, blank=True)
+    min_recorded_at = models.DateTimeField(null=True, blank=True)
+    max_recorded_at = models.DateTimeField(null=True, blank=True)
+
+    # Periodo di attività
+    first_seen_at = models.DateTimeField(null=True, blank=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    # Benchmark qualità comunicazione
+    uptime_percentage = models.FloatField(
+        default=100.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
+    )
+    consecutive_misses = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0)]
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('datalogger', 'serial_number')
+        indexes = [
+            models.Index(fields=['datalogger', 'is_online']),
+            models.Index(fields=['serial_number']),
+            models.Index(fields=['last_reading']),
+            models.Index(fields=['last_timestamp_1']),
+        ]
+        verbose_name = "Sensor"
+        verbose_name_plural = "Sensors"
+        ordering = ['datalogger__site__name', 'datalogger__label', 'label']
+
+    def __str__(self):
+        return f"{self.label} ({self.datalogger.label} - {self.datalogger.site.name})"
+
+    def clean(self):
+        super().clean()
+        # Validazioni custom
+        if self.total_readings > self.total_messages:
+            raise ValidationError("Total readings cannot exceed total messages")
+
+        if self.min_value_ever is not None and self.max_value_ever is not None:
+            if self.min_value_ever > self.max_value_ever:
+                raise ValidationError("Min value cannot be greater than max value")
+
+        # Validazione coerenza timestamp
+        timestamps = [
+            self.last_timestamp_1,
+            self.last_timestamp_2,
+            self.last_timestamp_3
+        ]
+        valid_timestamps = [ts for ts in timestamps if ts is not None]
+
+        if len(valid_timestamps) > 1:
+            # I timestamp devono essere in ordine decrescente (più recente primo)
+            for i in range(len(valid_timestamps) - 1):
+                if valid_timestamps[i] < valid_timestamps[i + 1]:
+                    raise ValidationError("Timestamp readings must be in descending order")
+
+    def save(self, *args, **kwargs):
+        # Default label = serial_number se non specificato
+        if not self.label and self.serial_number:
+            self.label = self.serial_number
+        self.full_clean()  # Chiama clean() e validatori
+        super().save(*args, **kwargs)
+
+    def add_new_reading(self, timestamp, data):
+        """
+        Aggiunge nuovo dato shiftando gli ultimi 3
+        Implementa rolling buffer: nuovo→1, 1→2, 2→3
+        """
+        from django.utils import timezone
+
+        # Shift dei dati: 1→2, 2→3, nuovo→1
+        self.last_timestamp_3 = self.last_timestamp_2
+        self.last_data_3 = self.last_data_2
+
+        self.last_timestamp_2 = self.last_timestamp_1
+        self.last_data_2 = self.last_data_1
+
+        self.last_timestamp_1 = timestamp
+        self.last_data_1 = data
+
+        # Update statistiche
+        self.total_readings += 1
+        self.last_reading = timestamp
+        self.last_seen_at = timestamp
+
+        if not self.first_seen_at:
+            self.first_seen_at = timestamp
+
+        # Reset consecutive misses se riceve dato
+        self.consecutive_misses = 0
+        self.is_online = True
+
+    def update_min_max_stats(self, value):
+        """Aggiorna statistiche min/max globali"""
+        from django.utils import timezone
+
+        if self.min_value_ever is None or value < self.min_value_ever:
+            self.min_value_ever = value
+            self.min_recorded_at = timezone.now()
+
+        if self.max_value_ever is None or value > self.max_value_ever:
+            self.max_value_ever = value
+            self.max_recorded_at = timezone.now()
+
+    def get_latest_readings(self):
+        """Ritorna lista degli ultimi 3 dati ordinati (più recente primo)"""
+        readings = []
+
+        if self.last_timestamp_1:
+            readings.append({
+                'timestamp': self.last_timestamp_1,
+                'data': self.last_data_1
+            })
+
+        if self.last_timestamp_2:
+            readings.append({
+                'timestamp': self.last_timestamp_2,
+                'data': self.last_data_2
+            })
+
+        if self.last_timestamp_3:
+            readings.append({
+                'timestamp': self.last_timestamp_3,
+                'data': self.last_data_3
+            })
+
+        return readings
 
 

@@ -2,6 +2,9 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { InlineLabelEditor } from "@/components/InlineLabelEditor";
+import { SensorDataDisplay } from "@/components/SensorDataDisplay";
+import { api } from "@/lib/axios";
 import {
   Activity,
   AlertTriangle,
@@ -30,11 +33,26 @@ interface SensorCardProps {
     min_value?: number;
     max_value?: number;
     status: 'active' | 'inactive' | 'calibrating' | 'error' | 'maintenance';
-    is_active: boolean;
+    is_active?: boolean;
+    is_online?: boolean; // Nuovo campo
     last_reading?: string;
     current_value?: number;
     description?: string;
+    latest_readings?: Array<{
+      timestamp: string;
+      data: Record<string, any>;
+    }>;
+    last_value?: number;
+    stats?: {
+      min_ever: number | null;
+      max_ever: number | null;
+      total_readings: number;
+      uptime_percentage: number;
+      days_active: number;
+    };
   };
+  onLabelUpdate?: (sensor: any, newLabel: string) => void;
+  showEnhanced?: boolean;
 }
 
 const sensorTypeConfig = {
@@ -59,7 +77,7 @@ const statusConfig = {
   maintenance: { color: "text-orange-500", label: "Manutenzione", bgColor: "bg-orange-500/10" }
 };
 
-export function SensorCard({ sensor }: SensorCardProps) {
+export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false }: SensorCardProps) {
   const typeConfig = sensorTypeConfig[sensor.sensor_type as keyof typeof sensorTypeConfig] || sensorTypeConfig.other;
   const statusInfo = statusConfig[sensor.status];
   const TypeIcon = typeConfig.icon;
@@ -71,8 +89,62 @@ export function SensorCard({ sensor }: SensorCardProps) {
       })
     : "Mai";
 
-  const isOnline = sensor.status === 'active';
+  const handleLabelUpdate = async (newLabel: string) => {
+    try {
+      await api.patch(`/v1/mqtt/sensors/${sensor.id}/update-label/`, {
+        label: newLabel
+      });
+
+      // Callback al parent per aggiornare la lista
+      if (onLabelUpdate) {
+        onLabelUpdate(sensor, newLabel);
+      }
+    } catch (error) {
+      console.error('Error updating sensor label:', error);
+      throw error;
+    }
+  };
+
+  const isOnline = sensor.is_online ?? (sensor.status === 'active');
   const hasValue = sensor.current_value !== undefined && sensor.current_value !== null;
+
+  // Se showEnhanced è true, usa il display avanzato
+  if (showEnhanced) {
+    return (
+      <Card className="card-standard">
+        <CardContent className="card-content-standard">
+          <div className="space-y-3">
+            {/* Header con nome editabile */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className={`p-1.5 rounded-lg ${typeConfig.bgColor} shrink-0`}>
+                  <TypeIcon className={`h-4 w-4 ${typeConfig.color}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <InlineLabelEditor
+                    label={sensor.name}
+                    onUpdate={handleLabelUpdate}
+                    size="sm"
+                    className="font-semibold"
+                  />
+                  <p className="text-xs text-muted-foreground">Ch{sensor.channel}</p>
+                </div>
+              </div>
+              <Badge
+                variant={isOnline ? "default" : "secondary"}
+                className="text-xs px-2 py-1 h-auto flex-shrink-0"
+              >
+                {statusInfo.label}
+              </Badge>
+            </div>
+
+            {/* Dati avanzati */}
+            <SensorDataDisplay sensor={sensor} compact={true} />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="card-standard h-[140px]">
@@ -84,7 +156,12 @@ export function SensorCard({ sensor }: SensorCardProps) {
               <TypeIcon className={`h-4 w-4 ${typeConfig.color}`} />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-sm truncate">{sensor.name}</h3>
+              <InlineLabelEditor
+                label={sensor.name}
+                onUpdate={handleLabelUpdate}
+                size="sm"
+                className="font-semibold"
+              />
               <p className="text-xs text-muted-foreground">Ch{sensor.channel}</p>
             </div>
           </div>

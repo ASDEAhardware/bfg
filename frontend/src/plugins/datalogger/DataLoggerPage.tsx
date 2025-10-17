@@ -128,6 +128,7 @@ export default function DataLoggerPage() {
   const [showStartConfirm, setShowStartConfirm] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [showScheduler, setShowScheduler] = useState(false);
+  const [showEnhancedSensorData, setShowEnhancedSensorData] = useState(false);
 
   // Hook per rilevare la larghezza del container
   const [containerRef, { isMobile, width }] = useContainerWidth();
@@ -167,7 +168,7 @@ export default function DataLoggerPage() {
       setError(null);
 
       try {
-        const response = await api.get('/v1/sites/dataloggers/', {
+        const response = await api.get('/v1/mqtt/dataloggers/', {
           params: { site_id: selectedSiteId }
         });
         setDataloggers(response.data);
@@ -200,8 +201,9 @@ export default function DataLoggerPage() {
     setSensorsError(null);
 
     try {
-      const response = await api.get(`/v1/sites/sensors/by-datalogger/${datalogger.id}`);
-      setSensors(response.data);
+      const response = await api.get(`/v1/mqtt/sensors/by-datalogger?datalogger_id=${datalogger.id}`);
+      // Nuovo formato response: { datalogger: {...}, sensors: [...], count: N }
+      setSensors(response.data.sensors || response.data);
     } catch (err) {
       setSensorsError(err instanceof Error ? err.message : 'Unknown error occurred');
       setSensors([]);
@@ -221,7 +223,7 @@ export default function DataLoggerPage() {
 
     setLoading(true);
     try {
-      const response = await api.get('/v1/sites/dataloggers/', {
+      const response = await api.get('/v1/mqtt/dataloggers/', {
         params: { site_id: selectedSiteId }
       });
       setDataloggers(response.data);
@@ -239,6 +241,29 @@ export default function DataLoggerPage() {
     setSensors([]);
     setSensorSearchTerm("");
     setIsSensorSearchOpen(false);
+  };
+
+  const handleDataloggerLabelUpdate = (datalogger: any, newLabel: string) => {
+    // Aggiorna la lista locale dei datalogger
+    setDataloggers(prev => prev.map(dl =>
+      dl.id === datalogger.id
+        ? { ...dl, name: newLabel }
+        : dl
+    ));
+
+    // Se è il datalogger selezionato, aggiorna anche quello
+    if (selectedLogger && selectedLogger.id === datalogger.id) {
+      setSelectedLogger(prev => prev ? { ...prev, name: newLabel } : null);
+    }
+  };
+
+  const handleSensorLabelUpdate = (sensor: any, newLabel: string) => {
+    // Aggiorna la lista locale dei sensori
+    setSensors(prev => prev.map(s =>
+      s.id === sensor.id
+        ? { ...s, name: newLabel }
+        : s
+    ));
   };
 
   // Filter sensors based on search term
@@ -429,6 +454,17 @@ export default function DataLoggerPage() {
                   <Search className="h-4 w-4" />
                 </Button>
 
+                <Button
+                  variant={showEnhancedSensorData ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowEnhancedSensorData(!showEnhancedSensorData)}
+                  className="h-8 px-3"
+                  title="Toggle enhanced sensor data view"
+                >
+                  <Activity className="h-4 w-4 mr-1" />
+                  <span className="text-xs">Enhanced</span>
+                </Button>
+
                 {/* System Info Button */}
                 {systemInfo && (
                   <Button
@@ -564,7 +600,12 @@ export default function DataLoggerPage() {
             ) : (
               <div className="grid-responsive-cards">
                 {filteredSensors.map((sensor) => (
-                  <SensorCard key={sensor.id} sensor={sensor} />
+                  <SensorCard
+                    key={sensor.id}
+                    sensor={sensor}
+                    onLabelUpdate={handleSensorLabelUpdate}
+                    showEnhanced={showEnhancedSensorData}
+                  />
                 ))}
               </div>
             )}
@@ -876,6 +917,7 @@ export default function DataLoggerPage() {
                 key={datalogger.id}
                 datalogger={datalogger}
                 onConnect={handleConnect}
+                onLabelUpdate={handleDataloggerLabelUpdate}
                 compact={viewMode === 'list'}
               />
             ))}
@@ -896,7 +938,7 @@ export default function DataLoggerPage() {
             // Add system info to the right side if available
             ...(systemInfo ? [
               {
-                label: systemInfo.os_version || 'System',
+                label: systemInfo.label || systemInfo.os_version || 'Gateway',
                 icon: Activity,
                 className: "text-muted-foreground"
               },
@@ -913,7 +955,7 @@ export default function DataLoggerPage() {
                 className: "text-muted-foreground"
               }] : []),
               {
-                label: `Updated ${new Date(systemInfo.last_updated).toLocaleTimeString()}`,
+                label: `Updated ${new Date(systemInfo.updated_at || systemInfo.last_updated || '').toLocaleTimeString()}`,
                 className: "text-xs text-muted-foreground/70"
               }
             ] : [])
@@ -927,7 +969,7 @@ export default function DataLoggerPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Info className="h-5 w-5" />
-              System Information - {systemInfo?.hostname}
+              Gateway Information - {systemInfo?.hostname || systemInfo?.label}
             </DialogTitle>
             <DialogDescription>
               Complete system details and performance metrics
@@ -939,11 +981,19 @@ export default function DataLoggerPage() {
               {/* System Overview */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <h3 className="text-lg font-semibold">System Information</h3>
+                  <h3 className="text-lg font-semibold">Gateway Information</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
+                      <span className="text-muted-foreground">Serial Number:</span>
+                      <span className="font-mono">{systemInfo.serial_number}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Label:</span>
+                      <span className="font-mono">{systemInfo.label}</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Hostname:</span>
-                      <span className="font-mono">{systemInfo.hostname}</span>
+                      <span className="font-mono">{systemInfo.hostname || 'Unknown'}</span>
                     </div>
                     {systemInfo.ip_address && (
                       <div className="flex justify-between">
@@ -953,30 +1003,40 @@ export default function DataLoggerPage() {
                     )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">MAC Address:</span>
-                      <span className="font-mono">{systemInfo.mac_address}</span>
+                      <span className="font-mono">{systemInfo.mac_address || 'Unknown'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">OS:</span>
-                      <span>{systemInfo.os_name} {systemInfo.os_version}</span>
+                      <span>{systemInfo.os_name || 'Unknown'} {systemInfo.os_version || ''}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Kernel:</span>
-                      <span className="font-mono">{systemInfo.kernel_version}</span>
+                      <span className="font-mono">{systemInfo.kernel_version || 'Unknown'}</span>
                     </div>
+                    {systemInfo.firmware_version && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Firmware:</span>
+                        <span className="font-mono">{systemInfo.firmware_version}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Python:</span>
-                      <span className="font-mono">{systemInfo.python_version}</span>
+                      <span className="font-mono">{systemInfo.python_version || 'Unknown'}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold">Hardware</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">CPU:</span>
-                      <span>{systemInfo.cpu_model}</span>
-                    </div>
+                {/* Hardware section - only show if we have data */}
+                {(systemInfo.cpu_model || systemInfo.cpu_cores || systemInfo.cpu_frequency || systemInfo.total_memory || systemInfo.total_storage) && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold">Hardware</h3>
+                    <div className="space-y-2 text-sm">
+                      {systemInfo.cpu_model && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">CPU:</span>
+                          <span>{systemInfo.cpu_model}</span>
+                        </div>
+                      )}
                     {systemInfo.cpu_cores && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Cores:</span>
@@ -1001,8 +1061,9 @@ export default function DataLoggerPage() {
                         <span>{(systemInfo.total_storage / (1024**3)).toFixed(2)} GB</span>
                       </div>
                     )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Performance Metrics */}
@@ -1088,7 +1149,7 @@ export default function DataLoggerPage() {
               </div>
 
               {/* Network Interfaces */}
-              {Object.keys(systemInfo.network_interfaces).length > 0 && (
+              {systemInfo.network_interfaces && Object.keys(systemInfo.network_interfaces).length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-lg font-semibold">Network Interfaces</h3>
                   <div className="bg-muted/30 rounded-lg p-3">
@@ -1100,7 +1161,7 @@ export default function DataLoggerPage() {
               )}
 
               {/* Installed Packages */}
-              {systemInfo.installed_packages.length > 0 && (
+              {systemInfo.installed_packages && systemInfo.installed_packages.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-lg font-semibold">Installed Packages ({systemInfo.installed_packages.length})</h3>
                   <div className="bg-muted/30 rounded-lg p-3 max-h-40 overflow-y-auto">
@@ -1115,7 +1176,7 @@ export default function DataLoggerPage() {
 
               {/* Last Updated */}
               <div className="text-xs text-muted-foreground text-center pt-4 border-t">
-                Last updated: {new Date(systemInfo.last_updated).toLocaleString()}
+                Last updated: {new Date(systemInfo.updated_at || systemInfo.last_updated || '').toLocaleString()}
               </div>
             </div>
           )}

@@ -7,7 +7,7 @@ from typing import Dict, Optional
 from django.utils import timezone
 from django.conf import settings
 from ..models import MqttConnection
-from .message_parser import MqttMessageParser
+from .autodiscovery import auto_discovery_service
 
 logger = logging.getLogger(__name__)
 
@@ -329,13 +329,25 @@ class MqttClientManager:
 
             logger.debug(f"Received message on {topic} for site {site_id}: {payload[:100]}...")
 
-            # Parse messaggio in base al topic
-            if topic.endswith('/heartbeat'):
-                MqttMessageParser.parse_heartbeat(payload, site_id)
-            elif topic.endswith('/sys_info'):
-                MqttMessageParser.parse_sys_info(payload, site_id)
-            else:
-                logger.warning(f"Unknown topic {topic} for site {site_id}")
+            # Process with new auto-discovery service
+            try:
+                # Parse JSON payload
+                import json
+                payload_dict = json.loads(payload)
+
+                # Get site instance
+                from sites.models import Site
+                site = Site.objects.get(id=site_id)
+
+                # Process with auto-discovery
+                auto_discovery_service.process_mqtt_message(site, topic, payload_dict)
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON payload for {topic}: {e}")
+            except Site.DoesNotExist:
+                logger.error(f"Site {site_id} not found for topic {topic}")
+            except Exception as e:
+                logger.error(f"Auto-discovery error for {topic}: {e}")
 
         except Exception as e:
             logger.error(f"Error processing message for site {site_id}: {e}")

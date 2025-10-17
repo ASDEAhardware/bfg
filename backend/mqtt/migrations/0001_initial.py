@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('sites', '0003_datalogger_sensor_and_more'),
+        ('sites', '0002_alter_site_latitude_alter_site_longitude'),
     ]
 
     operations = [

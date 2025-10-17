@@ -3,6 +3,8 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { InlineLabelEditor } from "@/components/InlineLabelEditor";
+import { api } from "@/lib/axios";
 import {
   Circle,
   Wifi,
@@ -33,6 +35,7 @@ interface DataloggerCardProps {
     active_sensors_count: number;
   };
   onConnect: (datalogger: any) => void;
+  onLabelUpdate?: (datalogger: any, newLabel: string) => void;
   compact?: boolean;
 }
 
@@ -63,7 +66,7 @@ const statusConfig = {
   }
 };
 
-export function DataloggerCard({ datalogger, onConnect, compact = false }: DataloggerCardProps) {
+export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact = false }: DataloggerCardProps) {
   const config = statusConfig[datalogger.status];
   const StatusIcon = config.icon;
 
@@ -75,6 +78,22 @@ export function DataloggerCard({ datalogger, onConnect, compact = false }: Datal
     : "Mai";
 
   const isOnline = datalogger.status === 'active';
+
+  const handleLabelUpdate = async (newLabel: string) => {
+    try {
+      await api.patch(`/v1/mqtt/dataloggers/${datalogger.id}/update-label/`, {
+        label: newLabel
+      });
+
+      // Callback al parent per aggiornare la lista
+      if (onLabelUpdate) {
+        onLabelUpdate(datalogger, newLabel);
+      }
+    } catch (error) {
+      console.error('Error updating datalogger label:', error);
+      throw error;
+    }
+  };
 
   if (compact) {
     return (
@@ -89,7 +108,14 @@ export function DataloggerCard({ datalogger, onConnect, compact = false }: Datal
             {/* Main Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-sm truncate">{datalogger.name}</h3>
+                <div className="flex-1 min-w-0">
+                  <InlineLabelEditor
+                    label={datalogger.name}
+                    onUpdate={handleLabelUpdate}
+                    size="sm"
+                    className="font-semibold"
+                  />
+                </div>
                 <Badge
                   variant={isOnline ? "default" : "secondary"}
                   className="text-xs px-1.5 py-0.5 h-auto flex-shrink-0"
@@ -156,7 +182,12 @@ export function DataloggerCard({ datalogger, onConnect, compact = false }: Datal
               <StatusIcon className={`h-4 w-4 ${config.color}`} />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-base truncate">{datalogger.name}</h3>
+              <InlineLabelEditor
+                label={datalogger.name}
+                onUpdate={handleLabelUpdate}
+                size="md"
+                className="font-semibold"
+              />
               <p className="text-sm text-muted-foreground truncate">{datalogger.model}</p>
             </div>
           </div>

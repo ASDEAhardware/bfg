@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { apiServer } from '@/lib/axios-server';
 import { cookies } from 'next/headers';
 
-async function forwardRequest(request: NextRequest, endpoint: string) {
+async function forwardRequest(request: NextRequest, endpoint: string = '') {
   try {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get('access_token');
@@ -26,14 +26,14 @@ async function forwardRequest(request: NextRequest, endpoint: string) {
 
     const response = await apiServer({
       method: request.method,
-      url: `/api/v1/mqtt/dataloggers/${fullEndpoint}`,
+      url: `/api/v1/mqtt/sensors/${fullEndpoint}`,
       headers,
       data: body,
     });
 
     return NextResponse.json(response.data, { status: response.status });
   } catch (error: any) {
-    console.error('Dataloggers API Error:', error);
+    console.error('MQTT Sensors API Error:', error);
 
     if (error.response) {
       return NextResponse.json(
