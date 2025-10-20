@@ -11,7 +11,7 @@ import { ContextualStatusBar, useContextualStatusBar } from "@/components/Contex
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { useGridStore } from "@/store/gridStore";
 import { useUserInfo } from "@/hooks/useAuth";
-import { useMqttConnectionStatus, useMqttControl, useSystemInfo } from "@/hooks/useMqttStatus";
+// import { useMqttConnectionStatus, useMqttControl, useSystemInfo } from "@/hooks/useMqttStatus";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,9 +92,19 @@ export default function DataLoggerPage() {
   const { selectedSiteId } = useUnifiedSiteContext();
   const { isGridModeEnabled } = useGridStore();
   const { data: userData } = useUserInfo();
-  const { connection: mqttConnection, hasError, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
-  const { controlConnection, loading: mqttControlLoading } = useMqttControl();
-  const { systemInfo } = useSystemInfo(selectedSiteId);
+  // const { connection: mqttConnection, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
+  // const { controlConnection } = useMqttControl();
+  // const { systemInfo } = useSystemInfo(selectedSiteId);
+
+  // Temporary fallback values until MQTT is rewritten
+  const mqttConnection = null;
+  const isHeartbeatTimeout = false;
+  const refreshMqttStatus = async () => {};
+  const controlConnection = async () => ({ success: false, message: 'MQTT temporarily disabled' });
+  const systemInfo = null;
+
+  const [startLoading, setStartLoading] = useState(false);
+  const [stopLoading, setStopLoading] = useState(false);
   const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -140,25 +150,25 @@ export default function DataLoggerPage() {
     if (!selectedSiteId) return null;
 
     if (!mqttConnection) {
-      return { variant: "secondary" as const, text: "Non configurato", className: "bg-muted text-muted-foreground" };
+      return { variant: "secondary" as const, text: "🔌 Non configurato", className: "bg-muted text-muted-foreground" };
     }
 
     switch (mqttConnection.status) {
       case 'connected':
-        return { variant: "default" as const, text: "MQTT Connesso", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" };
+        return { variant: "default" as const, text: "🟢 Connesso", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" };
       case 'connecting':
-        return { variant: "secondary" as const, text: "MQTT Connessione...", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" };
+        return { variant: "secondary" as const, text: "🟡 Connessione...", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" };
       case 'disconnected':
-        return { variant: "outline" as const, text: "MQTT Disconnesso", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100" };
+        return { variant: "outline" as const, text: "🔴 Disconnesso", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100" };
       case 'error':
         // Enhanced: distingui tra veri errori e heartbeat timeout
         if (isHeartbeatTimeout) {
-          return { variant: "secondary" as const, text: "MQTT Attivo (device offline)", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100" };
+          return { variant: "secondary" as const, text: "🟡 Device offline", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100" };
         } else {
-          return { variant: "outline" as const, text: "MQTT Errore", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" };
+          return { variant: "outline" as const, text: "🔴 Errore", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" };
         }
       default:
-        return { variant: "secondary" as const, text: "MQTT Sconosciuto", className: "bg-muted text-muted-foreground" };
+        return { variant: "secondary" as const, text: "❓ Sconosciuto", className: "bg-muted text-muted-foreground" };
     }
   };
 
@@ -175,10 +185,14 @@ export default function DataLoggerPage() {
       setError(null);
 
       try {
-        const response = await api.get('/v1/mqtt/dataloggers/', {
-          params: { site_id: selectedSiteId }
-        });
-        setDataloggers(response.data);
+        // TODO: Replace with new MQTT API when rewritten
+        // const response = await api.get('/v1/mqtt/dataloggers/', {
+        //   params: { site_id: selectedSiteId }
+        // });
+        // setDataloggers(response.data);
+
+        // Temporary: Set empty array until MQTT is rewritten
+        setDataloggers([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error occurred');
       } finally {
@@ -208,9 +222,12 @@ export default function DataLoggerPage() {
     setSensorsError(null);
 
     try {
-      const response = await api.get(`/v1/mqtt/sensors/by-datalogger?datalogger_id=${datalogger.id}`);
-      // Nuovo formato response: { datalogger: {...}, sensors: [...], count: N }
-      setSensors(response.data.sensors || response.data);
+      // TODO: Replace with new MQTT API when rewritten
+      // const response = await api.get(`/v1/mqtt/sensors/by_datalogger?datalogger_id=${datalogger.id}`);
+      // setSensors(response.data.sensors || response.data);
+
+      // Temporary: Set empty array until MQTT is rewritten
+      setSensors([]);
     } catch (err) {
       setSensorsError(err instanceof Error ? err.message : 'Unknown error occurred');
       setSensors([]);
@@ -230,10 +247,14 @@ export default function DataLoggerPage() {
 
     setLoading(true);
     try {
-      const response = await api.get('/v1/mqtt/dataloggers/', {
-        params: { site_id: selectedSiteId }
-      });
-      setDataloggers(response.data);
+      // TODO: Replace with new MQTT API when rewritten
+      // const response = await api.get('/v1/mqtt/dataloggers/', {
+      //   params: { site_id: selectedSiteId }
+      // });
+      // setDataloggers(response.data);
+
+      // Temporary: Set empty array until MQTT is rewritten
+      setDataloggers([]);
     } catch (err) {
       console.error('Error refreshing dataloggers:', err);
     } finally {
@@ -338,79 +359,69 @@ export default function DataLoggerPage() {
 
   // MQTT Control Functions (superuser only)
   const handleMqttStart = async () => {
-    if (!selectedSiteId || !userData?.is_superuser) return;
+    if (!selectedSiteId || !userData?.is_superuser || startLoading) return;
 
+    setStartLoading(true);
     toast.loading("Starting MQTT connection...", { id: "mqtt-control" });
 
     try {
       const result = await controlConnection(selectedSiteId, 'start');
 
-      toast.success(`✅ ${result.message}`, {
+      toast.success(`✅ MQTT Started`, {
         id: "mqtt-control",
-        description: `Status: ${result.new_status} | Client Active: ${result.real_time_state?.client_active}`
+        description: `${result.site_name} connection is now active`
       });
 
-      // Force immediate refresh of MQTT status
-      await refreshMqttStatus();
+      // Wait a bit for backend to update state, then refresh
+      setTimeout(async () => {
+        await refreshMqttStatus();
+      }, 1000);
     } catch (error) {
-      toast.error(`❌ Failed to start MQTT connection`, {
+      toast.error(`❌ Failed to start MQTT`, {
         id: "mqtt-control",
-        description: error instanceof Error ? error.message : 'Unknown error'
+        description: error instanceof Error ? error.message : 'Connection error'
       });
       // Refresh even on error to get updated status
-      await refreshMqttStatus();
+      setTimeout(async () => {
+        await refreshMqttStatus();
+      }, 500);
+    } finally {
+      setStartLoading(false);
     }
   };
 
   const handleMqttStop = async () => {
-    if (!selectedSiteId || !userData?.is_superuser) return;
+    if (!selectedSiteId || !userData?.is_superuser || stopLoading) return;
 
+    setStopLoading(true);
     toast.loading("Stopping MQTT connection...", { id: "mqtt-control" });
 
     try {
       const result = await controlConnection(selectedSiteId, 'stop');
 
-      toast.success(`🛑 ${result.message}`, {
+      toast.success(`🛑 MQTT Stopped`, {
         id: "mqtt-control",
-        description: `Status: ${result.new_status} | Client Active: ${result.real_time_state?.client_active}`
+        description: `${result.site_name} connection is now inactive`
       });
 
-      // Force immediate refresh of MQTT status
-      await refreshMqttStatus();
+      // Wait a bit for backend to update state, then refresh
+      setTimeout(async () => {
+        await refreshMqttStatus();
+      }, 1000);
     } catch (error) {
-      toast.error(`❌ Failed to stop MQTT connection`, {
+      toast.error(`❌ Failed to stop MQTT`, {
         id: "mqtt-control",
-        description: error instanceof Error ? error.message : 'Unknown error'
+        description: error instanceof Error ? error.message : 'Connection error'
       });
       // Refresh even on error to get updated status
-      await refreshMqttStatus();
+      setTimeout(async () => {
+        await refreshMqttStatus();
+      }, 500);
+    } finally {
+      setStopLoading(false);
     }
   };
 
-  const handleMqttRestart = async () => {
-    if (!selectedSiteId || !userData?.is_superuser) return;
-
-    toast.loading("Restarting MQTT connection (bypassing backoff)...", { id: "mqtt-control" });
-
-    try {
-      const result = await controlConnection(selectedSiteId, 'restart');
-
-      toast.success(`🔄 ${result.message}`, {
-        id: "mqtt-control",
-        description: `Status: ${result.new_status} | Operation Success: ${result.operation_success}`
-      });
-
-      // Force immediate refresh of MQTT status
-      await refreshMqttStatus();
-    } catch (error) {
-      toast.error(`❌ Failed to restart MQTT connection`, {
-        id: "mqtt-control",
-        description: error instanceof Error ? error.message : 'Unknown error'
-      });
-      // Refresh even on error to get updated status
-      await refreshMqttStatus();
-    }
-  };
 
   // Show legacy connected view when a datalogger is connected
   if (isConnected && selectedLogger) {
@@ -744,11 +755,25 @@ export default function DataLoggerPage() {
                           variant="default"
                           size="sm"
                           onClick={handleMqttStart}
-                          disabled={mqttControlLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting'}
-                          className={`h-6 w-6 p-0 ${!(mqttControlLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          title={`Start MQTT connection (status: ${mqttConnection?.status}, loading: ${mqttControlLoading})`}
+                          disabled={startLoading || stopLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting'}
+                          className={`h-6 w-6 p-0 ${!(startLoading || stopLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                          title={
+                            startLoading
+                              ? "Starting connection..."
+                              : stopLoading
+                                ? "Stop operation in progress..."
+                                : mqttConnection?.status === 'connected'
+                                  ? "Already connected"
+                                  : mqttConnection?.status === 'connecting'
+                                    ? "Connection in progress..."
+                                    : "Start MQTT connection"
+                          }
                         >
-                          <Play className="h-3 w-3" />
+                          {startLoading ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Play className="h-3 w-3" />
+                          )}
                         </Button>
 
                         {/* Stop Button */}
@@ -756,23 +781,23 @@ export default function DataLoggerPage() {
                           variant="destructive"
                           size="sm"
                           onClick={handleMqttStop}
-                          disabled={mqttControlLoading || mqttConnection?.status !== 'connected'}
-                          className={`h-6 w-6 p-0 ${!(mqttControlLoading || mqttConnection?.status !== 'connected') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          title="Stop MQTT connection"
+                          disabled={startLoading || stopLoading || mqttConnection?.status !== 'connected'}
+                          className={`h-6 w-6 p-0 ${!(startLoading || stopLoading || mqttConnection?.status !== 'connected') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                          title={
+                            stopLoading
+                              ? "Stopping connection..."
+                              : startLoading
+                                ? "Start operation in progress..."
+                                : mqttConnection?.status !== 'connected'
+                                  ? "Not connected"
+                                  : "Stop MQTT connection"
+                          }
                         >
-                          <Square className="h-3 w-3" />
-                        </Button>
-
-                        {/* Restart Button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleMqttRestart}
-                          disabled={mqttControlLoading}
-                          className={`h-6 w-6 p-0 ${!mqttControlLoading ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          title="Restart MQTT connection (bypass backoff)"
-                        >
-                          <RefreshCw className={`h-3 w-3 ${mqttControlLoading ? 'animate-spin' : ''}`} />
+                          {stopLoading ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Square className="h-3 w-3" />
+                          )}
                         </Button>
                       </div>
                     )}
@@ -979,13 +1004,11 @@ export default function DataLoggerPage() {
             ...(dataloggers.length > 0 ? [
               {
                 label: `MQTT Online: ${dataloggers.filter(d => d.is_active).length}`,
-                color: 'success',
-                className: "text-green-600"
+                color: 'success' as const
               },
               ...(dataloggers.filter(d => !d.is_active).length > 0 ? [{
                 label: `MQTT Offline: ${dataloggers.filter(d => !d.is_active).length}`,
-                color: 'error',
-                className: "text-red-600"
+                color: 'error' as const
               }] : [])
             ] : []),
             // Add system info to the right side if available
@@ -993,24 +1016,19 @@ export default function DataLoggerPage() {
               {
                 label: systemInfo.label || systemInfo.os_version || 'Gateway',
                 icon: Activity,
-                color: systemInfo.is_online ? 'success' : 'error',
-                className: systemInfo.is_online ? "text-green-600" : "text-red-600"
+                color: systemInfo.is_online ? 'success' as const : 'error' as const
               },
               ...(systemInfo.cpu_usage_percent !== undefined && systemInfo.cpu_usage_percent !== null ? [{
-                label: `CPU ${systemInfo.cpu_usage_percent.toFixed(1)}%`,
-                className: "text-muted-foreground"
+                label: `CPU ${systemInfo.cpu_usage_percent.toFixed(1)}%`
               }] : []),
               ...(systemInfo.memory_usage_percent !== undefined && systemInfo.memory_usage_percent !== null ? [{
-                label: `RAM ${systemInfo.memory_usage_percent.toFixed(1)}%`,
-                className: "text-muted-foreground"
+                label: `RAM ${systemInfo.memory_usage_percent.toFixed(1)}%`
               }] : []),
               ...(systemInfo.disk_usage_percent !== undefined && systemInfo.disk_usage_percent !== null ? [{
-                label: `Disk ${systemInfo.disk_usage_percent.toFixed(1)}%`,
-                className: "text-muted-foreground"
+                label: `Disk ${systemInfo.disk_usage_percent.toFixed(1)}%`
               }] : []),
               {
-                label: `Updated ${new Date(systemInfo.updated_at || systemInfo.last_updated || '').toLocaleTimeString()}`,
-                className: "text-xs text-muted-foreground/70"
+                label: `Updated ${new Date(systemInfo.updated_at || systemInfo.last_updated || '').toLocaleTimeString()}`
               }
             ] : [])
           ]}

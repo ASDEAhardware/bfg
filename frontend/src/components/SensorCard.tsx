@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineLabelEditor } from "@/components/InlineLabelEditor";
 import { SensorDataDisplay } from "@/components/SensorDataDisplay";
-import { api } from "@/lib/axios";
+// import { api } from "@/lib/axios";
 import {
   Activity,
   AlertTriangle,
@@ -91,9 +91,10 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false }: Sens
 
   const handleLabelUpdate = async (newLabel: string) => {
     try {
-      await api.patch(`/v1/mqtt/sensors/${sensor.id}/update-label/`, {
-        label: newLabel
-      });
+      // TODO: Replace with new MQTT API when rewritten
+      // await api.patch(`/v1/mqtt/sensors/${sensor.id}/update_label/`, {
+      //   label: newLabel
+      // });
 
       // Callback al parent per aggiornare la lista
       if (onLabelUpdate) {

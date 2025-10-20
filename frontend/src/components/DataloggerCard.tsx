@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineLabelEditor } from "@/components/InlineLabelEditor";
-import { api } from "@/lib/axios";
+// import { api } from "@/lib/axios";
 import {
   Circle,
   Wifi,
@@ -81,9 +81,10 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
 
   const handleLabelUpdate = async (newLabel: string) => {
     try {
-      await api.patch(`/v1/mqtt/dataloggers/${datalogger.id}/update-label/`, {
-        label: newLabel
-      });
+      // TODO: Replace with new MQTT API when rewritten
+      // await api.patch(`/v1/mqtt/dataloggers/${datalogger.id}/update_label/`, {
+      //   label: newLabel
+      // });
 
       // Callback al parent per aggiornare la lista
       if (onLabelUpdate) {
