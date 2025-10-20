@@ -212,7 +212,8 @@ export function useMqttConnectionStatus(siteId: string | number | null) {
     connection: connectionStatus,
     stats: siteStats,
     isConnected: connectionStatus?.status === 'connected',
-    hasError: connectionStatus?.status === 'error',
+    hasError: connectionStatus?.status === 'error' && connectionStatus?.error_message !== 'Heartbeat timeout',
+    isHeartbeatTimeout: connectionStatus?.status === 'error' && connectionStatus?.error_message === 'Heartbeat timeout',
     lastHeartbeat: connectionStatus?.last_heartbeat_at,
     refresh: refetch // Expose refresh function
   };

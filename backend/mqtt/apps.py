@@ -43,9 +43,9 @@ class MqttConfig(AppConfig):
 
                     logger.info("MQTT Client Manager (singleton) started successfully")
 
-                    # Mantieni il thread attivo per health checks
+                    # Mantieni il thread attivo per health checks (15 sec per detection rapida)
                     while True:
-                        time.sleep(30)  # Health check ogni 30 secondi
+                        time.sleep(15)  # Health check ogni 15 secondi
                         try:
                             manager.health_check()
                         except Exception as e:

@@ -32,27 +32,19 @@ class MqttDiscoveryError(MqttProcessingError):
     pass
 
 
-class EnhancedMqttAutoDiscovery:
+class MqttAutoDiscoveryService:
     """
-    Enhanced Service per auto-discovery di dispositivi da messaggi MQTT
+    Service per auto-discovery di dispositivi da messaggi MQTT
 
-    NUOVO Pattern Topic Gestiti:
-    - sito_001/datalogger/{tipo}/{id}/heartbeat (es: sito_001/datalogger/monstro/1/heartbeat)
-    - sito_001/datalogger/{tipo}/{id}/input
-    - sito_001/datalogger/{tipo}/{id}/output
-    - sito_001/gateway/{id}/heartbeat (es: sito_001/gateway/1/heartbeat)
-    - sito_001/gateway/{id}/input
-    - sito_001/gateway/{id}/output
-
-    Key Logic:
-    - Discovery basato su serial_number dal payload (non da topic)
-    - Auto-create/update device records
-    - Topic parsing completo per tutti i pattern
+    Pattern Topic Gestiti:
+    - sito_001/gateway/heartbeat
+    - sito_001/datalogger/monstro/1/heartbeat
+    - sito_001/datalogger/adaq/2/heartbeat
     """
 
     def process_mqtt_message(self, site, topic, payload):
         """
-        Enhanced Router per tutti i messaggi MQTT con discovery automatico
+        Router principale per messaggi MQTT
 
         Args:
             site: Instance del modello Site
@@ -60,26 +52,29 @@ class EnhancedMqttAutoDiscovery:
             payload: Dict con payload JSON del messaggio
         """
         try:
-            # Parse topic structure
-            topic_parts = topic.split('/')
-
-            if len(topic_parts) < 3:
-                logger.debug(f"Topic troppo corto: {topic}")
-                return  # Topic malformato
-
-            site_code, device_category = topic_parts[0], topic_parts[1]
-
-            # Verifica che corrisponda al site
-            if site_code != site.code:
-                logger.debug(f"Site code mismatch: topic={site_code}, site={site.code}")
+            parts = topic.split('/')
+            if len(parts) < 3:
+                logger.warning(f"Topic malformato: {topic}")
                 return
 
-            if device_category == 'datalogger':
-                self._process_datalogger_topic(site, topic_parts, payload)
-            elif device_category == 'gateway':
-                self._process_gateway_topic(site, topic_parts, payload)
+            site_code = parts[0]  # sito_001
+            device_category = parts[1]  # gateway o datalogger
+
+            # Verifica che il site_code corrisponda
+            if site.code != site_code:
+                logger.warning(f"Site code mismatch: topic={site_code}, site={site.code}")
+                return
+
+            if device_category == 'datalogger' and len(parts) >= 5:
+                # sito_001/datalogger/monstro/1/heartbeat
+                self._process_datalogger_message(site, parts, payload)
+
+            elif device_category == 'gateway' and len(parts) >= 3:
+                # sito_001/gateway/heartbeat
+                self._process_gateway_message(site, parts, payload)
+
             else:
-                logger.debug(f"Device category non gestito: {device_category}")
+                logger.debug(f"Topic non gestito: {topic}")
 
         except ValidationError as e:
             raise MqttValidationError(
@@ -105,149 +100,186 @@ class EnhancedMqttAutoDiscovery:
                 original_error=e
             )
 
-    def _process_datalogger_topic(self, site, topic_parts, payload):
+    def _process_datalogger_message(self, site, topic_parts, payload):
         """
-        Process datalogger topics: sito_001/datalogger/tipo/id/action
+        Gestisce messaggi datalogger con auto-discovery
 
-        Topic Structure: sito_001/datalogger/{tipo}/{id}/{action}
+        Topic: sito_001/datalogger/monstro/1/heartbeat
         Parts: [sito_001, datalogger, monstro, 1, heartbeat]
         """
-        if len(topic_parts) != 5:
-            logger.debug(f"Datalogger topic malformato: {'/'.join(topic_parts)}")
-            return
+        datalogger_type = topic_parts[2]  # monstro, adaq
+        instance_number = int(topic_parts[3])  # 1, 2, 3
+        message_type = topic_parts[4]  # input, output, heartbeat
 
-        _, _, datalogger_type, device_id, action = topic_parts
-
-        # Estrai serial dal payload
-        serial_number = payload.get('serial_number')
-        if not serial_number:
-            logger.debug(f"Payload senza serial_number per datalogger topic: {'/'.join(topic_parts)}")
-            return
-
-        if action == 'heartbeat':
-            self._update_or_create_datalogger(site, datalogger_type, device_id, serial_number, payload)
-        elif action in ['input', 'output']:
-            self._process_datalogger_data(site, serial_number, action, payload)
-        else:
-            logger.debug(f"Action non gestita per datalogger: {action}")
-
-    def _process_gateway_topic(self, site, topic_parts, payload):
-        """
-        Process gateway topics: sito_001/gateway/id/action
-
-        Topic Structure: sito_001/gateway/{id}/{action}
-        Parts: [sito_001, gateway, 1, heartbeat]
-        """
-        if len(topic_parts) != 4:
-            logger.debug(f"Gateway topic malformato: {'/'.join(topic_parts)}")
-            return
-
-        _, _, gateway_id, action = topic_parts
-
-        # Estrai serial dal payload
-        serial_number = payload.get('serial_number')
-        if not serial_number:
-            logger.debug(f"Payload senza serial_number per gateway topic: {'/'.join(topic_parts)}")
-            return
-
-        if action == 'heartbeat':
-            self._update_or_create_gateway(site, gateway_id, serial_number, payload)
-        elif action in ['input', 'output']:
-            self._process_gateway_data(site, serial_number, action, payload)
-        else:
-            logger.debug(f"Action non gestita per gateway: {action}")
-
-    @transaction.atomic
-    def _update_or_create_datalogger(self, site, datalogger_type, device_id, serial_number, payload):
-        """
-        Create o update datalogger basato su serial_number (KEY DISCRIMINANT)
-
-        Args:
-            site: Site instance
-            datalogger_type: Tipo datalogger (monstro, adaq)
-            device_id: Device ID dal topic (1, 2, 3)
-            serial_number: Serial number dal payload (KEY)
-            payload: Payload del messaggio heartbeat
-
-        Returns:
-            Datalogger instance
-        """
-        try:
-            datalogger, created = Datalogger.objects.get_or_create(
-                serial_number=serial_number,
-                defaults={
-                    'site': site,
-                    'datalogger_type': datalogger_type,
-                    'device_id': device_id,
-                    'label': f"{datalogger_type}/{device_id}",
-                    'is_online': True,
-                    'last_seen_at': timezone.now(),
-                }
+        if message_type == 'heartbeat':
+            # Auto-discovery datalogger dal payload
+            datalogger = self._auto_discover_datalogger(
+                site, datalogger_type, instance_number, payload
             )
-
-            if not created:
-                # Update existing
-                datalogger.is_online = True
-                datalogger.last_seen_at = timezone.now()
-                datalogger.datalogger_type = datalogger_type
-                datalogger.device_id = device_id
-                datalogger.save()
-
-            logger.info(f"{'Created' if created else 'Updated'} datalogger {serial_number}")
 
             # Process sensors dal payload se presenti
             sensors_data = payload.get('sensors_last_data', [])
             for sensor_data in sensors_data:
                 self._auto_discover_sensor(datalogger, sensor_data)
 
-            return datalogger
+        else:
+            logger.debug(f"Message type {message_type} non gestito per datalogger")
 
-        except Exception as e:
-            logger.error(f"Error updating datalogger {serial_number}: {e}")
-            return None
+    def _process_gateway_message(self, site, topic_parts, payload):
+        """
+        Gestisce messaggi gateway con auto-discovery
+
+        Topic: sito_001/gateway/heartbeat
+        Parts: [sito_001, gateway, heartbeat]
+        """
+        if len(topic_parts) >= 3:
+            message_type = topic_parts[2]  # heartbeat, input, output
+
+            if message_type == 'heartbeat':
+                self._auto_discover_gateway(site, payload)
+            else:
+                logger.debug(f"Message type {message_type} non gestito per gateway")
 
     @transaction.atomic
-    def _update_or_create_gateway(self, site, gateway_id, serial_number, payload):
+    def _auto_discover_datalogger(self, site, datalogger_type, instance_number, payload):
         """
-        Create o update gateway basato su serial_number (KEY DISCRIMINANT)
+        Auto-create/update datalogger da messaggio MQTT
 
         Args:
             site: Site instance
-            gateway_id: Gateway ID dal topic
-            serial_number: Serial number dal payload (KEY)
+            datalogger_type: Tipo datalogger (monstro, adaq)
+            instance_number: Numero istanza (1, 2, 3)
+            payload: Payload del messaggio heartbeat
+
+        Returns:
+            Datalogger instance
+        """
+        # Estrai serial number dal payload, fallback su pattern predefinito
+        serial_number = payload.get('serial_number')
+        if not serial_number:
+            serial_number = f"{datalogger_type}_{instance_number}"
+
+        # Get or create datalogger con select_for_update per evitare race conditions
+        try:
+            datalogger = Datalogger.objects.select_for_update(nowait=True).get(
+                site=site,
+                serial_number=serial_number
+            )
+            created = False
+        except Datalogger.DoesNotExist:
+            try:
+                datalogger, created = Datalogger.objects.get_or_create(
+                    site=site,
+                    serial_number=serial_number,
+                    defaults={
+                        'label': serial_number,  # Default editabile dall'utente
+                        'datalogger_type': datalogger_type,
+                        'instance_number': instance_number,
+                    }
+                )
+            except ValidationError as e:
+                logger.error(f"Validation error creating datalogger {serial_number}: {e}")
+                raise MqttValidationError(
+                    f"Invalid datalogger data for {serial_number}",
+                    original_error=e
+                )
+        except DatabaseError as e:
+            logger.warning(f"Database lock contention for datalogger {serial_number}, retrying without lock")
+            # Fallback senza lock se c'è contesa
+            datalogger, created = Datalogger.objects.get_or_create(
+                site=site,
+                serial_number=serial_number,
+                defaults={
+                    'label': serial_number,
+                    'datalogger_type': datalogger_type,
+                    'instance_number': instance_number,
+                }
+            )
+
+        # Update status e metadata sempre
+        now = timezone.now()
+        datalogger.is_online = True
+        datalogger.last_heartbeat = now
+        datalogger.last_communication = now
+        datalogger.total_heartbeats += 1
+        datalogger.raw_metadata = payload
+
+        # Update campi opzionali se presenti
+        if 'firmware_version' in payload:
+            datalogger.firmware_version = payload['firmware_version']
+        if 'ip_address' in payload:
+            datalogger.ip_address = payload['ip_address']
+
+        # Reset downtime se era offline
+        if datalogger.last_downtime_start:
+            datalogger.last_downtime_start = None
+
+        datalogger.save()
+
+        if created:
+            logger.info(f"Nuovo datalogger auto-discovered: {datalogger}")
+        else:
+            logger.debug(f"Datalogger aggiornato: {datalogger}")
+
+        return datalogger
+
+    @transaction.atomic
+    def _auto_discover_gateway(self, site, payload):
+        """
+        Auto-create/update gateway da messaggio MQTT
+
+        Args:
+            site: Site instance
             payload: Payload del messaggio heartbeat
 
         Returns:
             Gateway instance
         """
-        try:
-            # Gateway usa OneToOneField con Site, quindi get or create by site
-            gateway, created = Gateway.objects.get_or_create(
-                site=site,
-                defaults={
-                    'serial_number': serial_number,
-                    'label': f"Gateway {gateway_id}",
-                    'is_online': True,
-                    'last_heartbeat': timezone.now(),
-                    'last_communication': timezone.now(),
-                }
-            )
+        # Estrai serial number dal payload
+        serial_number = payload.get('serial_number')
+        if not serial_number:
+            serial_number = f"gateway_{site.code}"
 
-            if not created:
-                # Update existing
-                gateway.serial_number = serial_number  # Update serial if changed
-                gateway.is_online = True
-                gateway.last_heartbeat = timezone.now()
-                gateway.last_communication = timezone.now()
-                gateway.save()
+        # Get or create gateway
+        gateway, created = Gateway.objects.get_or_create(
+            site=site,
+            defaults={
+                'serial_number': serial_number,
+                'label': serial_number,
+            }
+        )
 
-            logger.info(f"{'Created' if created else 'Updated'} gateway {serial_number}")
+        # Update status e metadata sempre
+        now = timezone.now()
+        gateway.is_online = True
+        gateway.last_heartbeat = now
+        gateway.last_communication = now
+        gateway.raw_metadata = payload
 
-            return gateway
+        # Update campi opzionali se presenti
+        if 'hostname' in payload:
+            gateway.hostname = payload['hostname']
+        if 'ip_address' in payload:
+            gateway.ip_address = payload['ip_address']
+        if 'firmware_version' in payload:
+            gateway.firmware_version = payload['firmware_version']
+        if 'cpu_usage_percent' in payload:
+            gateway.cpu_usage_percent = payload['cpu_usage_percent']
+        if 'memory_usage_percent' in payload:
+            gateway.memory_usage_percent = payload['memory_usage_percent']
+        if 'disk_usage_percent' in payload:
+            gateway.disk_usage_percent = payload['disk_usage_percent']
+        if 'uptime_seconds' in payload:
+            gateway.uptime_seconds = payload['uptime_seconds']
 
-        except Exception as e:
-            logger.error(f"Error updating gateway {serial_number}: {e}")
-            return None
+        gateway.save()
+
+        if created:
+            logger.info(f"Nuovo gateway auto-discovered: {gateway}")
+        else:
+            logger.debug(f"Gateway aggiornato: {gateway}")
+
+        return gateway
 
     @transaction.atomic
     def _auto_discover_sensor(self, datalogger, sensor_data):
@@ -365,38 +397,5 @@ class EnhancedMqttAutoDiscovery:
                     sensor.update_min_max_stats(value)
 
 
-    def _process_datalogger_data(self, site, serial_number, action, payload):
-        """
-        Process input/output data per datalogger
-
-        Args:
-            site: Site instance
-            serial_number: Serial number del device
-            action: input o output
-            payload: Payload del messaggio
-        """
-        # TODO: Implementare processing dati input/output
-        logger.debug(f"Processing datalogger {action} data for {serial_number}")
-        pass
-
-    def _process_gateway_data(self, site, serial_number, action, payload):
-        """
-        Process input/output data per gateway
-
-        Args:
-            site: Site instance
-            serial_number: Serial number del device
-            action: input o output
-            payload: Payload del messaggio
-        """
-        # TODO: Implementare processing dati input/output
-        logger.debug(f"Processing gateway {action} data for {serial_number}")
-        pass
-
-
-# Alias per compatibilità e nuova istanza enhanced
-MqttAutoDiscoveryService = EnhancedMqttAutoDiscovery  # Alias per legacy compatibility
-
-# Singleton instances
-auto_discovery_service = EnhancedMqttAutoDiscovery()  # OLD name, NEW implementation
-enhanced_auto_discovery = EnhancedMqttAutoDiscovery()  # NEW - enhanced version
+# Singleton instance
+auto_discovery_service = MqttAutoDiscoveryService()

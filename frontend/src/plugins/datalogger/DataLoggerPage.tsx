@@ -92,7 +92,7 @@ export default function DataLoggerPage() {
   const { selectedSiteId } = useUnifiedSiteContext();
   const { isGridModeEnabled } = useGridStore();
   const { data: userData } = useUserInfo();
-  const { connection: mqttConnection, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
+  const { connection: mqttConnection, hasError, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
   const { controlConnection, loading: mqttControlLoading } = useMqttControl();
   const { systemInfo } = useSystemInfo(selectedSiteId);
   const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
@@ -151,7 +151,12 @@ export default function DataLoggerPage() {
       case 'disconnected':
         return { variant: "outline" as const, text: "MQTT Disconnesso", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100" };
       case 'error':
-        return { variant: "outline" as const, text: "MQTT Errore", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" };
+        // Enhanced: distingui tra veri errori e heartbeat timeout
+        if (isHeartbeatTimeout) {
+          return { variant: "secondary" as const, text: "MQTT Attivo (device offline)", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100" };
+        } else {
+          return { variant: "outline" as const, text: "MQTT Errore", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" };
+        }
       default:
         return { variant: "secondary" as const, text: "MQTT Sconosciuto", className: "bg-muted text-muted-foreground" };
     }
@@ -970,12 +975,26 @@ export default function DataLoggerPage() {
           )}
           rightItems={[
             ...createFilterItems(filteredDataloggers.length, searchTerm),
+            // Add MQTT device status indicators
+            ...(dataloggers.length > 0 ? [
+              {
+                label: `MQTT Online: ${dataloggers.filter(d => d.is_active).length}`,
+                color: 'success',
+                className: "text-green-600"
+              },
+              ...(dataloggers.filter(d => !d.is_active).length > 0 ? [{
+                label: `MQTT Offline: ${dataloggers.filter(d => !d.is_active).length}`,
+                color: 'error',
+                className: "text-red-600"
+              }] : [])
+            ] : []),
             // Add system info to the right side if available
             ...(systemInfo ? [
               {
                 label: systemInfo.label || systemInfo.os_version || 'Gateway',
                 icon: Activity,
-                className: "text-muted-foreground"
+                color: systemInfo.is_online ? 'success' : 'error',
+                className: systemInfo.is_online ? "text-green-600" : "text-red-600"
               },
               ...(systemInfo.cpu_usage_percent !== undefined && systemInfo.cpu_usage_percent !== null ? [{
                 label: `CPU ${systemInfo.cpu_usage_percent.toFixed(1)}%`,

@@ -268,14 +268,16 @@ class Datalogger(models.Model):
         ]
     )
 
-    # Auto-discovery info dal topic
-    datalogger_type = models.CharField(max_length=50, help_text="monstro, adaq, etc.")
-    instance_number = models.PositiveIntegerField(help_text="Numero istanza dal topic (1, 2, 3...)")
+    # Auto-discovery info dal topic ENHANCED (Fase 3)
+    datalogger_type = models.CharField(max_length=50, blank=True, help_text="monstro, adaq, etc. - dal topic")
+    device_id = models.CharField(max_length=50, blank=True, help_text="Device ID dal topic (1, 2, 3...)")
+    instance_number = models.PositiveIntegerField(blank=True, null=True, help_text="LEGACY: Numero istanza dal topic (1, 2, 3...)")
 
-    # Status e comunicazione
+    # Status e comunicazione ENHANCED (Fase 3)
     is_online = models.BooleanField(default=False)
-    last_heartbeat = models.DateTimeField(null=True, blank=True)
-    last_communication = models.DateTimeField(null=True, blank=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True, help_text="Ultimo heartbeat ricevuto (ENHANCED)")
+    last_heartbeat = models.DateTimeField(null=True, blank=True, help_text="LEGACY: compatibilità")
+    last_communication = models.DateTimeField(null=True, blank=True, help_text="LEGACY: compatibilità")
 
     # Metadata dal payload
     firmware_version = models.CharField(max_length=50, blank=True)
@@ -313,7 +315,14 @@ class Datalogger(models.Model):
         ordering = ['site__name', 'datalogger_type', 'instance_number']
 
     def __str__(self):
-        return f"{self.label} ({self.datalogger_type}/{self.instance_number} - {self.site.name})"
+        # Enhanced __str__ method per nuova logica
+        if self.datalogger_type and self.device_id:
+            return f"{self.datalogger_type}/{self.device_id} ({self.serial_number})"
+        elif self.datalogger_type and self.instance_number:
+            # Fallback per legacy data
+            return f"{self.datalogger_type}/{self.instance_number} ({self.serial_number})"
+        else:
+            return self.serial_number
 
     def clean(self):
         super().clean()

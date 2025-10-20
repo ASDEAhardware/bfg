@@ -7,7 +7,7 @@ from typing import Dict, Optional
 from django.utils import timezone
 from django.conf import settings
 from ..models import MqttConnection
-from .autodiscovery import enhanced_auto_discovery
+from .autodiscovery import auto_discovery_service
 
 logger = logging.getLogger(__name__)
 
@@ -282,29 +282,19 @@ class MqttClientManager:
                     attempts = self.reconnect_attempts.get(conn.site.id, 0)
                     logger.debug(f"Skipping reconnection for {conn.site.name} (attempt {attempts}, backing off)")
 
-            # Device offline detection (30 secondi) - NON disconnette connessione MQTT
-            device_timeout_threshold = timezone.now() - timezone.timedelta(seconds=30)
-
-            # Marca dataloggers offline se non ricevono heartbeat da 30 secondi
-            from .models import Datalogger, Gateway
-            offline_dataloggers = Datalogger.objects.filter(
-                is_online=True,
-                last_seen_at__lt=device_timeout_threshold
+            # Controlla heartbeat timeout solo per connessioni abilitate
+            timeout_threshold = timezone.now() - timezone.timedelta(minutes=5)
+            timed_out_connections = MqttConnection.objects.filter(
+                is_enabled=True,
+                status='connected',
+                last_heartbeat_at__lt=timeout_threshold
             )
-            if offline_dataloggers.exists():
-                count = offline_dataloggers.update(is_online=False)
-                logger.info(f"Marked {count} dataloggers as offline (no heartbeat for 30s)")
 
-            # Marca gateways offline se non ricevono heartbeat da 30 secondi
-            offline_gateways = Gateway.objects.filter(
-                is_online=True,
-                last_heartbeat__lt=device_timeout_threshold
-            )
-            if offline_gateways.exists():
-                count = offline_gateways.update(is_online=False)
-                logger.info(f"Marked {count} gateways as offline (no heartbeat for 30s)")
-
-            # IMPORTANTE: La connessione MQTT rimane sempre attiva, solo i device vanno offline
+            for conn in timed_out_connections:
+                logger.warning(f"Heartbeat timeout for {conn.site.name}, marking as error")
+                conn.status = 'error'
+                conn.error_message = 'Heartbeat timeout'
+                conn.save()
 
 
         except Exception as e:
@@ -410,8 +400,8 @@ class MqttClientManager:
                 from sites.models import Site
                 site = Site.objects.get(id=site_id)
 
-                # Process with enhanced auto-discovery
-                enhanced_auto_discovery.process_mqtt_message(site, topic, payload_dict)
+                # Process with auto-discovery
+                auto_discovery_service.process_mqtt_message(site, topic, payload_dict)
 
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON payload for {topic}: {e}")
