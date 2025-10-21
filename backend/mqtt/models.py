@@ -155,12 +155,70 @@ class MqttTopic(models.Model):
 # NUOVI MODELLI PER AUTO-DISCOVERY MQTT - REFACTORING
 # ============================================================================
 
+class DiscoveredTopic(models.Model):
+    """
+    Traccia tutti i topic MQTT scoperti automaticamente.
+    Usato per il discovery e l'analisi dei pattern di messaggi.
+    """
+    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE, related_name='discovered_topics')
+    topic_path = models.CharField(
+        max_length=500,
+        help_text="Topic completo ricevuto (es: 'sito_001/datalogger/heartbeat')"
+    )
+    topic_pattern = models.CharField(
+        max_length=500,
+        help_text="Pattern del topic senza prefix (es: 'datalogger/heartbeat')"
+    )
+
+    # Discovery info
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+    message_count = models.IntegerField(default=1)
+
+    # Message analysis
+    sample_payload = models.JSONField(
+        null=True, blank=True,
+        help_text="Campione del payload per analisi struttura"
+    )
+    payload_size_avg = models.FloatField(
+        null=True, blank=True,
+        help_text="Dimensione media payload in bytes"
+    )
+    message_frequency_seconds = models.FloatField(
+        null=True, blank=True,
+        help_text="Frequenza media messaggi in secondi"
+    )
+
+    # Processing status
+    is_processed = models.BooleanField(
+        default=False,
+        help_text="True se questo topic ha logica di processing implementata"
+    )
+    processor_name = models.CharField(
+        max_length=100, blank=True,
+        help_text="Nome del processore che gestisce questo topic"
+    )
+
+    class Meta:
+        unique_together = ('site', 'topic_path')
+        ordering = ['-last_seen_at', 'topic_path']
+        verbose_name = "Discovered Topic"
+        verbose_name_plural = "Discovered Topics"
+        indexes = [
+            models.Index(fields=['site', 'topic_pattern']),
+            models.Index(fields=['last_seen_at']),
+            models.Index(fields=['is_processed']),
+        ]
+
+    def __str__(self):
+        return f"{self.topic_path} ({self.message_count} msgs)"
+
 class Gateway(models.Model):
     """
     Gateway/Sistema principale del sito (evoluzione di SystemInfo)
     Gestisce informazioni sistema generale ricevute via gateway/heartbeat
     """
-    site = models.OneToOneField('sites.Site', on_delete=models.CASCADE, related_name='gateway')
+    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE, related_name='gateways')
     serial_number = models.CharField(
         max_length=100,
         unique=True,
@@ -186,28 +244,60 @@ class Gateway(models.Model):
     hostname = models.CharField(max_length=255, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     firmware_version = models.CharField(max_length=50, blank=True)
+    os_version = models.CharField(max_length=255, blank=True, help_text="Sistema operativo e versione")
 
     # Status tracking
     is_online = models.BooleanField(default=False)
     last_heartbeat = models.DateTimeField(null=True, blank=True)
     last_communication = models.DateTimeField(null=True, blank=True)
 
-    # Performance metrics
-    cpu_usage_percent = models.FloatField(
-        null=True, blank=True,
-        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
-    )
-    memory_usage_percent = models.FloatField(
-        null=True, blank=True,
-        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
-    )
-    disk_usage_percent = models.FloatField(
-        null=True, blank=True,
-        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
-    )
+    # System uptime (come stringa dal payload)
+    system_uptime = models.CharField(max_length=100, blank=True, help_text="Uptime formato stringa (es: '14 days, 3:24:30')")
     uptime_seconds = models.BigIntegerField(
         null=True, blank=True,
-        validators=[MinValueValidator(0)]
+        validators=[MinValueValidator(0)],
+        help_text="Uptime calcolato in secondi per ordinamento"
+    )
+
+    # CPU metrics
+    cpu_load_percent = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0)],
+        help_text="Carico CPU in percentuale"
+    )
+
+    # Memory/RAM metrics
+    ram_total_gb = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0)],
+        help_text="RAM totale in GB"
+    )
+    ram_used_gb = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0)],
+        help_text="RAM utilizzata in GB"
+    )
+    ram_percent_used = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)],
+        help_text="RAM utilizzata in percentuale"
+    )
+
+    # Disk metrics
+    disk_total_gb = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0)],
+        help_text="Spazio disco totale in GB"
+    )
+    disk_free_gb = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0)],
+        help_text="Spazio disco libero in GB"
+    )
+    disk_percent_used = models.FloatField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)],
+        help_text="Spazio disco utilizzato in percentuale"
     )
 
     # Raw MQTT payload for debugging
@@ -227,12 +317,20 @@ class Gateway(models.Model):
     def clean(self):
         super().clean()
         # Validazioni custom per Gateway
-        if self.cpu_usage_percent is not None and self.cpu_usage_percent < 0:
-            raise ValidationError("CPU usage cannot be negative")
-        if self.memory_usage_percent is not None and self.memory_usage_percent < 0:
-            raise ValidationError("Memory usage cannot be negative")
-        if self.disk_usage_percent is not None and self.disk_usage_percent < 0:
+        if self.cpu_load_percent is not None and self.cpu_load_percent < 0:
+            raise ValidationError("CPU load cannot be negative")
+        if self.ram_percent_used is not None and self.ram_percent_used < 0:
+            raise ValidationError("RAM usage cannot be negative")
+        if self.disk_percent_used is not None and self.disk_percent_used < 0:
             raise ValidationError("Disk usage cannot be negative")
+
+        # Validazioni coerenza dati RAM
+        if self.ram_total_gb and self.ram_used_gb and self.ram_used_gb > self.ram_total_gb:
+            raise ValidationError("RAM used cannot be greater than RAM total")
+
+        # Validazioni coerenza dati Disk
+        if self.disk_total_gb and self.disk_free_gb and self.disk_free_gb > self.disk_total_gb:
+            raise ValidationError("Disk free cannot be greater than disk total")
 
     def save(self, *args, **kwargs):
         # Default label = serial_number se non specificato
@@ -248,6 +346,7 @@ class Datalogger(models.Model):
     Ogni datalogger ha serial_number univoco + label editabile
     """
     site = models.ForeignKey('sites.Site', on_delete=models.CASCADE, related_name='mqtt_dataloggers')
+    gateway = models.ForeignKey(Gateway, on_delete=models.CASCADE, related_name='dataloggers', null=True, blank=True, help_text="Gateway di appartenenza")
     serial_number = models.CharField(
         max_length=100,
         validators=[

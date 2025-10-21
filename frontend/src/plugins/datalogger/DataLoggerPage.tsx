@@ -11,7 +11,7 @@ import { ContextualStatusBar, useContextualStatusBar } from "@/components/Contex
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { useGridStore } from "@/store/gridStore";
 import { useUserInfo } from "@/hooks/useAuth";
-// import { useMqttConnectionStatus, useMqttControl, useSystemInfo } from "@/hooks/useMqttStatus";
+import { useMqttConnectionStatus, useMqttControl, useDataloggers, useSensors } from "@/hooks/useMqtt";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,22 +92,17 @@ export default function DataLoggerPage() {
   const { selectedSiteId } = useUnifiedSiteContext();
   const { isGridModeEnabled } = useGridStore();
   const { data: userData } = useUserInfo();
-  // const { connection: mqttConnection, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
-  // const { controlConnection } = useMqttControl();
-  // const { systemInfo } = useSystemInfo(selectedSiteId);
 
-  // Temporary fallback values until MQTT is rewritten
-  const mqttConnection = null;
-  const isHeartbeatTimeout = false;
-  const refreshMqttStatus = async () => {};
-  const controlConnection = async () => ({ success: false, message: 'MQTT temporarily disabled' });
+  // New MQTT hooks
+  const { connection: mqttConnection, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
+  const { controlConnection } = useMqttControl();
+  const { dataloggers, loading: dataloggerLoading, error: dataloggerError, refresh: refreshDataloggers, updateDataloggerLabel } = useDataloggers(selectedSiteId);
+
+  // Legacy system info - will be removed when Gateway model is integrated
   const systemInfo = null;
 
   const [startLoading, setStartLoading] = useState(false);
   const [stopLoading, setStopLoading] = useState(false);
-  const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -172,94 +167,20 @@ export default function DataLoggerPage() {
     }
   };
 
-  // Fetch all dataloggers for the selected site
-  useEffect(() => {
-    const fetchDataloggers = async () => {
-      if (!selectedSiteId) {
-        setDataloggers([]);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        // TODO: Replace with new MQTT API when rewritten
-        // const response = await api.get('/v1/mqtt/dataloggers/', {
-        //   params: { site_id: selectedSiteId }
-        // });
-        // setDataloggers(response.data);
-
-        // Temporary: Set empty array until MQTT is rewritten
-        setDataloggers([]);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDataloggers();
-  }, [selectedSiteId]);
-
   // Filter dataloggers based on search and online status
   const filteredDataloggers = dataloggers.filter(datalogger => {
-    const matchesSearch = datalogger.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         datalogger.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = datalogger.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         datalogger.datalogger_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          datalogger.serial_number.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesOnlineFilter = showOnlineOnly ? datalogger.status === 'active' : true;
+    const matchesOnlineFilter = showOnlineOnly ? datalogger.is_online : true;
 
     return matchesSearch && matchesOnlineFilter;
   });
 
-  // Fetch sensors for connected datalogger
-  const fetchSensors = async (datalogger: Datalogger) => {
-    if (!datalogger) return;
-
-    setSensorsLoading(true);
-    setSensorsError(null);
-
-    try {
-      // TODO: Replace with new MQTT API when rewritten
-      // const response = await api.get(`/v1/mqtt/sensors/by_datalogger?datalogger_id=${datalogger.id}`);
-      // setSensors(response.data.sensors || response.data);
-
-      // Temporary: Set empty array until MQTT is rewritten
-      setSensors([]);
-    } catch (err) {
-      setSensorsError(err instanceof Error ? err.message : 'Unknown error occurred');
-      setSensors([]);
-    } finally {
-      setSensorsLoading(false);
-    }
-  };
-
   const handleConnect = (datalogger: Datalogger) => {
     setSelectedLogger(datalogger);
     setIsConnected(true);
-    fetchSensors(datalogger);
-  };
-
-  const refreshDataloggers = async () => {
-    if (!selectedSiteId) return;
-
-    setLoading(true);
-    try {
-      // TODO: Replace with new MQTT API when rewritten
-      // const response = await api.get('/v1/mqtt/dataloggers/', {
-      //   params: { site_id: selectedSiteId }
-      // });
-      // setDataloggers(response.data);
-
-      // Temporary: Set empty array until MQTT is rewritten
-      setDataloggers([]);
-    } catch (err) {
-      console.error('Error refreshing dataloggers:', err);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleDisconnect = () => {
@@ -367,15 +288,22 @@ export default function DataLoggerPage() {
     try {
       const result = await controlConnection(selectedSiteId, 'start');
 
-      toast.success(`✅ MQTT Started`, {
-        id: "mqtt-control",
-        description: `${result.site_name} connection is now active`
-      });
+      if (result.success) {
+        toast.success(`✅ MQTT Started`, {
+          id: "mqtt-control",
+          description: result.message
+        });
 
-      // Wait a bit for backend to update state, then refresh
-      setTimeout(async () => {
-        await refreshMqttStatus();
-      }, 1000);
+        // Refresh states after successful start
+        setTimeout(async () => {
+          await Promise.all([
+            refreshMqttStatus(),
+            refreshDataloggers()
+          ]);
+        }, 1000);
+      } else {
+        throw new Error(result.message);
+      }
     } catch (error) {
       toast.error(`❌ Failed to start MQTT`, {
         id: "mqtt-control",
@@ -399,15 +327,22 @@ export default function DataLoggerPage() {
     try {
       const result = await controlConnection(selectedSiteId, 'stop');
 
-      toast.success(`🛑 MQTT Stopped`, {
-        id: "mqtt-control",
-        description: `${result.site_name} connection is now inactive`
-      });
+      if (result.success) {
+        toast.success(`🛑 MQTT Stopped`, {
+          id: "mqtt-control",
+          description: result.message
+        });
 
-      // Wait a bit for backend to update state, then refresh
-      setTimeout(async () => {
-        await refreshMqttStatus();
-      }, 1000);
+        // Refresh states after successful stop
+        setTimeout(async () => {
+          await Promise.all([
+            refreshMqttStatus(),
+            refreshDataloggers()
+          ]);
+        }, 1000);
+      } else {
+        throw new Error(result.message);
+      }
     } catch (error) {
       toast.error(`❌ Failed to stop MQTT`, {
         id: "mqtt-control",
@@ -852,10 +787,10 @@ export default function DataLoggerPage() {
                 variant="outline"
                 size="sm"
                 onClick={refreshDataloggers}
-                disabled={loading}
+                disabled={dataloggerLoading}
                 className={`h-8 ${width < 350 ? 'w-8 p-0' : 'px-3'}`}
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${dataloggerLoading ? 'animate-spin' : ''}`} />
                 {width >= 350 && !isMobile && <span className="ml-2">Aggiorna</span>}
               </Button>
 
@@ -929,7 +864,7 @@ export default function DataLoggerPage() {
               </p>
             </div>
           </div>
-        ) : loading ? (
+        ) : dataloggerLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
@@ -941,7 +876,7 @@ export default function DataLoggerPage() {
               </p>
             </div>
           </div>
-        ) : error ? (
+        ) : dataloggerError ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <AlertCircle className="h-8 w-8 mx-auto mb-4 text-destructive" />
@@ -949,7 +884,7 @@ export default function DataLoggerPage() {
                 Errore nel caricamento
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {error}
+                {dataloggerError}
               </p>
               <Button onClick={refreshDataloggers} variant="outline">
                 Riprova

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import MqttConnection, MqttTopic, Gateway, Datalogger, Sensor
+from .models import MqttConnection, MqttTopic, DiscoveredTopic, Gateway, Datalogger, Sensor
 
 
 # ============================================================================
@@ -63,6 +63,43 @@ class MqttConnectionAdmin(admin.ModelAdmin):
     topics_count.short_description = 'Topics (Active/Total)'
 
 
+@admin.register(DiscoveredTopic)
+class DiscoveredTopicAdmin(admin.ModelAdmin):
+    list_display = ['topic_path', 'site', 'message_count', 'is_processed', 'processor_name', 'first_seen_at', 'last_seen_at', 'message_frequency_display']
+    list_filter = ['site', 'is_processed', 'processor_name', 'first_seen_at']
+    search_fields = ['topic_path', 'topic_pattern', 'site__name']
+    readonly_fields = ['first_seen_at', 'last_seen_at', 'message_count', 'payload_size_avg', 'message_frequency_seconds']
+    list_editable = ['is_processed']
+    ordering = ['-last_seen_at']
+
+    fieldsets = (
+        ('Topic Info', {
+            'fields': ('site', 'topic_path', 'topic_pattern')
+        }),
+        ('Discovery Stats', {
+            'fields': ('first_seen_at', 'last_seen_at', 'message_count', 'payload_size_avg', 'message_frequency_seconds'),
+            'classes': ['collapse']
+        }),
+        ('Processing', {
+            'fields': ('is_processed', 'processor_name')
+        }),
+        ('Sample Data', {
+            'fields': ('sample_payload',),
+            'classes': ['collapse']
+        }),
+    )
+
+    def message_frequency_display(self, obj):
+        if obj.message_frequency_seconds:
+            return f"{obj.message_frequency_seconds:.1f}s"
+        return "-"
+    message_frequency_display.short_description = 'Frequency'
+
+    def has_add_permission(self, request):
+        # Non permettere creazione manuale - solo auto-discovery
+        return False
+
+
 @admin.register(MqttTopic)
 class MqttTopicAdmin(admin.ModelAdmin):
     list_display = ['get_full_topic', 'mqtt_connection_site', 'is_active', 'qos_level', 'priority', 'description_preview']
@@ -113,21 +150,29 @@ class MqttTopicAdmin(admin.ModelAdmin):
 @admin.register(Gateway)
 class GatewayAdmin(admin.ModelAdmin):
     """Admin per Gateway (ex SystemInfo)"""
-    list_display = ['label', 'site', 'serial_number', 'hostname', 'is_online', 'cpu_usage_percent', 'memory_usage_percent', 'disk_usage_percent', 'uptime_display', 'last_heartbeat']
+    list_display = ['label', 'site', 'serial_number', 'hostname', 'is_online', 'cpu_load_percent', 'ram_percent_used', 'disk_percent_used', 'uptime_display', 'last_heartbeat']
     list_filter = ['is_online', 'site', 'last_heartbeat', 'created_at']
     search_fields = ['label', 'serial_number', 'site__name', 'hostname', 'ip_address']
     readonly_fields = ['last_heartbeat', 'last_communication', 'created_at', 'updated_at', 'uptime_display']
 
     fieldsets = (
         ('Gateway Information', {
-            'fields': ('site', 'serial_number', 'label', 'hostname', 'ip_address', 'firmware_version')
+            'fields': ('site', 'serial_number', 'label', 'hostname', 'ip_address', 'firmware_version', 'os_version')
         }),
         ('Status', {
-            'fields': ('is_online', 'last_heartbeat', 'last_communication'),
+            'fields': ('is_online', 'last_heartbeat', 'last_communication', 'system_uptime', 'uptime_display'),
             'classes': ('wide',)
         }),
-        ('Performance Metrics', {
-            'fields': ('cpu_usage_percent', 'memory_usage_percent', 'disk_usage_percent', 'uptime_seconds', 'uptime_display'),
+        ('CPU Metrics', {
+            'fields': ('cpu_load_percent',),
+            'classes': ('wide',)
+        }),
+        ('Memory/RAM Metrics', {
+            'fields': ('ram_total_gb', 'ram_used_gb', 'ram_percent_used'),
+            'classes': ('wide',)
+        }),
+        ('Disk Metrics', {
+            'fields': ('disk_total_gb', 'disk_free_gb', 'disk_percent_used'),
             'classes': ('wide',)
         }),
         ('Raw Data', {

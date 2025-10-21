@@ -28,7 +28,7 @@ interface DataloggerCardProps {
     model: string;
     firmware_version?: string;
     ip_address?: string;
-    status: 'active' | 'inactive' | 'maintenance' | 'error';
+    status: 'active' | 'inactive' | 'maintenance' | 'error' | 'connected' | 'disconnected' | 'connecting' | 'disabled';
     is_active: boolean;
     last_communication?: string;
     sensors_count: number;
@@ -46,11 +46,35 @@ const statusConfig = {
     icon: Wifi,
     label: "Online"
   },
+  connected: {
+    color: "text-green-500",
+    bgColor: "bg-green-500/10",
+    icon: Wifi,
+    label: "Connesso"
+  },
+  connecting: {
+    color: "text-yellow-500",
+    bgColor: "bg-yellow-500/10",
+    icon: Activity,
+    label: "Connessione..."
+  },
   inactive: {
     color: "text-gray-500",
     bgColor: "bg-gray-500/10",
     icon: WifiOff,
     label: "Offline"
+  },
+  disconnected: {
+    color: "text-gray-500",
+    bgColor: "bg-gray-500/10",
+    icon: WifiOff,
+    label: "Disconnesso"
+  },
+  disabled: {
+    color: "text-gray-400",
+    bgColor: "bg-gray-400/10",
+    icon: Circle,
+    label: "Disabilitato"
   },
   maintenance: {
     color: "text-yellow-500",
@@ -67,7 +91,7 @@ const statusConfig = {
 };
 
 export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact = false }: DataloggerCardProps) {
-  const config = statusConfig[datalogger.status];
+  const config = statusConfig[datalogger.status] || statusConfig.inactive;
   const StatusIcon = config.icon;
 
   const lastCommunication = datalogger.last_communication
