@@ -37,12 +37,12 @@ import {
   Gauge,
   MoreHorizontal,
   ArrowLeft,
-  Info
+  Info,
+  Eye
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { api } from "@/lib/axios";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,33 +58,50 @@ import {
 } from "@/components/ui/dialog";
 
 interface Datalogger {
-  id: string;
-  name: string;
+  id: number;
+  site_id: number;
+  site_name: string;
   serial_number: string;
-  model: string;
+  label: string;
+  datalogger_type: string;
+  device_id?: string;
+  is_online: boolean;
+  last_seen_at?: string;
+  last_heartbeat?: string;
+  last_communication?: string;
   firmware_version?: string;
   ip_address?: string;
-  status: 'active' | 'inactive' | 'maintenance' | 'error';
-  is_active: boolean;
-  last_communication?: string;
-  site_name: string;
+  total_heartbeats: number;
+  missed_heartbeats: number;
+  uptime_percentage: number;
   sensors_count: number;
   active_sensors_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Sensor {
-  id: string;
-  name: string;
+  id: number;
+  label: string;
+  serial_number: string;
   sensor_type: string;
-  channel: number;
   unit_of_measure?: string;
-  min_value?: number;
-  max_value?: number;
-  status: 'active' | 'inactive' | 'calibrating' | 'error' | 'maintenance';
-  is_active: boolean;
+  is_online: boolean;
   last_reading?: string;
+  latest_readings?: any[];
   current_value?: number;
-  description?: string;
+  datalogger_label: string;
+  site_name: string;
+  total_messages: number;
+  total_readings: number;
+  min_value_ever?: number;
+  max_value_ever?: number;
+  first_seen_at?: string;
+  last_seen_at?: string;
+  uptime_percentage: number;
+  consecutive_misses: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function DataLoggerPage() {
@@ -95,14 +112,15 @@ export default function DataLoggerPage() {
 
   // New MQTT hooks
   const { connection: mqttConnection, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
-  const { controlConnection } = useMqttControl();
-  const { dataloggers, loading: dataloggerLoading, error: dataloggerError, refresh: refreshDataloggers, updateDataloggerLabel } = useDataloggers(selectedSiteId);
+  const { controlConnection, forceDiscovery } = useMqttControl();
+  const { dataloggers, loading: dataloggerLoading, error: dataloggerError, refresh: refreshDataloggers } = useDataloggers(selectedSiteId);
 
   // Legacy system info - will be removed when Gateway model is integrated
   const systemInfo = null;
 
   const [startLoading, setStartLoading] = useState(false);
   const [stopLoading, setStopLoading] = useState(false);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -119,17 +137,17 @@ export default function DataLoggerPage() {
     }
   }, [isSearchOpen]);
 
-  // Sensors states
-  const [sensors, setSensors] = useState<Sensor[]>([]);
-  const [sensorsLoading, setSensorsLoading] = useState(false);
-  const [sensorsError, setSensorsError] = useState<string | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(5); // secondi
   const [sensorSearchTerm, setSensorSearchTerm] = useState("");
 
-  // Legacy states for the connected datalogger view
+  // States for the selected datalogger view
   const [selectedLogger, setSelectedLogger] = useState<Datalogger | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
+
+  // Hook for sensors of the selected datalogger
+  const { sensors, loading: sensorsLoading, error: sensorsError, refresh: refreshSensors, updateSensorLabel } = useSensors(selectedLogger);
 
   // Stati per conferme azioni critiche
   const [showStartConfirm, setShowStartConfirm] = useState(false);
@@ -145,25 +163,25 @@ export default function DataLoggerPage() {
     if (!selectedSiteId) return null;
 
     if (!mqttConnection) {
-      return { variant: "secondary" as const, text: "🔌 Non configurato", className: "bg-muted text-muted-foreground" };
+      return { variant: "secondary" as const, text: "MQTT non configurato", className: "bg-muted text-muted-foreground" };
     }
 
     switch (mqttConnection.status) {
       case 'connected':
-        return { variant: "default" as const, text: "🟢 Connesso", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" };
+        return { variant: "default" as const, text: "MQTT connesso", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" };
       case 'connecting':
-        return { variant: "secondary" as const, text: "🟡 Connessione...", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" };
+        return { variant: "secondary" as const, text: "MQTT connessione...", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" };
       case 'disconnected':
-        return { variant: "outline" as const, text: "🔴 Disconnesso", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100" };
+        return { variant: "outline" as const, text: "MQTT disconnesso", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100" };
       case 'error':
         // Enhanced: distingui tra veri errori e heartbeat timeout
         if (isHeartbeatTimeout) {
-          return { variant: "secondary" as const, text: "🟡 Device offline", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100" };
+          return { variant: "secondary" as const, text: "MQTT device offline", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100" };
         } else {
-          return { variant: "outline" as const, text: "🔴 Errore", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" };
+          return { variant: "outline" as const, text: "MQTT errore", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" };
         }
       default:
-        return { variant: "secondary" as const, text: "❓ Sconosciuto", className: "bg-muted text-muted-foreground" };
+        return { variant: "secondary" as const, text: "MQTT sconosciuto", className: "bg-muted text-muted-foreground" };
     }
   };
 
@@ -181,45 +199,42 @@ export default function DataLoggerPage() {
   const handleConnect = (datalogger: Datalogger) => {
     setSelectedLogger(datalogger);
     setIsConnected(true);
+    // Reset search when switching dataloggers
+    setSensorSearchTerm("");
+    setIsSensorSearchOpen(false);
   };
 
   const handleDisconnect = () => {
     setIsConnected(false);
     setIsLogging(false);
     setSelectedLogger(null);
-    setSensors([]);
     setSensorSearchTerm("");
     setIsSensorSearchOpen(false);
   };
 
-  const handleDataloggerLabelUpdate = (datalogger: any, newLabel: string) => {
-    // Aggiorna la lista locale dei datalogger
-    setDataloggers(prev => prev.map(dl =>
-      dl.id === datalogger.id
-        ? { ...dl, name: newLabel }
-        : dl
-    ));
-
-    // Se è il datalogger selezionato, aggiorna anche quello
-    if (selectedLogger && selectedLogger.id === datalogger.id) {
-      setSelectedLogger(prev => prev ? { ...prev, name: newLabel } : null);
+  const handleDataloggerLabelUpdate = async (datalogger: Datalogger, newLabel: string) => {
+    // Aggiorna la lista dei datalogger dopo il successo dell'API call
+    try {
+      await refreshDataloggers();
+    } catch (error) {
+      console.error('Failed to refresh dataloggers after label update:', error);
     }
   };
 
-  const handleSensorLabelUpdate = (sensor: any, newLabel: string) => {
-    // Aggiorna la lista locale dei sensori
-    setSensors(prev => prev.map(s =>
-      s.id === sensor.id
-        ? { ...s, name: newLabel }
-        : s
-    ));
+  const handleSensorLabelUpdate = async (sensor: Sensor, newLabel: string) => {
+    try {
+      await updateSensorLabel(sensor, newLabel);
+    } catch (error) {
+      console.error('Failed to update sensor label:', error);
+      // The hook will handle the error state
+    }
   };
 
   // Filter sensors based on search term
   const filteredSensors = sensors.filter(sensor =>
-    sensor.name.toLowerCase().includes(sensorSearchTerm.toLowerCase()) ||
-    sensor.sensor_type.toLowerCase().includes(sensorSearchTerm.toLowerCase()) ||
-    sensor.channel.toString().includes(sensorSearchTerm)
+    sensor.label?.toLowerCase().includes(sensorSearchTerm.toLowerCase()) ||
+    sensor.sensor_type?.toLowerCase().includes(sensorSearchTerm.toLowerCase()) ||
+    sensor.serial_number?.toLowerCase().includes(sensorSearchTerm.toLowerCase())
   );
 
   // Reset everything when site changes
@@ -229,7 +244,7 @@ export default function DataLoggerPage() {
       setIsConnected(false);
       setIsLogging(false);
       setSelectedLogger(null);
-      setSensors([]);
+      // Reset sensors when changing sites - handled by useSensors hook
       setSensorSearchTerm("");
     }
     // Reset search terms and states when site changes
@@ -240,16 +255,16 @@ export default function DataLoggerPage() {
   }, [selectedSiteId]);
 
 
-  // Auto-refresh sensors every 10 seconds when connected and auto-refresh is enabled
+  // Auto-refresh sensors with configurable interval when connected and auto-refresh is enabled
   React.useEffect(() => {
-    if (!isConnected || !selectedLogger || !autoRefreshEnabled) return;
+    if (!isConnected || !selectedLogger || !autoRefreshEnabled || !selectedLogger.is_online || autoRefreshInterval <= 0) return;
 
     const interval = setInterval(() => {
-      fetchSensors(selectedLogger);
-    }, 10000); // 10 seconds
+      refreshSensors();
+    }, autoRefreshInterval * 1000); // Convert seconds to milliseconds
 
     return () => clearInterval(interval);
-  }, [isConnected, selectedLogger, autoRefreshEnabled]);
+  }, [isConnected, selectedLogger, autoRefreshEnabled, autoRefreshInterval, refreshSensors]);
 
   const handleStart = () => {
     setShowStartConfirm(true);
@@ -273,7 +288,7 @@ export default function DataLoggerPage() {
     setShowScheduler(true);
   };
 
-  const handleScheduleSave = (schedule: any) => {
+  const handleScheduleSave = (schedule: unknown) => {
     console.log("Schedule saved:", schedule);
     // Qui andrà la logica per salvare la pianificazione
   };
@@ -339,7 +354,12 @@ export default function DataLoggerPage() {
             refreshMqttStatus(),
             refreshDataloggers()
           ]);
-        }, 1000);
+        }, 3000);
+
+        // Additional refresh after more time
+        setTimeout(async () => {
+          await refreshMqttStatus();
+        }, 6000);
       } else {
         throw new Error(result.message);
       }
@@ -357,99 +377,186 @@ export default function DataLoggerPage() {
     }
   };
 
+  // Force Discovery Function
+  const handleForceDiscovery = async () => {
+    if (!selectedSiteId || !userData?.is_superuser || discoveryLoading) return;
+
+    setDiscoveryLoading(true);
+    toast.loading("Forcing topic discovery refresh...", { id: "discovery-control" });
+
+    try {
+      const result = await forceDiscovery(selectedSiteId);
+
+      if (result.success) {
+        toast.success(`🔍 Discovery Refresh Complete`, {
+          id: "discovery-control",
+          description: `${result.success_count} topics processed successfully` +
+            (result.error_count > 0 ? `, ${result.error_count} errors` : '')
+        });
+
+        // Refresh everything after successful discovery
+        setTimeout(async () => {
+          await Promise.all([
+            refreshMqttStatus(),
+            refreshDataloggers()
+          ]);
+        }, 1000);
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      toast.error(`❌ Discovery refresh failed`, {
+        id: "discovery-control",
+        description: error instanceof Error ? error.message : 'Discovery error'
+      });
+    } finally {
+      setDiscoveryLoading(false);
+    }
+  };
+
 
   // Show legacy connected view when a datalogger is connected
   if (isConnected && selectedLogger) {
     return (
       <div ref={containerRef} className="flex flex-col h-full">
         {/* Connected Datalogger Interface */}
-        <div className="bg-background border-b border-border px-4 py-2">
+        <div className="bg-background border-b border-border px-4 py-1">
           <div className="flex flex-col">
             {/* Header row: Back button + Title + Controls - responsive */}
             <div className={`flex items-center ${width < 500 ? 'flex-col gap-2' : 'justify-between'}`}>
-              {/* Left section: Back + Device Info */}
+              {/* Left section: Back + Title + MQTT Status */}
               <div className="flex items-center gap-3">
                 <Button
                   onClick={handleDisconnect}
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 shrink-0"
+                  className="h-6 w-6 p-0 shrink-0"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <Videotape className="h-5 w-5 text-muted-foreground shrink-0" />
-                <h1 className="text-lg font-semibold truncate">{selectedLogger?.name}</h1>
-                {width >= 400 && !isMobile && (
-                  <Badge variant="outline" className="flex-shrink-0 text-xs">
-                    {selectedLogger?.model}
+                <h1 className="text-lg font-semibold">{selectedLogger?.label}</h1>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={selectedLogger?.is_online ? "default" : "secondary"}
+                    className={`text-xs h-6 flex items-center ${
+                      selectedLogger?.is_online
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                        : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100"
+                    }`}
+                  >
+                    {selectedLogger?.is_online ? "Online" : "Offline"}
                   </Badge>
-                )}
-                {/* Status indicators - minimal visual indicators */}
-                {width >= 400 && (
-                  <div className="flex items-center gap-2">
-                    <Circle className="h-2 w-2 fill-current text-green-500 animate-pulse" />
-                    {isLogging && (
-                      <Circle className="h-2 w-2 fill-current text-blue-500 animate-pulse" />
-                    )}
-                  </div>
-                )}
+
+                  {/* Data Acquisition Control Buttons */}
+                  {selectedLogger?.is_online && (
+                    <div className="flex items-center gap-1">
+                      {/* Start Button */}
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleStart}
+                        disabled={isLogging}
+                        className={`h-6 w-6 p-0 ${!isLogging ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                        title={isLogging ? "Already logging" : "Start data acquisition"}
+                      >
+                        <Play className="h-3 w-3" />
+                      </Button>
+
+                      {/* Stop Button */}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleStop}
+                        disabled={!isLogging}
+                        className={`h-6 w-6 p-0 ${isLogging ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                        title={!isLogging ? "Not logging" : "Stop data acquisition"}
+                      >
+                        <Square className="h-3 w-3" />
+                      </Button>
+
+                      {/* Schedule Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowScheduler(true)}
+                        className="h-6 px-2 cursor-pointer"
+                        title="Schedule data acquisition"
+                      >
+                        <Calendar className="h-3 w-3 mr-1" />
+                        <span className="text-xs">Pianifica</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Right section: Control Buttons - responsive */}
+              {/* Right section: Search, Enhanced, Refresh */}
               <div className={`flex items-center gap-2 ${width < 500 ? 'w-full justify-center' : ''}`}>
                 <Button
-                  onClick={handleStart}
-                  disabled={isLogging}
+                  variant={showEnhancedSensorData ? 'default' : 'outline'}
                   size="sm"
-                  variant="default"
-                  className={`flex items-center gap-1 h-8 ${width < 400 ? 'w-8 p-0' : ''}`}
+                  onClick={() => setShowEnhancedSensorData(!showEnhancedSensorData)}
+                  className="h-6 px-2"
+                  title="Toggle detailed sensor data view"
                 >
-                  <Play className="h-4 w-4" />
-                  {width >= 400 && <span>Start</span>}
+                  <Eye className="h-4 w-4 mr-1" />
+                  <span className="text-xs">Dettaglio</span>
                 </Button>
-
-                <Button
-                  onClick={handleStop}
-                  disabled={!isLogging}
-                  size="sm"
-                  variant="destructive"
-                  className={`flex items-center gap-1 h-8 ${width < 400 ? 'w-8 p-0' : ''}`}
-                >
-                  <Square className="h-4 w-4" />
-                  {width >= 400 && <span>Stop</span>}
-                </Button>
-
-                {width >= 500 && (
-                  <Button
-                    onClick={handleSchedule}
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center gap-1 h-8"
-                  >
-                    <Calendar className="h-4 w-4" />
-                    <span>Pianifica</span>
-                  </Button>
-                )}
 
                 <Button
                   variant={isSensorSearchOpen ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setIsSensorSearchOpen(!isSensorSearchOpen)}
-                  className="h-8 w-8 p-0"
+                  className="h-6 w-6 p-0"
                 >
                   <Search className="h-4 w-4" />
                 </Button>
 
-                <Button
-                  variant={showEnhancedSensorData ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setShowEnhancedSensorData(!showEnhancedSensorData)}
-                  className="h-8 px-3"
-                  title="Toggle enhanced sensor data view"
-                >
-                  <Activity className="h-4 w-4 mr-1" />
-                  <span className="text-xs">Enhanced</span>
-                </Button>
+                {/* Auto-refresh controls */}
+                {selectedLogger?.is_online && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="auto-refresh"
+                        checked={autoRefreshEnabled}
+                        onCheckedChange={setAutoRefreshEnabled}
+                      />
+                      <Label htmlFor="auto-refresh" className="text-xs whitespace-nowrap">Auto-refresh</Label>
+                    </div>
+
+                    {autoRefreshEnabled ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="1"
+                          max="300"
+                          value={autoRefreshInterval}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value);
+                            if (value > 0 && value <= 300) {
+                              setAutoRefreshInterval(value);
+                            }
+                          }}
+                          className="w-12 h-6 px-2 text-xs border border-border rounded bg-background text-foreground text-center"
+                          title="Auto-refresh interval in seconds (1-300)"
+                        />
+                        <span className="text-xs text-muted-foreground">s</span>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={refreshSensors}
+                        disabled={sensorsLoading}
+                        className="h-6 w-6 p-0"
+                        title="Manual refresh"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${sensorsLoading ? 'animate-spin' : ''}`} />
+                      </Button>
+                    )}
+                  </>
+                )}
 
                 {/* System Info Button */}
                 {systemInfo && (
@@ -457,34 +564,11 @@ export default function DataLoggerPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowSystemInfoModal(true)}
-                    className="h-8 w-8 p-0"
+                    className="h-6 w-6 p-0"
                     title="System Information"
                   >
                     <Info className="h-4 w-4" />
                   </Button>
-                )}
-
-                {/* More menu for hidden controls on very small screens */}
-                {width < 500 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuCheckboxItem
-                        disabled={isLogging}
-                        onClick={handleSchedule}
-                      >
-                        Pianifica
-                      </DropdownMenuCheckboxItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 )}
               </div>
             </div>
@@ -521,38 +605,6 @@ export default function DataLoggerPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Sensors Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-medium">
-                  Sensori - {selectedLogger?.name}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {isLogging ? "Acquisizione dati in corso..." : "Monitoraggio sensori attivo"}
-                  {autoRefreshEnabled && " • Aggiornamento automatico ogni 10s"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-                  className="h-8"
-                >
-                  <Activity className="h-4 w-4 mr-2" />
-                  {autoRefreshEnabled ? "Auto" : "Manuale"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => selectedLogger && fetchSensors(selectedLogger)}
-                  disabled={sensorsLoading}
-                  className="h-8"
-                >
-                  <RefreshCw className={`h-4 w-4 ${sensorsLoading ? 'animate-spin' : ''}`} />
-                </Button>
-              </div>
-            </div>
 
             {/* Sensors Grid */}
             {sensorsLoading && sensors.length === 0 ? (
@@ -584,7 +636,7 @@ export default function DataLoggerPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid-responsive-cards">
+              <div className="grid-responsive-sensors">
                 {filteredSensors.map((sensor) => (
                   <SensorCard
                     key={sensor.id}
@@ -603,15 +655,36 @@ export default function DataLoggerPage() {
       {isConnected && selectedLogger && !isGridModeEnabled && (
         <ContextualStatusBar
           leftItems={[
-            { label: 'Datalogger', value: selectedLogger.name },
+            { label: 'Datalogger', value: selectedLogger.label },
             { label: 'Sensori', value: sensors.length },
-            { label: 'Attivi', value: sensors.filter(s => s.status === 'active').length, color: 'success' },
-            { label: 'Offline', value: sensors.filter(s => s.status !== 'active').length, color: sensors.filter(s => s.status !== 'active').length > 0 ? 'error' : 'default' }
+            { label: 'Online', value: sensors.filter(s => s.is_online).length, color: 'success' },
+            { label: 'Offline', value: sensors.filter(s => !s.is_online).length, color: sensors.filter(s => !s.is_online).length > 0 ? 'error' : 'default' }
           ]}
           rightItems={[
             ...(sensorSearchTerm ? [{ label: 'Filtrati', value: filteredSensors.length }] : []),
-            { label: 'Auto-refresh', value: autoRefreshEnabled ? 'ON' : 'OFF', color: autoRefreshEnabled ? 'success' : 'default' },
-            { label: 'Stato', value: isLogging ? 'Logging' : 'Standby', color: isLogging ? 'success' : 'warning' }
+            // Add sensor statistics similar to main page
+            ...(sensors.length > 0 ? [
+              {
+                label: 'Total Readings',
+                value: (() => {
+                  const total = sensors.reduce((sum, s) => sum + s.total_readings, 0);
+                  if (total >= 1000000) return `${(total / 1000000).toFixed(1)}M`;
+                  if (total >= 1000) return `${(total / 1000).toFixed(1)}k`;
+                  return total;
+                })(),
+                color: 'default' as const
+              },
+              {
+                label: 'Avg Uptime',
+                value: `${(sensors.reduce((sum, s) => sum + s.uptime_percentage, 0) / sensors.length).toFixed(1)}%`,
+                color: (sensors.reduce((sum, s) => sum + s.uptime_percentage, 0) / sensors.length) >= 90 ? 'success' as const : 'warning' as const
+              }
+            ] : []),
+            {
+              label: 'Stato',
+              value: !selectedLogger?.is_online ? 'Offline' : isLogging ? 'Logging' : 'Standby',
+              color: !selectedLogger?.is_online ? 'error' : isLogging ? 'success' : 'warning'
+            }
           ]}
         />
       )}
@@ -622,8 +695,8 @@ export default function DataLoggerPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Avviare acquisizione dati?</AlertDialogTitle>
             <AlertDialogDescription>
-              Stai per avviare l'acquisizione dati dall'acquisitore "{selectedLogger?.name}".
-              L'operazione verrà eseguita immediatamente.
+              Stai per avviare l&apos;acquisizione dati dall&apos;acquisitore &quot;{selectedLogger?.label}&quot;.
+              L&apos;operazione verrà eseguita immediatamente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -639,7 +712,7 @@ export default function DataLoggerPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Fermare acquisizione dati?</AlertDialogTitle>
             <AlertDialogDescription>
-              Stai per fermare l'acquisizione dati in corso. Tutti i dati non salvati potrebbero andare persi.
+              Stai per fermare l&apos;acquisizione dati in corso. Tutti i dati non salvati potrebbero andare persi.
               Vuoi continuare?
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -667,7 +740,7 @@ export default function DataLoggerPage() {
   return (
     <div ref={containerRef} className="flex flex-col h-full">
       {/* Dashboard Header */}
-      <div className="bg-background border-b border-border px-4 py-2">
+      <div className="bg-background border-b border-border px-4 py-1">
         <div className="flex flex-col">
           {/* Header row: Title + Controls - responsive */}
           <div className={`flex items-center ${width < 500 ? 'flex-col gap-2' : 'justify-between'}`}>
@@ -679,7 +752,7 @@ export default function DataLoggerPage() {
                 const status = getMqttStatusBadge();
                 return status && (
                   <div className="flex items-center gap-2">
-                    <Badge variant={status.variant} className={`text-xs ${status.className}`}>
+                    <Badge variant={status.variant} className={`text-xs h-6 flex items-center ${status.className}`}>
                       {status.text}
                     </Badge>
                     {/* MQTT Control Buttons (superuser only) */}
@@ -734,6 +807,29 @@ export default function DataLoggerPage() {
                             <Square className="h-3 w-3" />
                           )}
                         </Button>
+
+                        {/* Discovery Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleForceDiscovery}
+                          disabled={startLoading || stopLoading || discoveryLoading}
+                          className={`h-6 px-2 ${!(startLoading || stopLoading || discoveryLoading) ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                          title={
+                            discoveryLoading
+                              ? "Discovery refresh in progress..."
+                              : startLoading || stopLoading
+                                ? "MQTT operation in progress..."
+                                : "Force topic discovery refresh"
+                          }
+                        >
+                          {discoveryLoading ? (
+                            <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                          ) : (
+                            <Search className="h-3 w-3 mr-1" />
+                          )}
+                          <span className="text-xs">Discover</span>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -751,7 +847,7 @@ export default function DataLoggerPage() {
                     checked={showOnlineOnly}
                     onCheckedChange={setShowOnlineOnly}
                   />
-                  <Label htmlFor="online-only" className={`text-sm whitespace-nowrap ${isMobile ? 'sr-only' : ''}`}>Solo online</Label>
+                  <Label htmlFor="online-only" className={`text-xs whitespace-nowrap ${isMobile ? 'sr-only' : ''}`}>Solo online</Label>
                 </div>
               )}
 
@@ -760,7 +856,7 @@ export default function DataLoggerPage() {
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
-                  className="rounded-r-none h-8 w-8 p-0"
+                  className="rounded-r-none h-6 w-6 p-0"
                 >
                   <Grid3X3 className="h-4 w-4" />
                 </Button>
@@ -768,7 +864,7 @@ export default function DataLoggerPage() {
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('list')}
-                  className="rounded-l-none h-8 w-8 p-0"
+                  className="rounded-l-none h-6 w-6 p-0"
                 >
                   <List className="h-4 w-4" />
                 </Button>
@@ -778,7 +874,7 @@ export default function DataLoggerPage() {
                 variant={isSearchOpen ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
-                className="h-8 w-8 p-0"
+                className="h-6 w-6 p-0"
               >
                 <Search className="h-4 w-4" />
               </Button>
@@ -788,10 +884,10 @@ export default function DataLoggerPage() {
                 size="sm"
                 onClick={refreshDataloggers}
                 disabled={dataloggerLoading}
-                className={`h-8 ${width < 350 ? 'w-8 p-0' : 'px-3'}`}
+                className={`h-6 ${width < 350 ? 'w-6 p-0' : 'px-3'}`}
               >
                 <RefreshCw className={`h-4 w-4 ${dataloggerLoading ? 'animate-spin' : ''}`} />
-                {width >= 350 && !isMobile && <span className="ml-2">Aggiorna</span>}
+                {width >= 350 && !isMobile && <span className="ml-2 text-xs">Aggiorna</span>}
               </Button>
 
               {/* System Info Button */}
@@ -800,7 +896,7 @@ export default function DataLoggerPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowSystemInfoModal(true)}
-                  className="h-8 w-8 p-0"
+                  className="h-6 w-6 p-0"
                   title="System Information"
                 >
                   <Info className="h-4 w-4" />
@@ -814,7 +910,7 @@ export default function DataLoggerPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-6 w-6 p-0"
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
@@ -865,16 +961,59 @@ export default function DataLoggerPage() {
             </div>
           </div>
         ) : dataloggerLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                Caricamento datalogger...
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Attendere prego
-              </p>
-            </div>
+          <div className={
+            viewMode === 'grid'
+              ? (width < 600 ? 'grid-responsive-cards-container' : 'grid-responsive-cards')
+              : 'grid-responsive-list'
+          }>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="card-standard">
+                <div className="card-content-detailed">
+                  {viewMode === 'list' ? (
+                    // Skeleton per modalità lista (compact)
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <div className="skeleton-shimmer h-5 w-32"></div>
+                          <div className="skeleton-shimmer h-5 w-16"></div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="skeleton-shimmer h-3 w-24"></div>
+                          <div className="skeleton-shimmer h-3 w-20"></div>
+                          <div className="skeleton-shimmer h-3 w-28 hidden sm:block"></div>
+                        </div>
+                      </div>
+                      <div className="hidden lg:flex items-center gap-6">
+                        <div className="skeleton-shimmer h-3 w-8"></div>
+                        <div className="skeleton-shimmer h-3 w-12"></div>
+                        <div className="skeleton-shimmer h-3 w-16"></div>
+                      </div>
+                      <div className="skeleton-shimmer h-8 w-20"></div>
+                    </div>
+                  ) : (
+                    // Skeleton per modalità griglia (full)
+                    <>
+                      <div className="flex items-start justify-between gap-3 mb-6">
+                        <div className="min-w-0 flex-1">
+                          <div className="skeleton-shimmer h-6 w-40 mb-2"></div>
+                        </div>
+                        <div className="skeleton-shimmer h-6 w-16"></div>
+                      </div>
+                      <div className="space-y-2 mb-4">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <div className="skeleton-shimmer h-4 w-4"></div>
+                            <div className="skeleton-shimmer h-3 w-12"></div>
+                            <div className="skeleton-shimmer h-3 w-24"></div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="skeleton-shimmer h-10 w-full"></div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         ) : dataloggerError ? (
           <div className="flex items-center justify-center h-full">
@@ -930,21 +1069,33 @@ export default function DataLoggerPage() {
         <ContextualStatusBar
           leftItems={createCountItems(
             dataloggers.length,
-            dataloggers.filter(d => d.status === 'active').length,
-            dataloggers.filter(d => d.status !== 'active').length
+            dataloggers.filter(d => d.is_online).length,
+            dataloggers.filter(d => !d.is_online).length
           )}
           rightItems={[
             ...createFilterItems(filteredDataloggers.length, searchTerm),
-            // Add MQTT device status indicators
+            // Add datalogger stats
             ...(dataloggers.length > 0 ? [
               {
-                label: `MQTT Online: ${dataloggers.filter(d => d.is_active).length}`,
-                color: 'success' as const
+                label: 'Total Sensors',
+                value: dataloggers.reduce((sum, d) => sum + d.sensors_count, 0),
+                color: 'default' as const
               },
-              ...(dataloggers.filter(d => !d.is_active).length > 0 ? [{
-                label: `MQTT Offline: ${dataloggers.filter(d => !d.is_active).length}`,
-                color: 'error' as const
-              }] : [])
+              {
+                label: 'Total Messages',
+                value: (() => {
+                  const total = dataloggers.reduce((sum, d) => sum + d.total_heartbeats, 0);
+                  if (total >= 1000000) return `${(total / 1000000).toFixed(1)}M`;
+                  if (total >= 1000) return `${(total / 1000).toFixed(1)}k`;
+                  return total;
+                })(),
+                color: 'default' as const
+              },
+              {
+                label: 'Avg Uptime',
+                value: `${(dataloggers.reduce((sum, d) => sum + d.uptime_percentage, 0) / dataloggers.length).toFixed(1)}%`,
+                color: (dataloggers.reduce((sum, d) => sum + d.uptime_percentage, 0) / dataloggers.length) >= 90 ? 'success' as const : 'warning' as const
+              }
             ] : []),
             // Add system info to the right side if available
             ...(systemInfo ? [

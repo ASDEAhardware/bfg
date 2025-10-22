@@ -4,18 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineLabelEditor } from "@/components/InlineLabelEditor";
-// import { api } from "@/lib/axios";
+import { api } from "@/lib/axios";
 import {
-  Circle,
-  Wifi,
-  WifiOff,
-  AlertTriangle,
   Settings,
   Activity,
   Cpu,
   Network,
   Clock,
-  Gauge
+  Gauge,
+  Router
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
@@ -23,92 +20,65 @@ import { it } from "date-fns/locale";
 interface DataloggerCardProps {
   datalogger: {
     id: string;
-    name: string;
+    site_id: number;
+    site_name: string;
     serial_number: string;
-    model: string;
+    label: string;
+    datalogger_type: string;
+    device_id?: string;
+    is_online: boolean;
+    last_seen_at?: string;
+    last_heartbeat?: string;
+    last_communication?: string;
     firmware_version?: string;
     ip_address?: string;
-    status: 'active' | 'inactive' | 'maintenance' | 'error' | 'connected' | 'disconnected' | 'connecting' | 'disabled';
-    is_active: boolean;
-    last_communication?: string;
+    total_heartbeats: number;
+    missed_heartbeats: number;
+    uptime_percentage: number;
     sensors_count: number;
     active_sensors_count: number;
+    created_at: string;
+    updated_at: string;
   };
-  onConnect: (datalogger: any) => void;
-  onLabelUpdate?: (datalogger: any, newLabel: string) => void;
+  onConnect: (datalogger: DataloggerCardProps['datalogger']) => void;
+  onLabelUpdate?: (datalogger: DataloggerCardProps['datalogger'], newLabel: string) => void;
   compact?: boolean;
 }
 
 const statusConfig = {
-  active: {
-    color: "text-green-500",
-    bgColor: "bg-green-500/10",
-    icon: Wifi,
-    label: "Online"
+  online: {
+    label: "Online",
+    variant: "default" as const,
+    className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
   },
-  connected: {
-    color: "text-green-500",
-    bgColor: "bg-green-500/10",
-    icon: Wifi,
-    label: "Connesso"
-  },
-  connecting: {
-    color: "text-yellow-500",
-    bgColor: "bg-yellow-500/10",
-    icon: Activity,
-    label: "Connessione..."
-  },
-  inactive: {
-    color: "text-gray-500",
-    bgColor: "bg-gray-500/10",
-    icon: WifiOff,
-    label: "Offline"
-  },
-  disconnected: {
-    color: "text-gray-500",
-    bgColor: "bg-gray-500/10",
-    icon: WifiOff,
-    label: "Disconnesso"
-  },
-  disabled: {
-    color: "text-gray-400",
-    bgColor: "bg-gray-400/10",
-    icon: Circle,
-    label: "Disabilitato"
-  },
-  maintenance: {
-    color: "text-yellow-500",
-    bgColor: "bg-yellow-500/10",
-    icon: Settings,
-    label: "Manutenzione"
-  },
-  error: {
-    color: "text-red-500",
-    bgColor: "bg-red-500/10",
-    icon: AlertTriangle,
-    label: "Errore"
+  offline: {
+    label: "Offline",
+    variant: "outline" as const,
+    className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100"
   }
 };
 
 export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact = false }: DataloggerCardProps) {
-  const config = statusConfig[datalogger.status] || statusConfig.inactive;
-  const StatusIcon = config.icon;
+  // Determine status based on is_online field
+  const status = datalogger.is_online ? 'online' : 'offline';
+  const config = statusConfig[status] || statusConfig.offline;
 
-  const lastCommunication = datalogger.last_communication
-    ? formatDistanceToNow(new Date(datalogger.last_communication), {
+  // Use last_seen_at as primary, with fallbacks
+  const lastCommunication = datalogger.last_seen_at || datalogger.last_heartbeat || datalogger.last_communication;
+  const lastCommText = lastCommunication
+    ? formatDistanceToNow(new Date(lastCommunication), {
         addSuffix: true,
         locale: it
       })
     : "Mai";
 
-  const isOnline = datalogger.status === 'active';
+  const isOnline = datalogger.is_online;
 
   const handleLabelUpdate = async (newLabel: string) => {
     try {
-      // TODO: Replace with new MQTT API when rewritten
-      // await api.patch(`/v1/mqtt/dataloggers/${datalogger.id}/update_label/`, {
-      //   label: newLabel
-      // });
+      await api.patch(`/v1/mqtt/dataloggers/${datalogger.id}/update_label/`, {
+        label: newLabel
+      });
 
       // Callback al parent per aggiornare la lista
       if (onLabelUpdate) {
@@ -120,36 +90,34 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
     }
   };
 
+  // Build display name from datalogger_type and device_id
+  const deviceName = datalogger.device_id
+    ? `${datalogger.datalogger_type}/${datalogger.device_id}`
+    : datalogger.datalogger_type || 'Unknown';
+
   if (compact) {
     return (
       <Card className="card-standard">
         <CardContent className="card-content-standard">
-          <div className="flex items-center card-spacing">
-            {/* Status Icon */}
-            <div className={`p-1.5 rounded-full ${config.bgColor} flex-shrink-0`}>
-              <StatusIcon className={`h-3 w-3 ${config.color}`} />
-            </div>
-
-            {/* Main Info */}
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Main Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="flex-1 min-w-0">
-                  <InlineLabelEditor
-                    label={datalogger.name}
-                    onUpdate={handleLabelUpdate}
-                    size="sm"
-                    className="font-semibold"
-                  />
-                </div>
+              <div className="flex items-center gap-3 mb-1">
+                <InlineLabelEditor
+                  label={datalogger.label}
+                  onUpdate={handleLabelUpdate}
+                  size="md"
+                  className="font-semibold text-base"
+                />
                 <Badge
-                  variant={isOnline ? "default" : "secondary"}
-                  className="text-xs px-1.5 py-0.5 h-auto flex-shrink-0"
+                  variant={config.variant}
+                  className={`text-xs flex-shrink-0 ${config.className}`}
                 >
                   {config.label}
                 </Badge>
               </div>
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="truncate">{datalogger.model}</span>
+                <span className="truncate">{deviceName}</span>
                 <span className="font-mono">{datalogger.serial_number}</span>
                 {datalogger.ip_address && (
                   <span className="font-mono hidden sm:inline">{datalogger.ip_address}</span>
@@ -157,39 +125,48 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
               </div>
             </div>
 
-            {/* Metrics */}
-            <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground">
+            {/* Center: Metrics */}
+            <div className="hidden lg:flex items-center gap-6 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Gauge className="h-3 w-3" />
                 <span>{datalogger.active_sensors_count}/{datalogger.sensors_count}</span>
               </div>
               <div className="flex items-center gap-1">
+                <Activity className="h-3 w-3" />
+                <span>{datalogger.uptime_percentage.toFixed(1)}%</span>
+              </div>
+              <div className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                <span className="min-w-[60px]">{lastCommunication}</span>
+                <span className="min-w-[60px]">{lastCommText}</span>
               </div>
             </div>
 
-            {/* Connect Button */}
+            {/* Right: Connect Button */}
             <Button
               onClick={() => onConnect(datalogger)}
               size="sm"
               className="h-8 px-4 text-xs cursor-pointer flex-shrink-0"
-              disabled={!isOnline}
             >
-              Connetti
+              {isOnline ? "Connetti" : "Visualizza"}
             </Button>
           </div>
 
           {/* Mobile Metrics */}
-          <div className="md:hidden mt-2 pt-2 border-t border-border/50">
+          <div className="lg:hidden mt-3 pt-3 border-t border-border/50">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Gauge className="h-3 w-3" />
-                <span>Sensori: {datalogger.active_sensors_count}/{datalogger.sensors_count}</span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1">
+                  <Gauge className="h-3 w-3" />
+                  <span>Sensori: {datalogger.active_sensors_count}/{datalogger.sensors_count}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  <span>Uptime: {datalogger.uptime_percentage.toFixed(1)}%</span>
+                </div>
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                <span>{lastCommunication}</span>
+                <span>{lastCommText}</span>
               </div>
             </div>
           </div>
@@ -201,24 +178,18 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
   return (
     <Card className="card-standard">
       <CardContent className="card-content-detailed">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className={`p-2 rounded-full ${config.bgColor}`}>
-              <StatusIcon className={`h-4 w-4 ${config.color}`} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <InlineLabelEditor
-                label={datalogger.name}
-                onUpdate={handleLabelUpdate}
-                size="md"
-                className="font-semibold"
-              />
-              <p className="text-sm text-muted-foreground truncate">{datalogger.model}</p>
-            </div>
+        <div className="flex items-start justify-between gap-3 mb-6">
+          <div className="min-w-0 flex-1">
+            <InlineLabelEditor
+              label={datalogger.label}
+              onUpdate={handleLabelUpdate}
+              size="lg"
+              className="text-lg font-bold"
+            />
           </div>
           <Badge
-            variant={isOnline ? "default" : "secondary"}
-            className="flex-shrink-0"
+            variant={config.variant}
+            className={`flex-shrink-0 ${config.className}`}
           >
             {config.label}
           </Badge>
@@ -228,47 +199,68 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
           <div className="flex items-center gap-2 text-sm">
             <Cpu className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">S/N:</span>
-            <span className="font-mono text-xs">{datalogger.serial_number}</span>
+            <span className="font-mono text-xs text-foreground">{datalogger.serial_number}</span>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm">
+            <Router className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Tipo:</span>
+            <span className="text-xs text-foreground">{datalogger.datalogger_type}</span>
+            {datalogger.device_id && (
+              <>
+                <span className="text-muted-foreground">ID:</span>
+                <span className="text-xs font-mono text-foreground">{datalogger.device_id}</span>
+              </>
+            )}
           </div>
 
           {datalogger.ip_address && (
             <div className="flex items-center gap-2 text-sm">
               <Network className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">IP:</span>
-              <span className="font-mono text-xs">{datalogger.ip_address}</span>
+              <span className="font-mono text-xs text-foreground">{datalogger.ip_address}</span>
             </div>
           )}
 
           {datalogger.firmware_version && (
             <div className="flex items-center gap-2 text-sm">
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <Settings className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">FW:</span>
-              <span className="text-xs">{datalogger.firmware_version}</span>
+              <span className="text-xs text-foreground">{datalogger.firmware_version}</span>
             </div>
           )}
 
           <div className="flex items-center gap-2 text-sm">
             <Gauge className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Sensori:</span>
-            <span className="text-xs">
-              <span className="font-medium text-green-600">{datalogger.active_sensors_count}</span>
-              <span className="text-muted-foreground">/{datalogger.sensors_count} attivi</span>
+            <span className="text-xs text-foreground">
+              {datalogger.active_sensors_count}/{datalogger.sensors_count} attivi
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm">
+            <Activity className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Uptime:</span>
+            <span className="text-xs text-foreground">
+              {datalogger.uptime_percentage.toFixed(1)}%
+              <span className="text-muted-foreground ml-1">
+                ({datalogger.total_heartbeats - datalogger.missed_heartbeats}/{datalogger.total_heartbeats} heartbeats)
+              </span>
             </span>
           </div>
 
           <div className="flex items-center gap-2 text-sm">
             <Clock className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Ultima comunicazione:</span>
-            <span className="text-xs">{lastCommunication}</span>
+            <span className="text-xs text-foreground">{lastCommText}</span>
           </div>
         </div>
 
         <Button
           onClick={() => onConnect(datalogger)}
           className="w-full cursor-pointer"
-          disabled={!isOnline}
         >
-          {isOnline ? "Connetti" : "Non disponibile"}
+          {isOnline ? "Connetti" : "Visualizza"}
         </Button>
       </CardContent>
     </Card>

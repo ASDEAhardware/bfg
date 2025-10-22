@@ -19,7 +19,7 @@ class SiteType(models.TextChoices):
 
 class Site(models.Model):
     name = models.CharField(max_length=255, unique=True)
-    code = models.CharField(max_length=50, unique=True, null=True, help_text="Site code for MQTT topics (e.g., 'sito_001')")
+    code = models.CharField(max_length=50, unique=True, null=True, help_text="Unique immutable site code for database queries")
     site_type = models.CharField(
         max_length=20,
         choices=SiteType.choices,

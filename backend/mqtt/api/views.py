@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.decorators import user_passes_test
 
 from ..services.mqtt_manager import mqtt_manager
-from ..models import MqttConnection, Datalogger, Sensor
+from ..models import MqttConnection, Datalogger, Sensor, DiscoveredTopic
 from .serializers import (
     MqttConnectionStatusSerializer,
     MqttControlResponseSerializer,
@@ -101,7 +101,6 @@ def stop_connection(request, site_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-@user_passes_test(is_superuser)
 def connection_status(request, site_id):
     """
     Ottiene stato connessione MQTT per un sito specifico.
@@ -277,6 +276,100 @@ def restart_manager(request):
 
     except Exception as e:
         logger.error(f"Error in restart_manager API: {e}")
+        return Response(
+            {'success': False, 'message': f'Internal error: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@user_passes_test(is_superuser)
+def force_discovery(request, site_id):
+    """
+    Forza refresh discovery per un sito - rilegge tutti i discovered topics
+    e aggiorna datalogger/sensori.
+
+    POST /v1/mqtt/sites/{site_id}/discover/
+    """
+    try:
+        logger.info(f"API request to force discovery refresh for site {site_id} by user {request.user}")
+
+        from sites.models import Site
+        from ..services.message_processor import message_processor
+        import json
+
+        # Verifica che il sito esista
+        try:
+            site = Site.objects.get(id=int(site_id))
+        except Site.DoesNotExist:
+            return Response(
+                {'success': False, 'message': f'Site {site_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Recupera tutti i discovered topics per questo sito
+        discovered_topics = DiscoveredTopic.objects.filter(site=site).order_by('-last_seen_at')
+
+        if not discovered_topics.exists():
+            return Response(
+                {'success': True, 'message': 'No MQTT topics discovered yet. Make sure IoT devices are sending messages to the broker.', 'processed_count': 0, 'total_topics': 0},
+                status=status.HTTP_200_OK
+            )
+
+        processed_count = 0
+        success_count = 0
+        error_count = 0
+
+        # Re-processa tutti i topic scoperti
+        for topic in discovered_topics:
+            try:
+                if topic.sample_payload:
+                    # Converte il payload in bytes per simulare un messaggio MQTT
+                    payload_str = json.dumps(topic.sample_payload)
+                    payload_bytes = payload_str.encode('utf-8')
+
+                    # Re-processa il messaggio
+                    result = message_processor.process_message(
+                        site_id=site.id,
+                        topic=topic.topic_path,
+                        payload=payload_bytes,
+                        qos=0,
+                        retain=False
+                    )
+
+                    if result:
+                        success_count += 1
+                    else:
+                        error_count += 1
+
+                    processed_count += 1
+
+            except Exception as e:
+                logger.error(f"Error reprocessing topic {topic.topic_path}: {e}")
+                error_count += 1
+
+        # Statistiche finali
+        total_topics = discovered_topics.count()
+
+        message = f"Discovery refresh completed: {success_count} successful, {error_count} errors, {total_topics} total topics"
+
+        return Response({
+            'success': True,
+            'message': message,
+            'processed_count': processed_count,
+            'success_count': success_count,
+            'error_count': error_count,
+            'total_topics': total_topics
+        }, status=status.HTTP_200_OK)
+
+    except ValueError:
+        return Response(
+            {'success': False, 'message': 'Invalid site_id'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.error(f"Error in force_discovery API for site {site_id}: {e}")
         return Response(
             {'success': False, 'message': f'Internal error: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

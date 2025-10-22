@@ -161,11 +161,12 @@ class MqttConnectionHandler:
             self._config = {
                 'site_id': mqtt_conn.site.id,
                 'site_name': mqtt_conn.site.name,
+                'site_code': mqtt_conn.client_id_prefix,  # Usa sempre client_id_prefix
                 'broker_host': mqtt_conn.broker_host,
                 'broker_port': mqtt_conn.broker_port,
                 'username': mqtt_conn.username,
                 'password': mqtt_conn.password,
-                'client_id_prefix': mqtt_conn.client_id_prefix,
+                'client_id_prefix': mqtt_conn.client_id_prefix,  # Manteniamo per client ID
                 'keep_alive_interval': mqtt_conn.keep_alive_interval,
                 'ssl_enabled': mqtt_conn.ssl_enabled,
                 'ca_cert_path': mqtt_conn.ca_cert_path,
@@ -304,8 +305,8 @@ class MqttConnectionHandler:
             self.is_connected = True
             logger.info(f"MQTT connected: {self._config['site_name']} ({self.mqtt_connection_id})")
 
-            # Sottoscrivi al topic pattern principale
-            topic_pattern = f"{self._config['client_id_prefix']}/#"
+            # Sottoscrivi al topic pattern principale usando site code
+            topic_pattern = f"{self._config['site_code']}/#"
             client.subscribe(topic_pattern, qos=0)
 
             self._update_connection_status('connected')

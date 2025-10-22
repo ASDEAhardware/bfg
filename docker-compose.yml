@@ -35,7 +35,7 @@ services:
     build:
       context: ./backend
     container_name: bfg_mqtt_service
-    command: python manage.py run_mqtt --log-level INFO
+    command: sh -c "while true; do python manage.py run_mqtt --log-level INFO; echo 'MQTT service stopped, restarting in 5 seconds...'; sleep 5; done"
     working_dir: /app
     volumes:
       - ./backend:/app

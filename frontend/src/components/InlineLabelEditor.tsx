@@ -102,6 +102,12 @@ export function InlineLabelEditor({
     lg: 'text-lg h-11'
   };
 
+  const textSizeClasses = {
+    sm: 'text-sm',
+    md: 'text-base',
+    lg: 'text-lg'
+  };
+
   const buttonSizeClasses = {
     sm: 'h-6 w-6',
     md: 'h-8 w-8',
@@ -152,22 +158,24 @@ export function InlineLabelEditor({
   }
 
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2 group cursor-pointer rounded px-2 py-1 hover:bg-muted/50",
-        "dark:hover:bg-muted/50",
-        disabled && "cursor-not-allowed opacity-50",
-        className
-      )}
-      onClick={handleStartEdit}
-    >
-      <span className={cn("flex-1 truncate", sizeClasses[size])}>
-        {label || placeholder}
-      </span>
+    <div className={cn("group", className)}>
+      <div
+        className={cn(
+          "inline-flex items-center gap-1 cursor-pointer rounded-sm px-1 py-0.5",
+          "hover:bg-muted/50 transition-colors",
+          "dark:hover:bg-muted/50",
+          disabled && "cursor-not-allowed opacity-50"
+        )}
+        onClick={handleStartEdit}
+      >
+        <span className={cn("truncate", textSizeClasses[size])}>
+          {label || placeholder}
+        </span>
 
-      {!disabled && (
-        <Edit2 className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-      )}
+        {!disabled && (
+          <Edit2 className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+        )}
+      </div>
     </div>
   );
 }

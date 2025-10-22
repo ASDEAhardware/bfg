@@ -42,27 +42,34 @@ class MqttMessageProcessor:
             # Log del messaggio ricevuto
             logger.debug(f"Processing MQTT message: site_id={site_id}, topic={topic}, size={len(payload)}")
 
-            # DISCOVERY: Logga SEMPRE il topic ricevuto
-            self._log_discovered_topic(site_id, topic, payload)
-
             # Decodifica payload JSON
+            payload_data = None
             try:
-                data = json.loads(payload.decode('utf-8'))
+                payload_data = json.loads(payload.decode('utf-8'))
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 logger.warning(f"Failed to decode MQTT payload for topic {topic}: {e}")
                 # Anche i payload non-JSON vanno loggati nel discovery
-                return True  # Non è un errore, è solo un topic non processabile
+                payload_data = {'error': 'invalid_json', 'raw_size': len(payload)}
+
+            # DISCOVERY: Logga SEMPRE il topic ricevuto
+            self._log_discovered_topic(site_id, topic, payload_data, len(payload))
+
+            # Se il payload non è JSON valido, non possiamo processarlo ulteriormente
+            if payload_data is None or 'error' in payload_data:
+                return True  # Discovery completato, ma nessun processing
 
             # Identifica tipo di messaggio dal topic usando la nuova struttura
             topic_info = self._parse_topic_structure(topic)
 
             processed = False
             if topic_info['type'] == 'gateway_heartbeat':
-                processed = self._process_new_gateway_heartbeat(site_id, topic, data, topic_info)
-                self._mark_topic_as_processed(site_id, topic, 'gateway_heartbeat')
+                processed = self._process_new_gateway_heartbeat(site_id, topic, payload_data, topic_info)
+                if processed:
+                    self._mark_topic_as_processed(site_id, topic, 'gateway_heartbeat')
             elif topic_info['type'] == 'datalogger_heartbeat':
-                processed = self._process_new_datalogger_heartbeat(site_id, topic, data, topic_info)
-                self._mark_topic_as_processed(site_id, topic, 'datalogger_heartbeat')
+                processed = self._process_new_datalogger_heartbeat(site_id, topic, payload_data, topic_info)
+                if processed:
+                    self._mark_topic_as_processed(site_id, topic, 'datalogger_heartbeat')
             else:
                 logger.debug(f"Topic discovered but no processor implemented: {topic} (type: {topic_info['type']})")
 
@@ -83,13 +90,20 @@ class MqttMessageProcessor:
         Returns:
             bool: True se è un heartbeat di datalogger
         """
-        # Verifica presenza del campo heart_beat e sensors_last_data
-        return (
-            isinstance(data, dict) and
-            'heart_beat' in data and
-            'sensors_last_data' in data and
-            isinstance(data['sensors_last_data'], list)
-        )
+        # Verifica presenza di sensors_last_data (formato reale datalogger)
+        # o heart_beat e sensors_last_data (formato legacy)
+        if not isinstance(data, dict):
+            return False
+
+        # Nuovo formato reale: solo serial_number + sensors_last_data
+        if 'serial_number' in data and 'sensors_last_data' in data and isinstance(data['sensors_last_data'], list):
+            return True
+
+        # Formato legacy: heart_beat + sensors_last_data
+        if 'heart_beat' in data and 'sensors_last_data' in data and isinstance(data['sensors_last_data'], list):
+            return True
+
+        return False
 
     def _process_datalogger_heartbeat(self, site_id: int, topic: str, data: Dict[str, Any]) -> bool:
         """
@@ -356,7 +370,7 @@ class MqttMessageProcessor:
         sensor_type = self._infer_sensor_type(sensor_data)
 
         unit_map = {
-            'accelerometer': 'g',
+            'accelerometer': 'g',  # Dati RAW - conversioni solo nel frontend
             'gyroscope': '°/s',
             'magnetometer': 'µT',
             'inclinometer': '°',
@@ -691,14 +705,15 @@ class MqttMessageProcessor:
         except Exception as e:
             logger.error(f"Error processing dataloggers from gateway: {e}")
 
-    def _log_discovered_topic(self, site_id: int, topic: str, payload: bytes):
+    def _log_discovered_topic(self, site_id: int, topic: str, payload_data: Dict[str, Any], payload_size: int):
         """
         Logga un topic scoperto nel database per analisi e discovery.
 
         Args:
             site_id: ID del sito
             topic: Topic completo ricevuto
-            payload: Payload del messaggio
+            payload_data: Dati decodificati del payload
+            payload_size: Dimensione del payload in bytes
         """
         try:
             from sites.models import Site
@@ -706,14 +721,6 @@ class MqttMessageProcessor:
             # Estrai topic pattern (rimuovi prefix)
             topic_parts = topic.split('/', 1)
             topic_pattern = topic_parts[1] if len(topic_parts) > 1 else topic
-
-            # Decodifica payload per sample (se possibile)
-            sample_payload = None
-            try:
-                sample_payload = json.loads(payload.decode('utf-8'))
-            except:
-                # Se non è JSON valido, salva solo la dimensione
-                pass
 
             site = Site.objects.get(id=site_id)
 
@@ -723,8 +730,8 @@ class MqttMessageProcessor:
                 topic_path=topic,
                 defaults={
                     'topic_pattern': topic_pattern,
-                    'sample_payload': sample_payload,
-                    'payload_size_avg': len(payload),
+                    'sample_payload': payload_data,
+                    'payload_size_avg': float(payload_size),
                     'message_count': 1,
                 }
             )
@@ -736,15 +743,14 @@ class MqttMessageProcessor:
                 # Aggiorna dimensione media payload
                 if discovered_topic.payload_size_avg:
                     discovered_topic.payload_size_avg = (
-                        (discovered_topic.payload_size_avg * (discovered_topic.message_count - 1) + len(payload)) /
+                        (discovered_topic.payload_size_avg * (discovered_topic.message_count - 1) + payload_size) /
                         discovered_topic.message_count
                     )
                 else:
-                    discovered_topic.payload_size_avg = len(payload)
+                    discovered_topic.payload_size_avg = float(payload_size)
 
-                # Aggiorna sample payload se è più recente
-                if sample_payload is not None:
-                    discovered_topic.sample_payload = sample_payload
+                # Aggiorna sample payload con l'ultimo ricevuto
+                discovered_topic.sample_payload = payload_data
 
                 # Calcola frequenza messaggi (se abbiamo abbastanza dati)
                 if discovered_topic.message_count > 1:
@@ -986,13 +992,21 @@ class MqttMessageProcessor:
                 logger.error(f"Site {site_id} not found for datalogger heartbeat")
                 return False
 
-            # Trova il gateway parent utilizzando la struttura topic
-            gateway_serial_number = f"{topic_info['site_code']}_gateway_{topic_info['gateway_number']}"
+            # Trova o crea il gateway parent utilizzando la struttura topic (nuovo formato)
+            gateway_serial_number = f"{topic_info['site_code']}-gateway_{topic_info['gateway_number']}"
             try:
                 gateway = Gateway.objects.get(serial_number=gateway_serial_number)
             except Gateway.DoesNotExist:
-                logger.warning(f"Gateway {gateway_serial_number} not found - ignoring datalogger heartbeat for {topic}")
-                return False  # IGNORA il datalogger se non c'è il gateway
+                logger.info(f"Gateway {gateway_serial_number} not found - auto-creating from datalogger heartbeat")
+                # Auto-crea il gateway se non esiste
+                gateway = Gateway.objects.create(
+                    site=site,
+                    serial_number=gateway_serial_number,
+                    label=f"Gateway {topic_info['gateway_number']}",
+                    is_online=True,
+                    last_heartbeat=timezone.now(),
+                    last_communication=timezone.now()
+                )
 
             # Genera serial_number datalogger basato sulla nuova struttura
             datalogger_serial = data.get('serial_number')
@@ -1059,12 +1073,19 @@ class MqttMessageProcessor:
 
                 datalogger.save()
 
-                # Processa dati sensori se presenti
-                sensors_data = data.get('sensors', [])
+                # Processa dati sensori se presenti (formato reale: sensors_last_data)
+                sensors_data = data.get('sensors_last_data', []) or data.get('sensors', [])
                 if sensors_data and isinstance(sensors_data, list):
+                    logger.info(f"Processing {len(sensors_data)} sensors for datalogger {datalogger.serial_number}")
                     for sensor_data in sensors_data:
                         if isinstance(sensor_data, dict):
-                            self._process_sensor_data(datalogger, sensor_data)
+                            success = self._process_sensor_data(datalogger, sensor_data)
+                            if success:
+                                logger.debug(f"Processed sensor {sensor_data.get('serial_number', 'unknown')}")
+                            else:
+                                logger.warning(f"Failed to process sensor {sensor_data.get('serial_number', 'unknown')}")
+                else:
+                    logger.debug(f"No sensor data found in datalogger heartbeat")
 
                 action = "Created" if created else "Updated"
                 logger.info(f"{action} datalogger: {datalogger.label} (Gateway: {gateway.label}, Site: {site.name})")

@@ -33,8 +33,8 @@ export function HeaderComponent() {
                 )}
             </div>
             <div className="ml-auto flex items-end gap-2 pr-4">
-                <TabModeToggle />
                 <GridModeToggle />
+                <TabModeToggle />
                 <ModeToggle />
             </div>
         </header>

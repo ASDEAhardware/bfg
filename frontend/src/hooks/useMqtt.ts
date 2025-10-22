@@ -155,10 +155,25 @@ export function useMqttControl() {
     return controlConnection(siteId, 'stop');
   }, [controlConnection]);
 
+  const forceDiscovery = useCallback(async (siteId: number) => {
+    setLoading(true);
+
+    try {
+      const response = await api.post(`v1/mqtt/sites/${siteId}/discover/`);
+      return response.data;
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to force discovery';
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     controlConnection,
     startConnection,
     stopConnection,
+    forceDiscovery,
     loading
   };
 }
@@ -230,7 +245,9 @@ export function useDataloggers(siteId: number | null, onlineOnly: boolean = fals
   };
 }
 
-// Sensors Hook
+/**
+ * Hook for managing sensors of a specific datalogger
+ */
 export function useSensors(datalogger: Datalogger | null) {
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [loading, setLoading] = useState(false);
@@ -246,7 +263,7 @@ export function useSensors(datalogger: Datalogger | null) {
     setError(null);
 
     try {
-      const response = await api.get(`v1/mqtt/sensors/by_datalogger/?datalogger_id=${datalogger.id}`);
+      const response = await api.get(`v1/mqtt/sensors/by_datalogger?datalogger_id=${datalogger.id}`);
       setSensors(response.data.sensors || []);
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch sensors';
@@ -255,7 +272,7 @@ export function useSensors(datalogger: Datalogger | null) {
     } finally {
       setLoading(false);
     }
-  }, [datalogger?.id]);
+  }, [datalogger]);
 
   useEffect(() => {
     fetchSensors();
@@ -292,7 +309,9 @@ export function useSensors(datalogger: Datalogger | null) {
   };
 }
 
-// Combined hook for MQTT status with polling
+/**
+ * Hook combinato per status MQTT e polling automatico
+ */
 export function useMqttStatusWithPolling(siteId: number | null, pollingInterval: number = 30000) {
   const mqttStatus = useMqttConnectionStatus(siteId);
   const dataloggers = useDataloggers(siteId);

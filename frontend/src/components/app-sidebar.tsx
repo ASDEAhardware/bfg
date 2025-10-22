@@ -61,7 +61,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             priority
           />
           <span className="font-semibold whitespace-nowrap group-data-[state=collapsed]:hidden">
-            Big Features GUI
+            Build Fast GUI
           </span>
         </div>
       </SidebarHeader>

@@ -131,7 +131,7 @@ class SensorSerializer(serializers.ModelSerializer):
         # Prende il dato più recente
         latest_data = latest_readings[0]['data']
 
-        # Cerca valore principale
+        # Cerca valore principale - SEMPRE dati RAW
         if 'acc00' in latest_data:
             return latest_data['acc00']
         elif 'incli_x' in latest_data:

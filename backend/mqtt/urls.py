@@ -12,6 +12,7 @@ urlpatterns = [
     path('sites/<int:site_id>/start/', views.start_connection, name='start_connection'),
     path('sites/<int:site_id>/stop/', views.stop_connection, name='stop_connection'),
     path('sites/<int:site_id>/status/', views.connection_status, name='connection_status'),
+    path('sites/<int:site_id>/discover/', views.force_discovery, name='force_discovery'),
 
     # Stato generale manager
     path('manager/status/', views.manager_status, name='manager_status'),
