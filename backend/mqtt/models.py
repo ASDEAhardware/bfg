@@ -303,6 +303,36 @@ class Gateway(models.Model):
     # Raw MQTT payload for debugging
     raw_metadata = models.JSONField(default=dict, blank=True)
 
+    # MQTT API versioning and dynamic monitoring fields
+    mqtt_api_version = models.CharField(
+        max_length=20,
+        default='v1.0.0',
+        help_text='MQTT API version used by this gateway'
+    )
+    connection_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('online', 'Online'),
+            ('warning', 'Warning'),
+            ('offline', 'Offline'),
+            ('unknown', 'Unknown')
+        ],
+        default='online',
+        help_text='Current connection status'
+    )
+    expected_heartbeat_interval = models.IntegerField(
+        default=60,
+        help_text='Expected heartbeat interval in seconds'
+    )
+    last_status_change = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When status last changed'
+    )
+    last_offline_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When device went offline'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -397,6 +427,37 @@ class Datalogger(models.Model):
         validators=[MinValueValidator(0.0), MaxValueValidator(100.0)]
     )
     last_downtime_start = models.DateTimeField(null=True, blank=True)
+
+    # MQTT API versioning and dynamic monitoring fields
+    mqtt_api_version = models.CharField(
+        max_length=20,
+        default='v1.0.0',
+        help_text='MQTT API version used by this datalogger'
+    )
+    connection_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('online', 'Online'),
+            ('warning', 'Warning'),
+            ('offline', 'Offline'),
+            ('gateway_offline', 'Gateway Offline'),
+            ('unknown', 'Unknown')
+        ],
+        default='online',
+        help_text='Current connection status'
+    )
+    expected_heartbeat_interval = models.IntegerField(
+        default=60,
+        help_text='Expected heartbeat interval in seconds'
+    )
+    last_status_change = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When status last changed'
+    )
+    last_offline_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When device went offline'
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -522,6 +583,38 @@ class Sensor(models.Model):
         validators=[MinValueValidator(0)]
     )
 
+    # MQTT API versioning and dynamic monitoring fields
+    mqtt_api_version = models.CharField(
+        max_length=20,
+        default='v1.0.0',
+        help_text='MQTT API version used by this sensor'
+    )
+    connection_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('online', 'Online'),
+            ('warning', 'Warning'),
+            ('offline', 'Offline'),
+            ('datalogger_offline', 'Datalogger Offline'),
+            ('gateway_offline', 'Gateway Offline'),
+            ('unknown', 'Unknown')
+        ],
+        default='online',
+        help_text='Current connection status'
+    )
+    expected_heartbeat_interval = models.IntegerField(
+        default=60,
+        help_text='Expected heartbeat interval in seconds'
+    )
+    last_status_change = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When status last changed'
+    )
+    last_offline_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When device went offline'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -635,5 +728,87 @@ class Sensor(models.Model):
             })
 
         return readings
+
+
+class MqttApiVersionUsage(models.Model):
+    """
+    Tracking dell'utilizzo delle versioni MQTT API per analytics
+    """
+    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE, related_name='mqtt_version_usage')
+    version = models.CharField(max_length=20, help_text="MQTT API version")
+    topic_pattern = models.CharField(max_length=255, help_text="Topic pattern")
+    message_count = models.IntegerField(default=1, help_text="Number of messages received")
+    device_count = models.IntegerField(default=1, help_text="Number of unique devices")
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "MQTT API Version Usage"
+        verbose_name_plural = "MQTT API Version Usage"
+        ordering = ['-last_seen_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['version', 'topic_pattern', 'site'],
+                name='unique_version_topic_site'
+            )
+        ]
+        indexes = [
+            models.Index(fields=['version', 'site']),
+            models.Index(fields=['topic_pattern']),
+        ]
+
+    def __str__(self):
+        return f"{self.version} on {self.topic_pattern} ({self.site.name})"
+
+
+class MqttDowntimeEvent(models.Model):
+    """
+    Eventi di downtime dei dispositivi MQTT per SLA monitoring
+    """
+    DEVICE_TYPE_CHOICES = [
+        ('gateway', 'Gateway'),
+        ('datalogger', 'Datalogger'),
+        ('sensor', 'Sensor'),
+    ]
+
+    site = models.ForeignKey(
+        'sites.Site',
+        on_delete=models.CASCADE,
+        related_name='mqtt_downtime_events',
+        null=True, blank=True
+    )
+    device_id = models.CharField(max_length=255, help_text="Device serial number")
+    device_type = models.CharField(max_length=50, choices=DEVICE_TYPE_CHOICES, help_text="Type of device")
+    offline_at = models.DateTimeField(help_text="When device went offline")
+    online_at = models.DateTimeField(null=True, blank=True, help_text="When device came back online")
+    downtime_seconds = models.IntegerField(null=True, blank=True, help_text="Total downtime in seconds")
+    expected_interval_seconds = models.IntegerField(help_text="Expected heartbeat interval")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "MQTT Downtime Event"
+        verbose_name_plural = "MQTT Downtime Events"
+        ordering = ['-offline_at']
+        indexes = [
+            models.Index(fields=['device_id', 'device_type']),
+            models.Index(fields=['site']),
+            models.Index(fields=['offline_at', 'online_at']),
+        ]
+
+    def __str__(self):
+        status = "ongoing" if not self.online_at else f"{self.downtime_seconds}s"
+        return f"{self.device_type} {self.device_id} downtime ({status})"
+
+    @property
+    def is_ongoing(self):
+        """True se il downtime è ancora in corso"""
+        return self.online_at is None
+
+    @property
+    def duration_minutes(self):
+        """Durata downtime in minuti"""
+        if self.downtime_seconds:
+            return self.downtime_seconds / 60
+        return None
 
 

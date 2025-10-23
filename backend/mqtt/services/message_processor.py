@@ -9,6 +9,8 @@ from django.utils import timezone
 from django.db import transaction
 
 from ..models import MqttConnection, DiscoveredTopic, Gateway, Datalogger, Sensor
+from .mqtt_versioning import versioned_processor
+from .dynamic_offline_monitor import dynamic_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +22,12 @@ class MqttMessageProcessor:
     """
 
     def __init__(self):
-        # Configurazione timeout per considerare dispositivi offline
+        # Configurazione timeout per considerare dispositivi offline (legacy)
         self.DATALOGGER_TIMEOUT_SECONDS = 15  # 3x heartbeat interval (5 sec)
         self.SENSOR_TIMEOUT_SECONDS = 15      # Stesso timeout per sensori
+
+        # Avvia il dynamic monitoring
+        dynamic_monitor.start_monitoring()
 
     def process_message(self, site_id: int, topic: str, payload: bytes, qos: int, retain: bool) -> bool:
         """
@@ -58,26 +63,98 @@ class MqttMessageProcessor:
             if payload_data is None or 'error' in payload_data:
                 return True  # Discovery completato, ma nessun processing
 
-            # Identifica tipo di messaggio dal topic usando la nuova struttura
-            topic_info = self._parse_topic_structure(topic)
+            # NUOVO: Use versioned processor per gestire processing
+            processed = versioned_processor.process_message(topic, payload_data, site_id)
 
-            processed = False
-            if topic_info['type'] == 'gateway_heartbeat':
-                processed = self._process_new_gateway_heartbeat(site_id, topic, payload_data, topic_info)
-                if processed:
-                    self._mark_topic_as_processed(site_id, topic, 'gateway_heartbeat')
-            elif topic_info['type'] == 'datalogger_heartbeat':
-                processed = self._process_new_datalogger_heartbeat(site_id, topic, payload_data, topic_info)
-                if processed:
-                    self._mark_topic_as_processed(site_id, topic, 'datalogger_heartbeat')
-            else:
-                logger.debug(f"Topic discovered but no processor implemented: {topic} (type: {topic_info['type']})")
+            if processed:
+                # Mark topic as processed
+                topic_info = self._parse_topic_structure(topic)
+                if topic_info['type'] in ['gateway_heartbeat', 'datalogger_heartbeat']:
+                    self._mark_topic_as_processed(site_id, topic, topic_info['type'])
 
             return True  # Il discovery è sempre un successo
 
         except Exception as e:
             logger.error(f"Error processing MQTT message for site {site_id}, topic {topic}: {e}")
             return False
+
+    def _process_versioned_message(self, site_id: int, topic: str, payload_data: dict, version_info: dict) -> bool:
+        """
+        Process message con version awareness e dynamic monitoring integration
+        Chiamato dal versioned_processor
+        """
+        try:
+            # Estrai informazioni versioning
+            api_version = version_info.get('mqtt_api_version', 'v1.0.0')
+            message_interval = version_info.get('message_interval_seconds', 60)
+            timestamp_str = version_info.get('timestamp')
+
+            # Parse timestamp
+            timestamp = self._parse_mqtt_timestamp(timestamp_str) if timestamp_str else timezone.now()
+
+            # Identifica tipo di messaggio dal topic
+            topic_info = self._parse_topic_structure(topic)
+
+            processed = False
+            device_id = None
+            device_type = None
+
+            if topic_info['type'] == 'gateway_heartbeat':
+                processed = self._process_new_gateway_heartbeat(site_id, topic, payload_data, topic_info)
+                device_id = payload_data.get('system', {}).get('serial_number')
+                device_type = 'gateway'
+
+            elif topic_info['type'] == 'datalogger_heartbeat':
+                processed = self._process_new_datalogger_heartbeat(site_id, topic, payload_data, topic_info)
+                device_id = payload_data.get('serial_number')
+                device_type = 'datalogger'
+
+            # NUOVO: Registra nel dynamic monitoring se processato con successo
+            if processed and device_id and device_type:
+                dynamic_monitor.register_device_heartbeat(
+                    device_id=device_id,
+                    device_type=device_type,
+                    interval_seconds=message_interval,
+                    timestamp=timestamp,
+                    site_id=site_id
+                )
+
+                # Update API version nel database
+                self._update_device_api_version(device_id, device_type, api_version)
+
+                logger.debug(f"Registered {device_type} {device_id} for dynamic monitoring - interval: {message_interval}s")
+
+            return processed
+
+        except Exception as e:
+            logger.error(f"Error in versioned message processing: {e}")
+            return False
+
+    def _parse_mqtt_timestamp(self, timestamp_str: str) -> datetime:
+        """Parse MQTT timestamp in ISO format"""
+        try:
+            # Parse ISO format: "2025-10-23T08:54:47.534661Z"
+            if timestamp_str.endswith('Z'):
+                timestamp_str = timestamp_str[:-1] + '+00:00'
+            from datetime import timezone as dt_timezone
+            return datetime.fromisoformat(timestamp_str).replace(tzinfo=dt_timezone.utc)
+        except Exception as e:
+            logger.warning(f"Error parsing timestamp {timestamp_str}: {e}")
+            return timezone.now()
+
+    def _update_device_api_version(self, device_id: str, device_type: str, api_version: str):
+        """Aggiorna versione API nel database per il device"""
+        try:
+            with transaction.atomic():
+                if device_type == 'gateway':
+                    Gateway.objects.filter(serial_number=device_id).update(mqtt_api_version=api_version)
+                elif device_type == 'datalogger':
+                    Datalogger.objects.filter(serial_number=device_id).update(mqtt_api_version=api_version)
+                elif device_type == 'sensor':
+                    Sensor.objects.filter(serial_number=device_id).update(mqtt_api_version=api_version)
+
+        except Exception as e:
+            logger.error(f"Error updating API version for {device_type} {device_id}: {e}")
 
     def _is_datalogger_heartbeat(self, topic: str, data: Dict[str, Any]) -> bool:
         """
@@ -578,8 +655,8 @@ class MqttMessageProcessor:
                     logger.error(f"Site {site_id} not found for gateway heartbeat")
                     return False
 
-                # Crea o aggiorna Gateway usando serial_number come chiave
-                gateway_serial = system_data.get('serial_number') or f"gw_{prefix}"
+                # Usa serial_number dal payload se presente, altrimenti derivalo dal topic
+                gateway_serial = system_data.get('serial_number') or f"{prefix}-gateway_1"
                 gateway, created = Gateway.objects.get_or_create(
                     serial_number=gateway_serial,
                     defaults={
@@ -896,10 +973,10 @@ class MqttMessageProcessor:
                 logger.warning(f"Invalid system data in gateway heartbeat: {system_data}")
                 return False
 
-            # Genera serial_number basato sulla nuova struttura
+            # Usa serial_number dal payload se presente, altrimenti derivalo dal topic
             serial_number = system_data.get('serial_number')
             if not serial_number:
-                serial_number = f"{topic_info['site_code']}_gateway_{topic_info['gateway_number']}"
+                serial_number = f"{topic_info['site_code']}-gateway_{topic_info['gateway_number']}"
 
             logger.info(f"Processing gateway heartbeat: site_id={site_id}, gateway={serial_number}")
 
