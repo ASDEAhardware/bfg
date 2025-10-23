@@ -281,8 +281,6 @@ class MqttMessageProcessor:
                         'device_id': datalogger_id.replace('datalogger_', ''),
                         'is_online': True,
                         'last_seen_at': timezone.now(),
-                        'last_heartbeat': timezone.now(),
-                        'last_communication': timezone.now(),
                         'raw_metadata': data,
                         'total_heartbeats': 1,
                         'missed_heartbeats': 0,
@@ -294,8 +292,6 @@ class MqttMessageProcessor:
                     # Aggiorna datalogger esistente
                     datalogger.is_online = True
                     datalogger.last_seen_at = timezone.now()
-                    datalogger.last_heartbeat = timezone.now()
-                    datalogger.last_communication = timezone.now()
                     datalogger.raw_metadata = data
                     datalogger.total_heartbeats += 1
 
@@ -495,14 +491,15 @@ class MqttMessageProcessor:
     def _update_datalogger_last_seen(self, datalogger: Datalogger):
         """
         Aggiorna timestamp ultima comunicazione del datalogger.
+        NOTA: Il dynamic monitoring ora gestisce automaticamente gli stati,
+        questo metodo mantiene compatibilità per il tracking base.
 
         Args:
             datalogger: Istanza datalogger
         """
         try:
             datalogger.last_seen_at = timezone.now()
-            datalogger.last_communication = timezone.now()
-            datalogger.save(update_fields=['last_seen_at', 'last_communication'])
+            datalogger.save(update_fields=['last_seen_at'])
         except Exception as e:
             logger.error(f"Error updating datalogger last_seen for {datalogger.serial_number}: {e}")
 
@@ -667,8 +664,6 @@ class MqttMessageProcessor:
                         'firmware_version': system_data.get('firmware_version', ''),
                         'os_version': system_data.get('os_version', ''),
                         'is_online': True,
-                        'last_heartbeat': timestamp,
-                        'last_communication': timestamp,
                         'system_uptime': system_data.get('system_uptime', ''),
                         'cpu_load_percent': system_data.get('cpu_load_percent'),
                         'ram_total_gb': system_data.get('ram_total_gb'),
@@ -686,8 +681,6 @@ class MqttMessageProcessor:
                     # Aggiorna sempre il sito (nel caso il gateway sia migrato)
                     gateway.site = site
                     gateway.is_online = True
-                    gateway.last_heartbeat = timestamp
-                    gateway.last_communication = timestamp
 
                     # Aggiorna informazioni di sistema
                     gateway.hostname = system_data.get('hostname', gateway.hostname)
@@ -762,13 +755,11 @@ class MqttMessageProcessor:
                         'firmware_version': dl_data.get('firmware_version', ''),
                         'ip_address': dl_data.get('ip_address'),
                         'is_active': dl_data.get('is_active', True),
-                        'last_communication': timestamp,
                     }
                 )
 
                 if not created:
                     # Aggiorna datalogger esistente
-                    datalogger.last_communication = timestamp
                     datalogger.is_active = dl_data.get('is_active', datalogger.is_active)
                     if 'ip_address' in dl_data:
                         datalogger.ip_address = dl_data['ip_address']
@@ -992,8 +983,6 @@ class MqttMessageProcessor:
                         'firmware_version': system_data.get('firmware_version', ''),
                         'os_version': system_data.get('os_version', ''),
                         'is_online': True,
-                        'last_heartbeat': timestamp,
-                        'last_communication': timestamp,
                         'system_uptime': system_data.get('system_uptime', ''),
                         'cpu_load_percent': system_data.get('cpu_load_percent'),
                         'ram_total_gb': system_data.get('ram_total_gb'),
@@ -1011,8 +1000,6 @@ class MqttMessageProcessor:
                     # Aggiorna sempre il sito (nel caso il gateway sia migrato)
                     gateway.site = site
                     gateway.is_online = True
-                    gateway.last_heartbeat = timestamp
-                    gateway.last_communication = timestamp
 
                     # Aggiorna informazioni di sistema
                     gateway.hostname = system_data.get('hostname', gateway.hostname)
@@ -1081,8 +1068,9 @@ class MqttMessageProcessor:
                     serial_number=gateway_serial_number,
                     label=f"Gateway {topic_info['gateway_number']}",
                     is_online=True,
-                    last_heartbeat=timezone.now(),
-                    last_communication=timezone.now()
+                    connection_status='online',
+                    mqtt_api_version=version_info.get('mqtt_api_version', '1.0.0'),
+                    expected_heartbeat_interval=version_info.get('message_interval_seconds', 60)
                 )
 
             # Genera serial_number datalogger basato sulla nuova struttura
@@ -1101,12 +1089,9 @@ class MqttMessageProcessor:
                         'gateway': gateway,  # ASSOCIA AL GATEWAY
                         'label': datalogger_serial,  # Default label = serial_number
                         'datalogger_type': topic_info['datalogger_type'],
-                        'instance_number': int(topic_info['datalogger_number']),
                         'device_id': topic_info['datalogger_number'],
                         'is_online': True,
                         'last_seen_at': timestamp,
-                        'last_heartbeat': timestamp,
-                        'last_communication': timestamp,
                         'firmware_version': data.get('firmware_version', ''),
                         'ip_address': data.get('ip_address'),
                         'total_heartbeats': 1,
@@ -1128,8 +1113,6 @@ class MqttMessageProcessor:
                     datalogger.gateway = gateway
                     datalogger.is_online = True
                     datalogger.last_seen_at = timestamp
-                    datalogger.last_heartbeat = timestamp
-                    datalogger.last_communication = timestamp
                     datalogger.total_heartbeats += 1
 
                     # Aggiorna informazioni opzionali

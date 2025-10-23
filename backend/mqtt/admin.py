@@ -150,17 +150,17 @@ class MqttTopicAdmin(admin.ModelAdmin):
 @admin.register(Gateway)
 class GatewayAdmin(admin.ModelAdmin):
     """Admin per Gateway (ex SystemInfo)"""
-    list_display = ['label', 'site', 'serial_number', 'hostname', 'is_online', 'cpu_load_percent', 'ram_percent_used', 'disk_percent_used', 'uptime_display', 'last_heartbeat']
-    list_filter = ['is_online', 'site', 'last_heartbeat', 'created_at']
+    list_display = ['label', 'site', 'serial_number', 'hostname', 'is_online', 'connection_status', 'cpu_load_percent', 'ram_percent_used', 'disk_percent_used', 'uptime_display']
+    list_filter = ['is_online', 'connection_status', 'site', 'created_at']
     search_fields = ['label', 'serial_number', 'site__name', 'hostname', 'ip_address']
-    readonly_fields = ['last_heartbeat', 'last_communication', 'created_at', 'updated_at', 'uptime_display']
+    readonly_fields = ['serial_number', 'last_status_change', 'mqtt_api_version', 'created_at', 'updated_at', 'uptime_display']
 
     fieldsets = (
         ('Gateway Information', {
-            'fields': ('site', 'serial_number', 'label', 'hostname', 'ip_address', 'firmware_version', 'os_version')
+            'fields': ('site', 'serial_number', 'label', 'hostname', 'ip_address', 'firmware_version', 'os_version', 'mqtt_api_version')
         }),
-        ('Status', {
-            'fields': ('is_online', 'last_heartbeat', 'last_communication', 'system_uptime', 'uptime_display'),
+        ('Status & Monitoring', {
+            'fields': ('is_online', 'connection_status', 'last_status_change', 'expected_heartbeat_interval', 'system_uptime', 'uptime_display'),
             'classes': ('wide',)
         }),
         ('CPU Metrics', {
@@ -224,18 +224,18 @@ class SensorInline(admin.TabularInline):
 @admin.register(Datalogger)
 class DataloggerAdmin(admin.ModelAdmin):
     """Admin per Datalogger auto-discovered"""
-    list_display = ['label', 'site', 'datalogger_type', 'instance_number', 'serial_number', 'is_online', 'sensors_count', 'uptime_percentage', 'last_heartbeat']
-    list_filter = ['is_online', 'datalogger_type', 'site', 'last_heartbeat', 'created_at']
-    search_fields = ['label', 'serial_number', 'site__name', 'datalogger_type']
-    readonly_fields = ['serial_number', 'datalogger_type', 'instance_number', 'last_heartbeat', 'last_communication', 'total_heartbeats', 'missed_heartbeats', 'created_at', 'updated_at']
+    list_display = ['label', 'site', 'datalogger_type', 'device_id', 'serial_number', 'is_online', 'connection_status', 'sensors_count', 'uptime_percentage', 'last_seen_at']
+    list_filter = ['is_online', 'connection_status', 'datalogger_type', 'site', 'last_seen_at', 'created_at']
+    search_fields = ['label', 'serial_number', 'site__name', 'datalogger_type', 'device_id']
+    readonly_fields = ['serial_number', 'datalogger_type', 'device_id', 'last_seen_at', 'last_status_change', 'total_heartbeats', 'missed_heartbeats', 'mqtt_api_version', 'created_at', 'updated_at']
     inlines = [SensorInline]
 
     fieldsets = (
         ('Datalogger Information', {
-            'fields': ('site', 'serial_number', 'label', 'datalogger_type', 'instance_number')
+            'fields': ('site', 'serial_number', 'label', 'datalogger_type', 'device_id', 'mqtt_api_version')
         }),
-        ('Connection', {
-            'fields': ('is_online', 'last_heartbeat', 'last_communication', 'firmware_version', 'ip_address'),
+        ('Connection & Monitoring', {
+            'fields': ('is_online', 'connection_status', 'last_seen_at', 'last_status_change', 'expected_heartbeat_interval', 'firmware_version', 'ip_address'),
             'classes': ('wide',)
         }),
         ('Statistics', {

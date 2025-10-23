@@ -74,15 +74,15 @@ class DataloggerSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'site_id', 'site_name', 'serial_number', 'label',
             'datalogger_type', 'device_id', 'is_online', 'last_seen_at',
-            'last_heartbeat', 'last_communication', 'firmware_version',
-            'ip_address', 'total_heartbeats', 'missed_heartbeats',
+            'connection_status', 'mqtt_api_version', 'expected_heartbeat_interval',
+            'firmware_version', 'ip_address', 'total_heartbeats', 'missed_heartbeats',
             'uptime_percentage', 'sensors_count', 'active_sensors_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'site_id', 'last_seen_at', 'last_heartbeat', 'last_communication',
-            'total_heartbeats', 'missed_heartbeats', 'uptime_percentage',
-            'created_at', 'updated_at'
+            'id', 'site_id', 'last_seen_at', 'connection_status', 'mqtt_api_version',
+            'expected_heartbeat_interval', 'total_heartbeats', 'missed_heartbeats',
+            'uptime_percentage', 'created_at', 'updated_at'
         ]
 
     def get_sensors_count(self, obj):

@@ -248,8 +248,6 @@ class Gateway(models.Model):
 
     # Status tracking
     is_online = models.BooleanField(default=False)
-    last_heartbeat = models.DateTimeField(null=True, blank=True)
-    last_communication = models.DateTimeField(null=True, blank=True)
 
     # System uptime (come stringa dal payload)
     system_uptime = models.CharField(max_length=100, blank=True, help_text="Uptime formato stringa (es: '14 days, 3:24:30')")
@@ -400,13 +398,10 @@ class Datalogger(models.Model):
     # Auto-discovery info dal topic ENHANCED (Fase 3)
     datalogger_type = models.CharField(max_length=50, blank=True, help_text="monstro, adaq, etc. - dal topic")
     device_id = models.CharField(max_length=50, blank=True, help_text="Device ID dal topic (1, 2, 3...)")
-    instance_number = models.PositiveIntegerField(blank=True, null=True, help_text="LEGACY: Numero istanza dal topic (1, 2, 3...)")
 
     # Status e comunicazione ENHANCED (Fase 3)
     is_online = models.BooleanField(default=False)
     last_seen_at = models.DateTimeField(null=True, blank=True, help_text="Ultimo heartbeat ricevuto (ENHANCED)")
-    last_heartbeat = models.DateTimeField(null=True, blank=True, help_text="LEGACY: compatibilità")
-    last_communication = models.DateTimeField(null=True, blank=True, help_text="LEGACY: compatibilità")
 
     # Metadata dal payload
     firmware_version = models.CharField(max_length=50, blank=True)
@@ -465,22 +460,19 @@ class Datalogger(models.Model):
     class Meta:
         unique_together = ('site', 'serial_number')
         indexes = [
-            models.Index(fields=['site', 'datalogger_type', 'instance_number']),
+            models.Index(fields=['site', 'datalogger_type', 'device_id']),
             models.Index(fields=['serial_number']),
             models.Index(fields=['is_online']),
-            models.Index(fields=['last_heartbeat']),
+            models.Index(fields=['last_seen_at']),
         ]
         verbose_name = "Datalogger"
         verbose_name_plural = "Dataloggers"
-        ordering = ['site__name', 'datalogger_type', 'instance_number']
+        ordering = ['site__name', 'datalogger_type', 'device_id']
 
     def __str__(self):
         # Enhanced __str__ method per nuova logica
         if self.datalogger_type and self.device_id:
             return f"{self.datalogger_type}/{self.device_id} ({self.serial_number})"
-        elif self.datalogger_type and self.instance_number:
-            # Fallback per legacy data
-            return f"{self.datalogger_type}/{self.instance_number} ({self.serial_number})"
         else:
             return self.serial_number
 
