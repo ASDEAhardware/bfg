@@ -34,7 +34,10 @@ export function PluginRouteRenderer() {
           if (route.exact !== false) {
             return route.path === pathname
           } else {
-            return pathname.startsWith(route.path)
+            // Support dynamic routes like /datalogger/[id]
+            const routePattern = route.path.replace(/\[([^\]]+)\]/g, '([^/]+)')
+            const routeRegex = new RegExp(`^${routePattern}$`)
+            return routeRegex.test(pathname)
           }
         })
 

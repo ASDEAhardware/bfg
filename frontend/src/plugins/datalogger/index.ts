@@ -12,7 +12,7 @@ export const dataloggerPlugin: Plugin = {
   routes: [
     {
       path: '/datalogger',
-      component: () => import('./DataLoggerPage'),
+      component: () => import('./DataLoggerListPage'),
       title: 'Datalogger'
     }
   ],

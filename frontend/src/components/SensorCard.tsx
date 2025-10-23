@@ -3,7 +3,7 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineLabelEditor } from "@/components/InlineLabelEditor";
-import { SensorDataDisplay } from "@/components/SensorDataDisplay";
+import { TrendChart } from "@/components/TrendChart";
 import {
   Activity,
   Thermometer,
@@ -14,8 +14,7 @@ import {
   Vibrate,
   RotateCcw,
   Droplets,
-  BarChart3,
-  Circle
+  BarChart3
 } from "lucide-react";
 
 interface SensorCardProps {
@@ -47,6 +46,7 @@ interface SensorCardProps {
   };
   onLabelUpdate?: (sensor: SensorCardProps['sensor'], newLabel: string) => void;
   showEnhanced?: boolean;
+  chartOpacity?: number;
 }
 
 const sensorTypeConfig = {
@@ -63,7 +63,7 @@ const sensorTypeConfig = {
   other: { icon: Activity, color: "text-gray-500", bgColor: "bg-gray-500/10" }
 };
 
-export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false }: SensorCardProps) {
+export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartOpacity = 25 }: SensorCardProps) {
   const typeConfig = sensorTypeConfig[sensor.sensor_type as keyof typeof sensorTypeConfig] || sensorTypeConfig.other;
 
   // Handle both old and new sensor data formats
@@ -99,10 +99,105 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false }: Sens
 
   const hasValue = sensor.current_value !== undefined && sensor.current_value !== null;
 
+  // Extract trend data from latest readings for chart
+  const getTrendData = () => {
+    if (!sensor.latest_readings || sensor.latest_readings.length === 0) {
+      return [];
+    }
+
+    if (sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g') {
+      // For accelerometers, return separate X, Y, Z arrays
+      const readings = sensor.latest_readings.slice(0, 3).reverse(); // Last 3 readings
+
+      const xData = readings.map(r => (r.data.acc00 || 0) * 1000);
+      const yData = readings.map(r => (r.data.acc01 || 0) * 1000);
+      const zData = readings.map(r => (r.data.acc02 || 0) * 1000);
+
+      // Add current values if available
+      if (sensor.latest_readings?.[0]?.data) {
+        const current = sensor.latest_readings[0].data;
+        xData.push((current.acc00 || 0) * 1000);
+        yData.push((current.acc01 || 0) * 1000);
+        zData.push((current.acc02 || 0) * 1000);
+      }
+
+      return { x: xData, y: yData, z: zData };
+    }
+
+    // For other sensors, use magnitude/main value
+    const historicalData = sensor.latest_readings
+      .slice(0, 4) // Get last 4 readings
+      .reverse() // Show chronologically (oldest to newest)
+      .map(reading => {
+        return reading.data?.incli_x || reading.data?.value || 0;
+      });
+
+    // Add current value as the latest point
+    if (hasValue && sensor.current_value !== undefined) {
+      historicalData.push(sensor.current_value);
+    }
+
+    return historicalData;
+  };
+
+  const trendData = getTrendData();
+
   // Layout unificato - sempre la stessa struttura base, con dettagli extra se showEnhanced=true
   return (
-    <Card className="card-standard h-full">
-      <CardContent className="card-content-standard flex flex-col h-full">
+    <Card className="card-standard h-full relative overflow-hidden">
+      {/* Trend Chart Background - always visible, full card */}
+      {((Array.isArray(trendData) && trendData.length >= 2) ||
+        (typeof trendData === 'object' && trendData.x && trendData.x.length >= 2)) && (
+        <div className="absolute inset-0" style={{ opacity: chartOpacity / 100 }}>
+          {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' && typeof trendData === 'object' ? (
+            /* Three stacked mini-charts for X, Y, Z */
+            <div className="w-full h-full flex flex-col">
+              <div className="flex-1 relative">
+                <TrendChart
+                  data={trendData.x}
+                  width={200}
+                  height={60}
+                  color="currentColor"
+                  strokeWidth={1.5}
+                  className={`w-full h-full text-red-500`}
+                />
+              </div>
+              <div className="flex-1 relative">
+                <TrendChart
+                  data={trendData.y}
+                  width={200}
+                  height={60}
+                  color="currentColor"
+                  strokeWidth={1.5}
+                  className={`w-full h-full text-green-500`}
+                />
+              </div>
+              <div className="flex-1 relative">
+                <TrendChart
+                  data={trendData.z}
+                  width={200}
+                  height={60}
+                  color="currentColor"
+                  strokeWidth={1.5}
+                  className={`w-full h-full text-blue-500`}
+                />
+              </div>
+            </div>
+          ) : (
+            /* Single chart for other sensors */
+            <TrendChart
+              data={Array.isArray(trendData) ? trendData : []}
+              width={200}
+              height={200}
+              color="currentColor"
+              strokeWidth={2}
+              className={`w-full h-full ${typeConfig.color}`}
+            />
+          )}
+        </div>
+      )}
+
+      <CardContent className="card-content-standard flex flex-col h-full relative z-10">
         {/* Riga 1: Icona + Titolo (sx) + Badge Status (dx) */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -136,19 +231,19 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false }: Sens
               {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' && sensor.latest_readings?.[0]?.data ? (
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div>
-                    <div className="text-sm font-mono font-bold text-foreground">
+                    <div className="text-lg font-mono font-bold text-foreground">
                       {(sensor.latest_readings[0].data.acc00 * 1000).toFixed(1)}
                     </div>
                     <div className="text-xs text-muted-foreground">X</div>
                   </div>
                   <div>
-                    <div className="text-sm font-mono font-bold text-foreground">
+                    <div className="text-lg font-mono font-bold text-foreground">
                       {(sensor.latest_readings[0].data.acc01 * 1000).toFixed(1)}
                     </div>
                     <div className="text-xs text-muted-foreground">Y</div>
                   </div>
                   <div>
-                    <div className="text-sm font-mono font-bold text-foreground">
+                    <div className="text-lg font-mono font-bold text-foreground">
                       {(sensor.latest_readings[0].data.acc02 * 1000).toFixed(1)}
                     </div>
                     <div className="text-xs text-muted-foreground">Z</div>
@@ -173,14 +268,14 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false }: Sens
                   )}
                 </div>
               )}
-            </>
-          ) : (
-            <div className="text-center py-2">
-              <div className="text-sm text-muted-foreground">
-                {isOnline ? "In attesa dati..." : "Offline"}
+              </>
+            ) : (
+              <div className="text-center py-2">
+                <div className="text-sm text-muted-foreground">
+                  {isOnline ? "In attesa dati..." : "Offline"}
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
 
         {/* Riga 3: Dettagli base (sempre presenti) */}
