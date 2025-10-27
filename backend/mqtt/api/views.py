@@ -12,6 +12,9 @@ from django.contrib.auth.decorators import user_passes_test
 
 from ..services.mqtt_manager import mqtt_manager
 from ..models import MqttConnection, Datalogger, Sensor, DiscoveredTopic
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+import json
 from .serializers import (
     MqttConnectionStatusSerializer,
     MqttControlResponseSerializer,
@@ -370,6 +373,205 @@ def force_discovery(request, site_id):
         )
     except Exception as e:
         logger.error(f"Error in force_discovery API for site {site_id}: {e}")
+        return Response(
+            {'success': False, 'message': f'Internal error: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ============================================================================
+# DATALOGGER CONTROL APIs - per comandi start/stop
+# ============================================================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def publish_mqtt_message(request, site_id):
+    """
+    Pubblica un messaggio MQTT su un topic specifico.
+
+    POST /v1/mqtt/sites/{site_id}/publish/
+    Body: {
+        "topic": "site_001/gateway/1/datalogger/monstro/1/input",
+        "message": "start",
+        "qos": 1
+    }
+    """
+    try:
+        site_id = int(site_id)
+
+        # Validazione input
+        topic = request.data.get('topic')
+        message = request.data.get('message')
+        qos = request.data.get('qos', 0)
+
+        if not topic or not message:
+            return Response(
+                {'success': False, 'message': 'Topic and message are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verifica che l'utente abbia accesso al sito
+        connection = MqttConnection.objects.filter(site_id=site_id).first()
+        if not connection:
+            return Response(
+                {'success': False, 'message': f'No MQTT connection found for site {site_id}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Pubblica il messaggio tramite MQTT manager
+        result = mqtt_manager.publish_message(
+            site_id=site_id,
+            topic=topic,
+            message=message,
+            qos=qos
+        )
+
+        if result.get('success'):
+            logger.info(f"MQTT message published by {request.user} to {topic}: {message}")
+            return Response({
+                'success': True,
+                'message': f'Message published to {topic}',
+                'topic': topic,
+                'message_content': message
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {'success': False, 'message': result.get('message', 'Failed to publish message')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    except ValueError:
+        return Response(
+            {'success': False, 'message': 'Invalid site_id'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.error(f"Error publishing MQTT message for site {site_id}: {e}")
+        return Response(
+            {'success': False, 'message': f'Internal error: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def subscribe_mqtt_topic(request, site_id):
+    """
+    Sottoscrivi a un topic MQTT per ricevere messaggi.
+
+    POST /v1/mqtt/sites/{site_id}/subscribe/
+    Body: {
+        "topic": "site_001/gateway/1/datalogger/monstro/1/output",
+        "callback_url": "/api/datalogger-control/123/mqtt-callback/"
+    }
+    """
+    try:
+        site_id = int(site_id)
+
+        topic = request.data.get('topic')
+        callback_url = request.data.get('callback_url')
+
+        if not topic:
+            return Response(
+                {'success': False, 'message': 'Topic is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verifica connessione MQTT
+        connection = MqttConnection.objects.filter(site_id=site_id).first()
+        if not connection:
+            return Response(
+                {'success': False, 'message': f'No MQTT connection found for site {site_id}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Sottoscrivi tramite MQTT manager
+        result = mqtt_manager.subscribe_topic(
+            site_id=site_id,
+            topic=topic,
+            callback_url=callback_url
+        )
+
+        if result.get('success'):
+            logger.info(f"MQTT subscription created by {request.user} for topic {topic}")
+            return Response({
+                'success': True,
+                'message': f'Subscribed to {topic}',
+                'topic': topic
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {'success': False, 'message': result.get('message', 'Failed to subscribe')},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    except ValueError:
+        return Response(
+            {'success': False, 'message': 'Invalid site_id'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.error(f"Error subscribing to MQTT topic for site {site_id}: {e}")
+        return Response(
+            {'success': False, 'message': f'Internal error: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@csrf_exempt
+def datalogger_mqtt_callback(request, datalogger_id):
+    """
+    Callback per ricevere messaggi MQTT dai topic di output dei datalogger.
+
+    POST /api/datalogger-control/{datalogger_id}/mqtt-callback/
+    Body: {
+        "topic": "site_001/gateway/1/datalogger/monstro/1/output",
+        "message": {"status": "running", "session_id": "..."}
+    }
+    """
+    try:
+        datalogger_id = int(datalogger_id)
+
+        topic = request.data.get('topic')
+        message = request.data.get('message')
+
+        if not message:
+            return Response(
+                {'success': False, 'message': 'Message is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verifica che il datalogger esista
+        datalogger = Datalogger.objects.filter(id=datalogger_id).first()
+        if not datalogger:
+            return Response(
+                {'success': False, 'message': f'Datalogger {datalogger_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Processa il messaggio per aggiornare lo stato del datalogger
+        # Questo dovrebbe essere gestito dal frontend tramite WebSocket o polling
+        # Per ora registriamo solo il messaggio
+        logger.info(f"MQTT callback for datalogger {datalogger_id}: {message}")
+
+        # TODO: Implementare notifica real-time al frontend
+        # Opzioni: WebSocket, Server-Sent Events, o polling dal frontend
+
+        return Response({
+            'success': True,
+            'message': 'Callback processed',
+            'datalogger_id': datalogger_id
+        }, status=status.HTTP_200_OK)
+
+    except ValueError:
+        return Response(
+            {'success': False, 'message': 'Invalid datalogger_id'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.error(f"Error in datalogger MQTT callback {datalogger_id}: {e}")
         return Response(
             {'success': False, 'message': f'Internal error: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

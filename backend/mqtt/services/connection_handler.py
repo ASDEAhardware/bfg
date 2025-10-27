@@ -381,3 +381,48 @@ class MqttConnectionHandler:
 
         except Exception as e:
             logger.error(f"Error updating connection status {self.mqtt_connection_id}: {e}")
+
+    def publish_message(self, topic: str, message: str, qos: int = 0) -> Dict[str, Any]:
+        """
+        Pubblica un messaggio su un topic MQTT.
+
+        Args:
+            topic: Topic MQTT su cui pubblicare
+            message: Messaggio da pubblicare
+            qos: Quality of Service (0, 1, 2)
+
+        Returns:
+            Dict con success e messaggio
+        """
+        if not self.is_connected or not self.client:
+            return {
+                'success': False,
+                'message': f'MQTT connection for site {self.mqtt_connection_id} is not connected'
+            }
+
+        try:
+            # Pubblica il messaggio
+            result = self.client.publish(topic, message, qos=qos)
+
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                logger.info(f"Message published to {topic}: {message}")
+                return {
+                    'success': True,
+                    'message': f'Message published to {topic}',
+                    'message_id': result.mid
+                }
+            else:
+                error_msg = f"Failed to publish message to {topic}: {mqtt.error_string(result.rc)}"
+                logger.error(error_msg)
+                return {
+                    'success': False,
+                    'message': error_msg
+                }
+
+        except Exception as e:
+            error_msg = f"Error publishing message to {topic}: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'message': error_msg
+            }

@@ -1,7 +1,9 @@
 """
 Django Management Command per avviare il servizio MQTT permanente
 """
+import fcntl
 import logging
+import os
 import signal
 import sys
 import time
@@ -23,6 +25,90 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+class MqttServiceLock:
+    """Gestisce il PID file per prevenire istanze multiple del servizio MQTT."""
+
+    def __init__(self, pid_file='/tmp/mqtt_service.pid'):
+        self.pid_file = pid_file
+        self.lock_file = None
+
+    def __enter__(self):
+        """Acquisisce il lock esclusivo."""
+        try:
+            # Apri il file PID in modalità write
+            self.lock_file = open(self.pid_file, 'w')
+
+            # Prova ad acquisire lock esclusivo non-bloccante
+            fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            # Scrivi il PID corrente
+            self.lock_file.write(str(os.getpid()))
+            self.lock_file.flush()
+
+            logger.info(f"MQTT service lock acquired - PID: {os.getpid()}")
+            return self
+
+        except IOError as e:
+            # Lock già acquisito da altro processo
+            if self.lock_file:
+                self.lock_file.close()
+
+            # Prova a leggere il PID del processo concorrente
+            existing_pid = self._get_existing_pid()
+            raise CommandError(
+                f"MQTT service già in esecuzione (PID: {existing_pid}). "
+                f"Usa '--stop' per fermare il servizio esistente o '--status' per verificare."
+            )
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Rilascia il lock e rimuove il file PID."""
+        if self.lock_file:
+            try:
+                # Rilascia il lock
+                fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
+                self.lock_file.close()
+
+                # Rimuovi il file PID
+                if os.path.exists(self.pid_file):
+                    os.unlink(self.pid_file)
+
+                logger.info("MQTT service lock released")
+
+            except Exception as e:
+                logger.warning(f"Error releasing MQTT service lock: {e}")
+
+    def _get_existing_pid(self):
+        """Legge il PID del processo esistente dal file."""
+        try:
+            with open(self.pid_file, 'r') as f:
+                return f.read().strip()
+        except:
+            return "unknown"
+
+    @classmethod
+    def is_service_running(cls, pid_file='/tmp/mqtt_service.pid'):
+        """Verifica se il servizio è già in esecuzione."""
+        if not os.path.exists(pid_file):
+            return False
+
+        try:
+            with open(pid_file, 'r') as f:
+                pid = int(f.read().strip())
+
+            # Verifica se il processo esiste
+            os.kill(pid, 0)  # Non invia segnale, solo verifica esistenza
+            return True
+
+        except (ValueError, OSError):
+            # PID non valido o processo non esistente
+            # Rimuovi file PID stale
+            try:
+                os.unlink(pid_file)
+            except:
+                pass
+            return False
 
 
 class Command(BaseCommand):
@@ -97,25 +183,28 @@ class Command(BaseCommand):
     def _start_service(self):
         """Avvia il servizio MQTT in modalità normale."""
         self.stdout.write(self.style.SUCCESS('Starting MQTT Service...'))
-        logger.info("=" * 50)
-        logger.info("MQTT SERVICE STARTING")
-        logger.info(f"Timestamp: {datetime.now().isoformat()}")
-        logger.info(f"Django settings: {settings.SETTINGS_MODULE}")
-        logger.info("=" * 50)
 
-        # Configura signal handlers per shutdown pulito
-        self._setup_signal_handlers()
+        # Acquisisce lock esclusivo per prevenire istanze multiple
+        with MqttServiceLock():
+            logger.info("=" * 50)
+            logger.info("MQTT SERVICE STARTING")
+            logger.info(f"Timestamp: {datetime.now().isoformat()}")
+            logger.info(f"Django settings: {settings.SETTINGS_MODULE}")
+            logger.info("=" * 50)
 
-        # Avvia manager
-        success = mqtt_manager.start()
-        if not success:
-            raise CommandError("Failed to start MQTT Manager")
+            # Configura signal handlers per shutdown pulito
+            self._setup_signal_handlers()
 
-        self.stdout.write(self.style.SUCCESS('✅ MQTT Service started successfully'))
-        logger.info("MQTT Service is now running")
+            # Avvia manager
+            success = mqtt_manager.start()
+            if not success:
+                raise CommandError("Failed to start MQTT Manager")
 
-        # Mantieni servizio attivo
-        self._keep_alive()
+            self.stdout.write(self.style.SUCCESS('✅ MQTT Service started successfully'))
+            logger.info("MQTT Service is now running")
+
+            # Mantieni servizio attivo
+            self._keep_alive()
 
     def _start_daemon(self):
         """Avvia il servizio come daemon."""
@@ -168,6 +257,18 @@ class Command(BaseCommand):
         self.stdout.write(self.style.HTTP_INFO('MQTT Service Status'))
         self.stdout.write('=' * 50)
 
+        # Verifica PID file
+        pid_running = MqttServiceLock.is_service_running()
+        if pid_running:
+            try:
+                with open('/tmp/mqtt_service.pid', 'r') as f:
+                    pid = f.read().strip()
+                self.stdout.write(f"PID File: ✅ Service locked (PID: {pid})")
+            except:
+                self.stdout.write(f"PID File: ⚠️  Lock detected but unreadable")
+        else:
+            self.stdout.write(f"PID File: ❌ No active service lock")
+
         # Stato manager
         is_running = mqtt_manager.is_running()
         status_color = self.style.SUCCESS if is_running else self.style.ERROR
@@ -175,6 +276,12 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Manager Status: {status_color(status_text)}")
         self.stdout.write(f"Timestamp: {datetime.now().isoformat()}")
+
+        # Consistency check
+        if pid_running != is_running:
+            self.stdout.write(self.style.WARNING(
+                "⚠️  WARNING: PID file and Manager status are inconsistent!"
+            ))
 
         # Exit code per healthcheck Docker
         if not is_running:

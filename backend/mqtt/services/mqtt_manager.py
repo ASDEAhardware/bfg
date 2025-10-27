@@ -474,6 +474,70 @@ class MqttManager:
         except Exception as e:
             logger.error(f"Error checking failed connections: {e}")
 
+    def publish_message(self, site_id: int, topic: str, message: str, qos: int = 0) -> Dict[str, Any]:
+        """
+        Pubblica un messaggio MQTT su un topic specifico per un sito.
+
+        Args:
+            site_id: ID del sito
+            topic: Topic MQTT su cui pubblicare
+            message: Messaggio da pubblicare
+            qos: Quality of Service (0, 1, 2)
+
+        Returns:
+            Dict con success e messaggio
+        """
+        with self._connections_lock:
+            handler = self._connections.get(site_id)
+
+            if not handler:
+                return {
+                    'success': False,
+                    'message': f'No MQTT connection found for site {site_id}'
+                }
+
+            if not handler.is_connected:
+                return {
+                    'success': False,
+                    'message': f'MQTT connection for site {site_id} is not connected'
+                }
+
+            return handler.publish_message(topic, message, qos)
+
+    def subscribe_topic(self, site_id: int, topic: str, callback_url: str = None) -> Dict[str, Any]:
+        """
+        Sottoscrivi a un topic MQTT per un sito specifico.
+
+        Args:
+            site_id: ID del sito
+            topic: Topic MQTT da sottoscrivere
+            callback_url: URL di callback per notifiche (opzionale)
+
+        Returns:
+            Dict con success e messaggio
+        """
+        with self._connections_lock:
+            handler = self._connections.get(site_id)
+
+            if not handler:
+                return {
+                    'success': False,
+                    'message': f'No MQTT connection found for site {site_id}'
+                }
+
+            if not handler.is_connected:
+                return {
+                    'success': False,
+                    'message': f'MQTT connection for site {site_id} is not connected'
+                }
+
+            # Per ora assumiamo che la sottoscrizione avvenga automaticamente
+            # In futuro si potrebbe implementare sottoscrizione dinamica
+            return {
+                'success': True,
+                'message': f'Subscription to {topic} will be handled automatically'
+            }
+
 
 # Singleton instance
 mqtt_manager = MqttManager()

@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from django.utils import timezone
-from django.db import transaction
+from django.db import transaction, models
 
 from ..models import MqttConnection, DiscoveredTopic, Gateway, Datalogger, Sensor
 from .mqtt_versioning import versioned_processor
@@ -717,7 +717,7 @@ class MqttMessageProcessor:
                 # Processa eventuali datalogger dal gateway heartbeat
                 dataloggers_data = data.get('dataloggers', [])
                 if isinstance(dataloggers_data, list):
-                    self._process_dataloggers_from_gateway(site, dataloggers_data, timestamp)
+                    self._process_dataloggers_from_gateway(gateway, dataloggers_data, timestamp)
 
                 action = "Created" if created else "Updated"
                 logger.info(f"{action} gateway: {gateway.label} (Site: {site.name})")
@@ -727,16 +727,18 @@ class MqttMessageProcessor:
             logger.error(f"Error processing gateway heartbeat for site {site_id}: {e}")
             return False
 
-    def _process_dataloggers_from_gateway(self, site, dataloggers_data: List[Dict], timestamp):
+    def _process_dataloggers_from_gateway(self, gateway, dataloggers_data: List[Dict], timestamp):
         """
         Processa informazioni sui datalogger dal gateway heartbeat.
 
         Args:
-            site: Oggetto Site
+            gateway: Oggetto Gateway
             dataloggers_data: Lista di dati sui datalogger
             timestamp: Timestamp del messaggio
         """
         try:
+            processed_datalogger_serials = set()
+
             for dl_data in dataloggers_data:
                 if not isinstance(dl_data, dict):
                     continue
@@ -747,7 +749,7 @@ class MqttMessageProcessor:
 
                 # Crea o aggiorna Datalogger
                 datalogger, created = Datalogger.objects.get_or_create(
-                    site=site,
+                    gateway=gateway,
                     serial_number=dl_serial,
                     defaults={
                         'label': dl_data.get('label', dl_serial),
@@ -755,11 +757,13 @@ class MqttMessageProcessor:
                         'firmware_version': dl_data.get('firmware_version', ''),
                         'ip_address': dl_data.get('ip_address'),
                         'is_active': dl_data.get('is_active', True),
+                        'is_online': True,
                     }
                 )
 
                 if not created:
                     # Aggiorna datalogger esistente
+                    datalogger.is_online = True
                     datalogger.is_active = dl_data.get('is_active', datalogger.is_active)
                     if 'ip_address' in dl_data:
                         datalogger.ip_address = dl_data['ip_address']
@@ -767,8 +771,12 @@ class MqttMessageProcessor:
                         datalogger.firmware_version = dl_data['firmware_version']
                     datalogger.save()
 
+                processed_datalogger_serials.add(dl_serial)
                 action = "Created" if created else "Updated"
                 logger.debug(f"{action} datalogger from gateway: {datalogger.label}")
+
+            # Mark dataloggers not present in gateway message as offline
+            self._mark_missing_dataloggers_offline(gateway, processed_datalogger_serials)
 
         except Exception as e:
             logger.error(f"Error processing dataloggers from gateway: {e}")
@@ -1135,17 +1143,24 @@ class MqttMessageProcessor:
 
                 # Processa dati sensori se presenti (formato reale: sensors_last_data)
                 sensors_data = data.get('sensors_last_data', []) or data.get('sensors', [])
+                processed_sensor_serials = set()
+
                 if sensors_data and isinstance(sensors_data, list):
                     logger.info(f"Processing {len(sensors_data)} sensors for datalogger {datalogger.serial_number}")
                     for sensor_data in sensors_data:
                         if isinstance(sensor_data, dict):
                             success = self._process_sensor_data(datalogger, sensor_data)
                             if success:
-                                logger.debug(f"Processed sensor {sensor_data.get('serial_number', 'unknown')}")
+                                sensor_serial = sensor_data.get('serial_number', 'unknown')
+                                processed_sensor_serials.add(sensor_serial)
+                                logger.debug(f"Processed sensor {sensor_serial}")
                             else:
                                 logger.warning(f"Failed to process sensor {sensor_data.get('serial_number', 'unknown')}")
                 else:
                     logger.debug(f"No sensor data found in datalogger heartbeat")
+
+                # Mark sensors not present in MQTT message as offline
+                self._mark_missing_sensors_offline(datalogger, processed_sensor_serials)
 
                 action = "Created" if created else "Updated"
                 logger.info(f"{action} datalogger: {datalogger.label} (Gateway: {gateway.label}, Site: {site.name})")
@@ -1154,6 +1169,81 @@ class MqttMessageProcessor:
         except Exception as e:
             logger.error(f"Error processing new datalogger heartbeat for site {site_id}: {e}")
             return False
+
+    def _mark_missing_sensors_offline(self, datalogger: Datalogger, processed_sensor_serials: set):
+        """
+        Marca come offline tutti i sensori del datalogger che non sono presenti nel messaggio MQTT.
+
+        Args:
+            datalogger: Il datalogger che ha inviato il messaggio
+            processed_sensor_serials: Set dei serial number dei sensori presenti nel messaggio MQTT
+        """
+        try:
+            # Trova tutti i sensori di questo datalogger
+            all_sensors = Sensor.objects.filter(datalogger=datalogger)
+
+            # Identifica i sensori mancanti dal messaggio MQTT
+            missing_sensors = all_sensors.exclude(serial_number__in=processed_sensor_serials)
+
+            if missing_sensors.exists():
+                # Aggiorna tutti i sensori mancanti come offline
+                updated_count = missing_sensors.update(
+                    is_online=False,
+                    connection_status='offline',
+                    last_status_change=timezone.now(),
+                    consecutive_misses=models.F('consecutive_misses') + 1
+                )
+
+                logger.info(f"Marked {updated_count} missing sensors as offline for datalogger {datalogger.serial_number}")
+
+                # Log dettagliato dei sensori marcati offline
+                for sensor in missing_sensors:
+                    logger.debug(f"Sensor {sensor.serial_number} marked offline (missing from MQTT message)")
+            else:
+                logger.debug(f"All sensors for datalogger {datalogger.serial_number} are present in MQTT message")
+
+        except Exception as e:
+            logger.error(f"Error marking missing sensors offline for datalogger {datalogger.serial_number}: {e}")
+
+    def _mark_missing_dataloggers_offline(self, gateway: Gateway, processed_datalogger_serials: set):
+        """
+        Marca come offline tutti i datalogger del gateway che non sono presenti nel messaggio MQTT.
+
+        Args:
+            gateway: Il gateway che ha inviato il messaggio
+            processed_datalogger_serials: Set dei serial number dei datalogger presenti nel messaggio MQTT
+        """
+        try:
+            # Trova tutti i datalogger di questo gateway
+            all_dataloggers = Datalogger.objects.filter(gateway=gateway)
+
+            # Identifica i datalogger mancanti dal messaggio MQTT
+            missing_dataloggers = all_dataloggers.exclude(serial_number__in=processed_datalogger_serials)
+
+            if missing_dataloggers.exists():
+                # Aggiorna tutti i datalogger mancanti come offline
+                updated_count = missing_dataloggers.update(
+                    is_online=False,
+                    connection_status='offline',
+                    last_status_change=timezone.now(),
+                    consecutive_misses=models.F('consecutive_misses') + 1
+                )
+
+                logger.info(f"Marked {updated_count} missing dataloggers as offline for gateway {gateway.serial_number}")
+
+                # Cascade offline status to sensors of missing dataloggers
+                for datalogger in missing_dataloggers:
+                    datalogger.sensors.update(
+                        is_online=False,
+                        connection_status='datalogger_offline',
+                        last_status_change=timezone.now()
+                    )
+                    logger.debug(f"Datalogger {datalogger.serial_number} marked offline (missing from gateway message)")
+            else:
+                logger.debug(f"All dataloggers for gateway {gateway.serial_number} are present in MQTT message")
+
+        except Exception as e:
+            logger.error(f"Error marking missing dataloggers offline for gateway {gateway.serial_number}: {e}")
 
 
 # Singleton instance

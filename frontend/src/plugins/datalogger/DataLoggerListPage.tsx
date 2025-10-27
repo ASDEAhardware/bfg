@@ -31,7 +31,8 @@ import {
   Videotape,
   MoreHorizontal,
   Info,
-  X
+  X,
+  Shield
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -85,8 +86,20 @@ export default function DataLoggerListPage() {
   const { controlConnection, forceDiscovery } = useMqttControl();
   const { dataloggers, loading: dataloggerLoading, error: dataloggerError, refresh: refreshDataloggers } = useDataloggers(selectedSiteId);
 
-  // Legacy system info - will be removed when Gateway model is integrated
-  const systemInfo = null;
+  // System info from dataloggers aggregated
+  const systemInfo = dataloggers.length > 0 ? {
+    total_dataloggers: dataloggers.length,
+    online_dataloggers: dataloggers.filter(d => d.is_online).length,
+    total_sensors: dataloggers.reduce((sum, d) => sum + d.sensors_count, 0),
+    active_sensors: dataloggers.reduce((sum, d) => sum + d.active_sensors_count, 0),
+    total_heartbeats: dataloggers.reduce((sum, d) => sum + d.total_heartbeats, 0),
+    avg_uptime: dataloggers.reduce((sum, d) => sum + d.uptime_percentage, 0) / dataloggers.length,
+    firmware_versions: [...new Set(dataloggers.map(d => d.firmware_version).filter(Boolean))],
+    datalogger_types: [...new Set(dataloggers.map(d => d.datalogger_type).filter(Boolean))],
+    api_versions: [...new Set(dataloggers.map(d => d.mqtt_api_version).filter(Boolean))],
+    ip_addresses: dataloggers.map(d => d.ip_address).filter(Boolean),
+    last_updated: Math.max(...dataloggers.map(d => new Date(d.updated_at).getTime()))
+  } : null;
 
   const [startLoading, setStartLoading] = useState(false);
   const [stopLoading, setStopLoading] = useState(false);
@@ -97,7 +110,13 @@ export default function DataLoggerListPage() {
   const [showSystemInfoModal, setShowSystemInfoModal] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(5);
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(false);
+  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const skeletonTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // States for confirm dialogs
   const [showStartConfirm, setShowStartConfirm] = useState(false);
@@ -158,6 +177,51 @@ export default function DataLoggerListPage() {
       console.error('Failed to refresh dataloggers after label update:', error);
     }
   };
+
+  // Skeleton delay effect - show skeleton only after 600ms of loading
+  useEffect(() => {
+    if (dataloggerLoading && !isAutoRefreshing) {
+      // Clear any existing timeout
+      if (skeletonTimeoutRef.current) {
+        clearTimeout(skeletonTimeoutRef.current);
+      }
+
+      // Set skeleton to show after 600ms delay
+      skeletonTimeoutRef.current = setTimeout(() => {
+        setShowSkeleton(true);
+      }, 600);
+    } else {
+      // Clear timeout and hide skeleton immediately when not loading
+      if (skeletonTimeoutRef.current) {
+        clearTimeout(skeletonTimeoutRef.current);
+        skeletonTimeoutRef.current = null;
+      }
+      setShowSkeleton(false);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (skeletonTimeoutRef.current) {
+        clearTimeout(skeletonTimeoutRef.current);
+      }
+    };
+  }, [dataloggerLoading, isAutoRefreshing]);
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefreshEnabled || !selectedSiteId) return;
+
+    const interval = setInterval(async () => {
+      setIsAutoRefreshing(true);
+      try {
+        await refreshDataloggers();
+      } finally {
+        setIsAutoRefreshing(false);
+      }
+    }, autoRefreshInterval * 1000);
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, selectedSiteId, autoRefreshInterval, refreshDataloggers]);
 
   // Reset everything when site changes
   React.useEffect(() => {
@@ -305,82 +369,80 @@ export default function DataLoggerListPage() {
                     <Badge variant={status.variant} className={`text-xs h-6 flex items-center ${status.className}`}>
                       {status.text}
                     </Badge>
-                    {/* MQTT Control Buttons (superuser only) */}
+                    {/* Admin Menu (superuser only) */}
                     {userData?.is_superuser && selectedSiteId && (
-                      <div className="flex items-center gap-1">
-                        {/* Start Button */}
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => setShowStartConfirm(true)}
-                          disabled={startLoading || stopLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting'}
-                          className={`h-6 w-6 p-0 ${!(startLoading || stopLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          title={
-                            startLoading
-                              ? "Starting connection..."
-                              : stopLoading
-                                ? "Stop operation in progress..."
-                                : mqttConnection?.status === 'connected'
-                                  ? "Already connected"
-                                  : mqttConnection?.status === 'connecting'
-                                    ? "Connection in progress..."
-                                    : "Start MQTT connection"
-                          }
-                        >
-                          {startLoading ? (
-                            <RefreshCw className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Play className="h-3 w-3" />
-                          )}
-                        </Button>
-                        {/* Stop Button */}
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setShowStopConfirm(true)}
-                          disabled={startLoading || stopLoading || mqttConnection?.status !== 'connected'}
-                          className={`h-6 w-6 p-0 ${!(startLoading || stopLoading || mqttConnection?.status !== 'connected') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          title={
-                            startLoading
-                              ? "Start operation in progress..."
-                              : stopLoading
-                                ? "Stopping connection..."
-                                : mqttConnection?.status !== 'connected'
-                                  ? "Not connected"
-                                  : "Stop MQTT connection"
-                          }
-                        >
-                          {stopLoading ? (
-                            <RefreshCw className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Square className="h-3 w-3" />
-                          )}
-                        </Button>
-                        {/* Force Discovery Button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleForceDiscovery}
-                          disabled={startLoading || stopLoading || discoveryLoading || mqttConnection?.status !== 'connected'}
-                          className={`h-6 px-2 ${!(startLoading || stopLoading || discoveryLoading || mqttConnection?.status !== 'connected') ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          title={
-                            startLoading || stopLoading
-                              ? "MQTT operation in progress..."
-                              : discoveryLoading
-                                ? "Discovery in progress..."
-                                : mqttConnection?.status !== 'connected'
-                                  ? "MQTT not connected"
-                                  : "Force topic discovery refresh"
-                          }
-                        >
-                          {discoveryLoading ? (
-                            <RefreshCw className="h-3 w-3 animate-spin mr-1" />
-                          ) : (
-                            <RefreshCw className="h-3 w-3 mr-1" />
-                          )}
-                          <span className="text-xs">Discover</span>
-                        </Button>
-                      </div>
+                      <DropdownMenu open={isAdminMenuOpen} onOpenChange={setIsAdminMenuOpen}>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant={isAdminMenuOpen ? 'default' : 'outline'}
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            title="Admin Controls"
+                          >
+                            <Shield className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <div className="p-2 space-y-2">
+                            {/* Start Button */}
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => {
+                                setIsAdminMenuOpen(false);
+                                setShowStartConfirm(true);
+                              }}
+                              disabled={startLoading || stopLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting'}
+                              className="w-full justify-start gap-2"
+                            >
+                              {startLoading ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Play className="h-3 w-3" />
+                              )}
+                              <span>Start MQTT</span>
+                            </Button>
+
+                            {/* Stop Button */}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                setIsAdminMenuOpen(false);
+                                setShowStopConfirm(true);
+                              }}
+                              disabled={startLoading || stopLoading || mqttConnection?.status !== 'connected'}
+                              className="w-full justify-start gap-2"
+                            >
+                              {stopLoading ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Square className="h-3 w-3" />
+                              )}
+                              <span>Stop MQTT</span>
+                            </Button>
+
+                            {/* Force Discovery Button */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setIsAdminMenuOpen(false);
+                                handleForceDiscovery();
+                              }}
+                              disabled={startLoading || stopLoading || discoveryLoading || mqttConnection?.status !== 'connected'}
+                              className="w-full justify-start gap-2"
+                            >
+                              {discoveryLoading ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                              <span>Force Discovery</span>
+                            </Button>
+                          </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 );
@@ -414,25 +476,39 @@ export default function DataLoggerListPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* View Toggle */}
-              <div className="flex rounded-md border border-border overflow-hidden">
+              {/* Auto-refresh input or manual refresh button */}
+              {autoRefreshEnabled ? (
+                <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md border border-border">
+                  <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Auto</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={autoRefreshInterval}
+                    onChange={(e) => setAutoRefreshInterval(parseInt(e.target.value) || 5)}
+                    className="w-8 h-4 text-xs text-center px-1 border-0 bg-transparent text-foreground font-medium"
+                    title="Intervallo auto-refresh in secondi"
+                  />
+                  <span className="text-xs text-muted-foreground">s</span>
+                </div>
+              ) : (
                 <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  variant="outline"
                   size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="h-6 px-2 rounded-none border-0"
+                  onClick={refreshDataloggers}
+                  disabled={dataloggerLoading}
+                  className="h-6 px-2"
+                  title="Refresh datalogger"
                 >
-                  <Grid3X3 className="h-3 w-3" />
+                  {dataloggerLoading ? (
+                    <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                  )}
+                  <span className="text-xs">Refresh</span>
                 </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="h-6 px-2 rounded-none border-0 border-l border-border"
-                >
-                  <List className="h-3 w-3" />
-                </Button>
-              </div>
+              )}
 
               {/* System Info Button */}
               {systemInfo && (
@@ -465,8 +541,8 @@ export default function DataLoggerListPage() {
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto">
         <div className="p-4">
-          {dataloggerLoading ? (
-            // Loading skeleton
+          {showSkeleton ? (
+            // Loading skeleton - only shown after 600ms delay
             <div className="grid-responsive-cards">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="animate-pulse">
@@ -544,54 +620,65 @@ export default function DataLoggerListPage() {
       {/* Contextual Status Bar - only when not in grid mode */}
       {!isGridModeEnabled && (
         <ContextualStatusBar
-          leftItems={createCountItems(
-            dataloggers.length,
-            dataloggers.filter(d => d.is_online).length,
-            dataloggers.filter(d => !d.is_online).length
-          )}
-          rightItems={[
+          leftItems={[
+            // LEFT: Operational info (utili per l'operatore)
+            ...createCountItems(
+              dataloggers.length,
+              dataloggers.filter(d => d.is_online).length,
+              dataloggers.filter(d => !d.is_online).length
+            ),
             ...createFilterItems(filteredDataloggers.length, searchTerm),
-            // Add datalogger stats
             ...(dataloggers.length > 0 ? [
               {
-                label: 'Total Sensors',
-                value: dataloggers.reduce((sum, d) => sum + d.sensors_count, 0),
-                color: 'default' as const
+                label: 'Sensori',
+                value: `${systemInfo?.active_sensors}/${systemInfo?.total_sensors}`,
+                color: (systemInfo?.active_sensors || 0) >= (systemInfo?.total_sensors || 1) * 0.8 ? 'success' as const : 'warning' as const
               },
               {
-                label: 'Total Messages',
+                label: 'Heartbeats',
                 value: (() => {
-                  const total = dataloggers.reduce((sum, d) => sum + d.total_heartbeats, 0);
+                  const total = systemInfo?.total_heartbeats || 0;
                   if (total >= 1000000) return `${(total / 1000000).toFixed(1)}M`;
                   if (total >= 1000) return `${(total / 1000).toFixed(1)}k`;
-                  return total;
+                  return total.toString();
                 })(),
                 color: 'default' as const
               },
               {
-                label: 'Avg Uptime',
-                value: `${(dataloggers.reduce((sum, d) => sum + d.uptime_percentage, 0) / dataloggers.length).toFixed(1)}%`,
-                color: (dataloggers.reduce((sum, d) => sum + d.uptime_percentage, 0) / dataloggers.length) >= 90 ? 'success' as const : 'warning' as const
+                label: 'Uptime Medio',
+                value: `${(systemInfo?.avg_uptime || 0).toFixed(1)}%`,
+                color: (systemInfo?.avg_uptime || 0) >= 90 ? 'success' as const : 'warning' as const
               }
-            ] : []),
-            // Add system info to the right side if available
+            ] : [])
+          ]}
+          rightItems={[
+            // RIGHT: System/Technical info (metadati e info tecniche)
             ...(systemInfo ? [
               {
-                label: systemInfo.label || systemInfo.os_version || 'Gateway',
-                icon: Activity,
-                color: systemInfo.is_online ? 'success' as const : 'error' as const
+                label: 'Firmware',
+                value: systemInfo.firmware_versions.length > 0 ?
+                  systemInfo.firmware_versions.length === 1 ?
+                    systemInfo.firmware_versions[0] :
+                    `${systemInfo.firmware_versions.length} versioni` : 'N/A',
+                color: 'default' as const
               },
-              ...(systemInfo.cpu_usage_percent !== undefined && systemInfo.cpu_usage_percent !== null ? [{
-                label: `CPU ${systemInfo.cpu_usage_percent.toFixed(1)}%`
-              }] : []),
-              ...(systemInfo.memory_usage_percent !== undefined && systemInfo.memory_usage_percent !== null ? [{
-                label: `RAM ${systemInfo.memory_usage_percent.toFixed(1)}%`
-              }] : []),
-              ...(systemInfo.disk_usage_percent !== undefined && systemInfo.disk_usage_percent !== null ? [{
-                label: `Disk ${systemInfo.disk_usage_percent.toFixed(1)}%`
-              }] : []),
               {
-                label: `Updated ${new Date(systemInfo.updated_at || systemInfo.last_updated || '').toLocaleTimeString()}`
+                label: 'Tipi DL',
+                value: systemInfo.datalogger_types.join(', ') || 'N/A',
+                color: 'default' as const
+              },
+              {
+                label: 'API',
+                value: systemInfo.api_versions.join(', ') || 'v1.0.0',
+                color: 'default' as const
+              },
+              {
+                label: 'Ultimo aggiornamento',
+                value: new Date(systemInfo.last_updated).toLocaleTimeString('it-IT', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }),
+                color: 'default' as const
               }
             ] : [])
           ]}
@@ -600,18 +687,115 @@ export default function DataLoggerListPage() {
 
       {/* System Info Modal */}
       <Dialog open={showSystemInfoModal} onOpenChange={setShowSystemInfoModal}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>System Information</DialogTitle>
             <DialogDescription>
-              Current system status and information
+              Informazioni dettagliate del sistema datalogger
             </DialogDescription>
           </DialogHeader>
           {systemInfo && (
-            <div className="space-y-4">
-              <pre className="text-sm bg-muted p-4 rounded overflow-auto">
-                {JSON.stringify(systemInfo, null, 2)}
-              </pre>
+            <div className="space-y-6">
+              {/* Overview Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-muted/30 p-3 rounded-lg">
+                  <div className="text-sm text-muted-foreground">Datalogger</div>
+                  <div className="text-lg font-semibold">{systemInfo.online_dataloggers}/{systemInfo.total_dataloggers}</div>
+                  <div className="text-xs text-muted-foreground">online</div>
+                </div>
+                <div className="bg-muted/30 p-3 rounded-lg">
+                  <div className="text-sm text-muted-foreground">Sensori</div>
+                  <div className="text-lg font-semibold">{systemInfo.active_sensors}/{systemInfo.total_sensors}</div>
+                  <div className="text-xs text-muted-foreground">attivi</div>
+                </div>
+                <div className="bg-muted/30 p-3 rounded-lg">
+                  <div className="text-sm text-muted-foreground">Heartbeats</div>
+                  <div className="text-lg font-semibold">
+                    {systemInfo.total_heartbeats >= 1000000 ?
+                      `${(systemInfo.total_heartbeats / 1000000).toFixed(1)}M` :
+                      systemInfo.total_heartbeats >= 1000 ?
+                      `${(systemInfo.total_heartbeats / 1000).toFixed(0)}k` :
+                      systemInfo.total_heartbeats}
+                  </div>
+                  <div className="text-xs text-muted-foreground">totali</div>
+                </div>
+                <div className="bg-muted/30 p-3 rounded-lg">
+                  <div className="text-sm text-muted-foreground">Uptime</div>
+                  <div className="text-lg font-semibold">{systemInfo.avg_uptime.toFixed(1)}%</div>
+                  <div className="text-xs text-muted-foreground">medio</div>
+                </div>
+              </div>
+
+              {/* Firmware Versions */}
+              {systemInfo.firmware_versions.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Versioni Firmware</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {systemInfo.firmware_versions.map((version, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        {version}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Datalogger Types */}
+              {systemInfo.datalogger_types.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Tipi Datalogger</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {systemInfo.datalogger_types.map((type, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {type}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* API Versions */}
+              {systemInfo.api_versions.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Versioni API MQTT</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {systemInfo.api_versions.map((version, idx) => (
+                      <Badge key={idx} variant="default" className="text-xs">
+                        {version}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* IP Addresses */}
+              {systemInfo.ip_addresses.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Indirizzi IP Attivi ({systemInfo.ip_addresses.length})</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs font-mono">
+                    {systemInfo.ip_addresses.slice(0, 10).map((ip, idx) => (
+                      <div key={idx} className="bg-muted/20 p-2 rounded text-xs">
+                        {ip}
+                      </div>
+                    ))}
+                    {systemInfo.ip_addresses.length > 10 && (
+                      <div className="bg-muted/20 p-2 rounded text-xs text-muted-foreground">
+                        ... e altri {systemInfo.ip_addresses.length - 10}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Raw Data (collapsed) */}
+              <details className="bg-muted/20 p-3 rounded">
+                <summary className="text-sm font-medium cursor-pointer">
+                  Dati Raw (JSON)
+                </summary>
+                <pre className="text-xs bg-background p-3 rounded mt-2 overflow-auto max-h-40">
+                  {JSON.stringify(systemInfo, null, 2)}
+                </pre>
+              </details>
             </div>
           )}
         </DialogContent>
@@ -640,6 +824,18 @@ export default function DataLoggerListPage() {
           </div>
           <div className="p-4">
             <div className="space-y-4">
+              {/* Auto Refresh Toggle */}
+              <div className="flex items-center justify-between">
+                <Label htmlFor="auto-refresh" className="text-sm font-medium text-foreground">
+                  Refresh automatico
+                </Label>
+                <Switch
+                  id="auto-refresh"
+                  checked={autoRefreshEnabled}
+                  onCheckedChange={setAutoRefreshEnabled}
+                />
+              </div>
+
               {/* Solo Online Toggle */}
               <div className="flex items-center justify-between">
                 <Label htmlFor="solo-online" className="text-sm font-medium text-foreground">
@@ -650,6 +846,31 @@ export default function DataLoggerListPage() {
                   checked={showOnlineOnly}
                   onCheckedChange={setShowOnlineOnly}
                 />
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium text-foreground">
+                  Visualizzazione
+                </Label>
+                <div className="flex rounded-md border border-border overflow-hidden">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('grid')}
+                    className="h-6 w-6 p-0 rounded-none border-0"
+                  >
+                    <Grid3X3 className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('list')}
+                    className="h-6 w-6 p-0 rounded-none border-0 border-l border-border"
+                  >
+                    <List className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

@@ -304,7 +304,19 @@ class DeviceStatusUpdater:
 
 
 class AdaptiveToleranceManager:
-    """Gestisce tolleranze adattive basate sui pattern reali"""
+    """
+    Gestisce tolleranze adattive basate sui pattern reali
+
+    REGOLA GENERALE: 20% dell'intervallo dichiarato come tolleranza standard
+    - Minimo assoluto: 2 secondi
+    - Massimo: 30% dell'intervallo (per evitare tolleranze eccessive)
+    - Con storico >= 5 campioni: usa il maggiore tra tolleranza adattiva e 20%
+
+    Esempi:
+    - Datalogger (5s): 20% = 1s → minimo 2s applicato → 2s tolerance
+    - Gateway (60s): 20% = 12s → 12s tolerance
+    - Sensori veloci (10s): 20% = 2s → 2s tolerance
+    """
 
     def __init__(self):
         self.tolerance_history: Dict[str, List[float]] = {}
@@ -315,8 +327,8 @@ class AdaptiveToleranceManager:
         actual_intervals = self.tolerance_history.get(device_id, [])
 
         if len(actual_intervals) < 5:
-            # Non abbastanza dati, usa tolleranza standard
-            return max(1, declared_interval // 10)  # 10% tolerance, min 1s
+            # Non abbastanza dati, usa tolleranza standard del 20%
+            return max(2, int(declared_interval * 0.2))  # 20% tolerance, min 2s
 
         # Calcola deviazione standard degli intervalli reali
         try:
@@ -324,18 +336,22 @@ class AdaptiveToleranceManager:
             # Tolleranza = 2 * standard deviation + buffer
             adaptive_tolerance = int(2 * std_dev) + 1
 
-            # Limita la tolleranza tra 1 secondo e 50% dell'intervallo
-            min_tolerance = 1
-            max_tolerance = declared_interval // 2
+            # Tolleranza standard del 20% come baseline
+            standard_tolerance = max(2, int(declared_interval * 0.2))
 
-            tolerance = max(min_tolerance, min(adaptive_tolerance, max_tolerance))
+            # Usa la maggiore tra tolleranza adattiva e standard del 20%
+            # ma limita al 30% dell'intervallo per evitare tolleranze eccessive
+            min_tolerance = 2  # Minimo assoluto 2 secondi
+            max_tolerance = int(declared_interval * 0.3)  # Massimo 30% dell'intervallo
 
-            logger.debug(f"Adaptive tolerance for {device_id}: {tolerance}s (std_dev: {std_dev:.2f})")
+            tolerance = max(min_tolerance, min(max(adaptive_tolerance, standard_tolerance), max_tolerance))
+
+            logger.debug(f"Adaptive tolerance for {device_id}: {tolerance}s (std_dev: {std_dev:.2f}, standard: {standard_tolerance}s)")
             return tolerance
 
         except Exception as e:
             logger.error(f"Error calculating adaptive tolerance for {device_id}: {e}")
-            return max(1, declared_interval // 10)
+            return max(2, int(declared_interval * 0.2))
 
     def update_interval_history(self, device_id: str, actual_interval: float):
         """Aggiorna storia degli intervalli reali per un device"""

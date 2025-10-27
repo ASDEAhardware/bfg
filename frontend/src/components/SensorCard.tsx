@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { InlineLabelEditor } from "@/components/InlineLabelEditor";
 import { TrendChart } from "@/components/TrendChart";
+import { api } from "@/lib/axios";
 import {
   Activity,
   Thermometer,
@@ -47,6 +48,7 @@ interface SensorCardProps {
   onLabelUpdate?: (sensor: SensorCardProps['sensor'], newLabel: string) => void;
   showEnhanced?: boolean;
   chartOpacity?: number;
+  compact?: boolean;
 }
 
 const sensorTypeConfig = {
@@ -63,7 +65,7 @@ const sensorTypeConfig = {
   other: { icon: Activity, color: "text-gray-500", bgColor: "bg-gray-500/10" }
 };
 
-export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartOpacity = 25 }: SensorCardProps) {
+export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartOpacity = 25, compact = false }: SensorCardProps) {
   const typeConfig = sensorTypeConfig[sensor.sensor_type as keyof typeof sensorTypeConfig] || sensorTypeConfig.other;
 
   // Handle both old and new sensor data formats
@@ -92,8 +94,18 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
     : "Mai";
 
   const handleLabelUpdate = async (newLabel: string) => {
-    if (onLabelUpdate) {
-      onLabelUpdate(sensor, newLabel);
+    try {
+      await api.patch(`/v1/mqtt/sensors/${sensor.id}/update_label/`, {
+        label: newLabel
+      });
+
+      // Callback al parent per aggiornare la lista
+      if (onLabelUpdate) {
+        onLabelUpdate(sensor, newLabel);
+      }
+    } catch (error) {
+      console.error('Error updating sensor label:', error);
+      throw error;
     }
   };
 
@@ -106,19 +118,19 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
     }
 
     if (sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g') {
-      // For accelerometers, return separate X, Y, Z arrays
+      // For accelerometers, return separate X, Y, Z arrays with raw values
       const readings = sensor.latest_readings.slice(0, 3).reverse(); // Last 3 readings
 
-      const xData = readings.map(r => (r.data.acc00 || 0) * 1000);
-      const yData = readings.map(r => (r.data.acc01 || 0) * 1000);
-      const zData = readings.map(r => (r.data.acc02 || 0) * 1000);
+      const xData = readings.map(r => r.data.acc00 || 0);
+      const yData = readings.map(r => r.data.acc01 || 0);
+      const zData = readings.map(r => r.data.acc02 || 0);
 
       // Add current values if available
       if (sensor.latest_readings?.[0]?.data) {
         const current = sensor.latest_readings[0].data;
-        xData.push((current.acc00 || 0) * 1000);
-        yData.push((current.acc01 || 0) * 1000);
-        zData.push((current.acc02 || 0) * 1000);
+        xData.push(current.acc00 || 0);
+        yData.push(current.acc01 || 0);
+        zData.push(current.acc02 || 0);
       }
 
       return { x: xData, y: yData, z: zData };
@@ -145,8 +157,8 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
   // Layout unificato - sempre la stessa struttura base, con dettagli extra se showEnhanced=true
   return (
     <Card className="card-standard h-full relative overflow-hidden">
-      {/* Trend Chart Background - always visible, full card */}
-      {((Array.isArray(trendData) && trendData.length >= 2) ||
+      {/* Trend Chart Background - only in full mode, hidden in compact */}
+      {!compact && ((Array.isArray(trendData) && trendData.length >= 2) ||
         (typeof trendData === 'object' && trendData.x && trendData.x.length >= 2)) && (
         <div className="absolute inset-0" style={{ opacity: chartOpacity / 100 }}>
           {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' && typeof trendData === 'object' ? (
@@ -155,8 +167,8 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
               <div className="flex-1 relative">
                 <TrendChart
                   data={trendData.x}
-                  width={200}
-                  height={60}
+                  width={400}
+                  height={80}
                   color="currentColor"
                   strokeWidth={1.5}
                   className={`w-full h-full text-red-500`}
@@ -165,8 +177,8 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
               <div className="flex-1 relative">
                 <TrendChart
                   data={trendData.y}
-                  width={200}
-                  height={60}
+                  width={400}
+                  height={80}
                   color="currentColor"
                   strokeWidth={1.5}
                   className={`w-full h-full text-green-500`}
@@ -175,8 +187,8 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
               <div className="flex-1 relative">
                 <TrendChart
                   data={trendData.z}
-                  width={200}
-                  height={60}
+                  width={400}
+                  height={80}
                   color="currentColor"
                   strokeWidth={1.5}
                   className={`w-full h-full text-blue-500`}
@@ -187,8 +199,8 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
             /* Single chart for other sensors */
             <TrendChart
               data={Array.isArray(trendData) ? trendData : []}
-              width={200}
-              height={200}
+              width={400}
+              height={250}
               color="currentColor"
               strokeWidth={2}
               className={`w-full h-full ${typeConfig.color}`}
@@ -197,102 +209,223 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
         </div>
       )}
 
-      <CardContent className="card-content-standard flex flex-col h-full relative z-10">
-        {/* Riga 1: Icona + Titolo (sx) + Badge Status (dx) */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className={`p-1.5 rounded-lg ${typeConfig.bgColor} flex-shrink-0`}>
-              <TypeIcon className={`h-4 w-4 ${typeConfig.color}`} />
+      {/* Background chart for compact mode - covering more area */}
+      {compact && ((Array.isArray(trendData) && trendData.length >= 2) ||
+        (typeof trendData === 'object' && trendData.x && trendData.x.length >= 2)) && (
+        <div className="absolute inset-0" style={{ opacity: chartOpacity / 100 }}>
+          {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' && typeof trendData === 'object' ? (
+            /* Three horizontal mini-charts for X, Y, Z in list mode */
+            <div className="w-full h-full flex flex-col">
+              <div className="flex-1 relative">
+                <TrendChart
+                  data={trendData.x}
+                  width={600}
+                  height={25}
+                  color="currentColor"
+                  strokeWidth={1}
+                  className={`w-full h-full text-red-500`}
+                />
+              </div>
+              <div className="flex-1 relative">
+                <TrendChart
+                  data={trendData.y}
+                  width={600}
+                  height={25}
+                  color="currentColor"
+                  strokeWidth={1}
+                  className={`w-full h-full text-green-500`}
+                />
+              </div>
+              <div className="flex-1 relative">
+                <TrendChart
+                  data={trendData.z}
+                  width={600}
+                  height={25}
+                  color="currentColor"
+                  strokeWidth={1}
+                  className={`w-full h-full text-blue-500`}
+                />
+              </div>
             </div>
-            <InlineLabelEditor
-              label={sensor.label}
-              onUpdate={handleLabelUpdate}
-              size="sm"
-              className="font-semibold text-sm truncate"
+          ) : (
+            /* Single horizontal chart for other sensors in list mode */
+            <TrendChart
+              data={Array.isArray(trendData) ? trendData : []}
+              width={600}
+              height={75}
+              color="currentColor"
+              strokeWidth={1.5}
+              className={`w-full h-full ${typeConfig.color}`}
             />
-          </div>
-          <Badge
-            variant={isOnline ? "default" : "secondary"}
-            className={`text-xs flex-shrink-0 ${
-              isOnline
-                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100"
-            }`}
-          >
-            {statusInfo.label}
-          </Badge>
+          )}
         </div>
+      )}
 
-        {/* Riga 2: Valori principali (assi o valore singolo) */}
-        <div className="mb-3 py-2 bg-muted/20 rounded-lg">
-          {hasValue ? (
-            <>
-              {/* Accelerometri: mostra 3 assi */}
-              {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' && sensor.latest_readings?.[0]?.data ? (
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <div className="text-lg font-mono font-bold text-foreground">
-                      {(sensor.latest_readings[0].data.acc00 * 1000).toFixed(1)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">X</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-mono font-bold text-foreground">
-                      {(sensor.latest_readings[0].data.acc01 * 1000).toFixed(1)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Y</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-mono font-bold text-foreground">
-                      {(sensor.latest_readings[0].data.acc02 * 1000).toFixed(1)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Z</div>
-                  </div>
-                </div>
-              ) : (
-                /* Altri sensori: valore singolo centrato */
-                <div className="text-center">
-                  <div className="text-lg font-mono font-bold text-foreground">
-                    {(() => {
-                      if (sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g') {
-                        return sensor.current_value ? (sensor.current_value * 1000).toFixed(1) : 'N/A';
-                      }
-                      if (sensor.unit_of_measure === '°') return sensor.current_value?.toFixed(3);
-                      return sensor.current_value?.toFixed(2);
-                    })()}
-                  </div>
-                  {sensor.unit_of_measure && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' ? 'mg' : sensor.unit_of_measure}
-                    </div>
-                  )}
-                </div>
-              )}
-              </>
-            ) : (
-              <div className="text-center py-2">
-                <div className="text-sm text-muted-foreground">
-                  {isOnline ? "In attesa dati..." : "Offline"}
+      <CardContent className={`${compact ? 'p-3' : 'card-content-standard'} flex flex-col h-full relative z-10`}>
+        {/* Layout responsive: compact vs full */}
+        {compact ? (
+          /* Compact Layout (List mode) */
+          <div className="flex items-center justify-between gap-3 h-full">
+            {/* Left: Icon + Label + Status */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={`p-1 rounded ${typeConfig.bgColor} flex-shrink-0`}>
+                <TypeIcon className={`h-3 w-3 ${typeConfig.color}`} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <InlineLabelEditor
+                  label={sensor.label}
+                  onUpdate={handleLabelUpdate}
+                  size="sm"
+                  className="font-semibold text-sm truncate"
+                />
+                <div className="text-xs text-muted-foreground truncate">
+                  {sensor.serial_number}
                 </div>
               </div>
-            )}
-        </div>
+            </div>
 
-        {/* Riga 3: Dettagli base (sempre presenti) */}
-        <div className="space-y-2 mb-3 text-xs text-muted-foreground">
-          <div className="flex justify-between">
-            <span>Serial:</span>
-            <span className="font-mono">{sensor.serial_number}</span>
+            {/* Center: Value */}
+            <div className="text-center flex-shrink-0">
+              {hasValue ? (
+                <>
+                  {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' && sensor.latest_readings?.[0]?.data ? (
+                    <div className="grid grid-cols-3 gap-1 text-xs">
+                      <div className="text-center">
+                        <div className="font-mono font-bold text-foreground">{sensor.latest_readings[0].data.acc00?.toFixed(4) || '0.0000'}</div>
+                        <div className="text-red-500 text-xs">X</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-mono font-bold text-foreground">{sensor.latest_readings[0].data.acc01?.toFixed(4) || '0.0000'}</div>
+                        <div className="text-green-500 text-xs">Y</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-mono font-bold text-foreground">{sensor.latest_readings[0].data.acc02?.toFixed(4) || '0.0000'}</div>
+                        <div className="text-blue-500 text-xs">Z</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm font-mono font-bold">
+                      {(() => {
+                        if (sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g') {
+                          return sensor.current_value?.toFixed(4) || 'N/A';
+                        }
+                        if (sensor.unit_of_measure === '°') return sensor.current_value?.toFixed(3);
+                        return sensor.current_value?.toFixed(2);
+                      })()}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-xs text-muted-foreground">No data</div>
+              )}
+            </div>
+
+            {/* Right: Status Badge */}
+            <Badge
+              variant={isOnline ? "default" : "secondary"}
+              className={`text-xs flex-shrink-0 ${
+                isOnline
+                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                  : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100"
+              }`}
+            >
+              {statusInfo.label}
+            </Badge>
           </div>
-          <div className="flex justify-between">
-            <span>Uptime:</span>
-            <span className="font-medium">{sensor.uptime_percentage.toFixed(1)}%</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Ultima lettura:</span>
-            <span className="font-medium">{lastReadingText}</span>
-          </div>
-        </div>
+        ) : (
+          /* Full Layout (Grid mode) */
+          <>
+            {/* Riga 1: Icona + Titolo (sx) + Badge Status (dx) */}
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className={`p-1.5 rounded-lg ${typeConfig.bgColor} flex-shrink-0`}>
+                  <TypeIcon className={`h-4 w-4 ${typeConfig.color}`} />
+                </div>
+                <InlineLabelEditor
+                  label={sensor.label}
+                  onUpdate={handleLabelUpdate}
+                  size="sm"
+                  className="font-semibold text-sm truncate"
+                />
+              </div>
+              <Badge
+                variant={isOnline ? "default" : "secondary"}
+                className={`text-xs flex-shrink-0 ${
+                  isOnline
+                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                    : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100"
+                }`}
+              >
+                {statusInfo.label}
+              </Badge>
+            </div>
+
+            {/* Riga 2: Valori principali (assi o valore singolo) */}
+            <div className="mb-3 py-2 bg-muted/20 rounded-lg">
+              {hasValue ? (
+                <>
+                  {/* Accelerometri: mostra 3 assi */}
+                  {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' && sensor.latest_readings?.[0]?.data ? (
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <div className="text-lg font-mono font-bold text-foreground">{sensor.latest_readings[0].data.acc00?.toFixed(4) || '0.0000'}</div>
+                        <div className="text-red-500 text-xs">X</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-mono font-bold text-foreground">{sensor.latest_readings[0].data.acc01?.toFixed(4) || '0.0000'}</div>
+                        <div className="text-green-500 text-xs">Y</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-mono font-bold text-foreground">{sensor.latest_readings[0].data.acc02?.toFixed(4) || '0.0000'}</div>
+                        <div className="text-blue-500 text-xs">Z</div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Altri sensori: valore singolo centrato */
+                    <div className="text-center">
+                      <div className="text-lg font-mono font-bold text-foreground">
+                        {(() => {
+                          if (sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g') {
+                            return sensor.current_value?.toFixed(4) || 'N/A';
+                          }
+                          if (sensor.unit_of_measure === '°') return sensor.current_value?.toFixed(3);
+                          return sensor.current_value?.toFixed(2);
+                        })()}
+                      </div>
+                      {sensor.unit_of_measure && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {sensor.unit_of_measure}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  </>
+                ) : (
+                  <div className="text-center py-2">
+                    <div className="text-sm text-muted-foreground">
+                      {isOnline ? "In attesa dati..." : "Offline"}
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            {/* Riga 3: Dettagli base (sempre presenti) */}
+            <div className="space-y-2 mb-3 text-xs text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Serial:</span>
+                <span className="font-mono">{sensor.serial_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Uptime:</span>
+                <span className="font-medium">{sensor.uptime_percentage.toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Ultima lettura:</span>
+                <span className="font-medium">{lastReadingText}</span>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Sezioni extra quando showEnhanced=true */}
         {showEnhanced && (
@@ -303,14 +436,14 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
                 <div className="text-muted-foreground">Min</div>
                 <div className="font-medium">
                   {sensor.min_value_ever !== undefined ?
-                    `${(sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' ? sensor.min_value_ever * 1000 : sensor.min_value_ever).toFixed(1)}` : 'N/A'}
+                    `${(sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' ? sensor.min_value_ever.toFixed(4) : sensor.min_value_ever.toFixed(2))}` : 'N/A'}
                 </div>
               </div>
               <div className="bg-muted/50 p-2 rounded">
                 <div className="text-muted-foreground">Max</div>
                 <div className="font-medium">
                   {sensor.max_value_ever !== undefined ?
-                    `${(sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' ? sensor.max_value_ever * 1000 : sensor.max_value_ever).toFixed(1)}` : 'N/A'}
+                    `${(sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g' ? sensor.max_value_ever.toFixed(4) : sensor.max_value_ever.toFixed(2))}` : 'N/A'}
                 </div>
               </div>
             </div>
@@ -345,15 +478,15 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
                           <div className="grid grid-cols-4 gap-1 text-xs">
                             <div className="text-center">
                               <div className="text-muted-foreground">X</div>
-                              <div className="font-mono font-medium">{(reading.data.acc00 * 1000).toFixed(1)}</div>
+                              <div className="font-mono font-medium">{reading.data.acc00?.toFixed(4) || '0.0000'}</div>
                             </div>
                             <div className="text-center">
                               <div className="text-muted-foreground">Y</div>
-                              <div className="font-mono font-medium">{(reading.data.acc01 * 1000).toFixed(1)}</div>
+                              <div className="font-mono font-medium">{reading.data.acc01?.toFixed(4) || '0.0000'}</div>
                             </div>
                             <div className="text-center">
                               <div className="text-muted-foreground">Z</div>
-                              <div className="font-mono font-medium">{(reading.data.acc02 * 1000).toFixed(1)}</div>
+                              <div className="font-mono font-medium">{reading.data.acc02?.toFixed(4) || '0.0000'}</div>
                             </div>
                             <div className="text-center">
                               <div className="text-muted-foreground">Tempo</div>
@@ -383,8 +516,8 @@ export function SensorCard({ sensor, onLabelUpdate, showEnhanced = false, chartO
         {/* Riga 4: Footer con tipo sensore (sempre presente) */}
         <div className="pt-2 border-t border-border/30 mt-auto">
           <div className="text-xs text-muted-foreground text-center truncate">
-            {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure === 'g'
-              ? 'Acceleration [mg]'
+            {sensor.sensor_type === 'accelerometer' && sensor.unit_of_measure
+              ? `Acceleration [${sensor.unit_of_measure}]`
               : sensor.sensor_type.replace('_', ' ')}
           </div>
         </div>

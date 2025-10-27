@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +12,9 @@ import {
   Network,
   Clock,
   Gauge,
-  Router
+  Router,
+  HardDrive,
+  Loader2
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
@@ -59,6 +61,8 @@ const statusConfig = {
 };
 
 export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact = false }: DataloggerCardProps) {
+  const [isNavigating, setIsNavigating] = useState(false);
+
   // Determine status based on is_online field
   const status = datalogger.is_online ? 'online' : 'offline';
   const config = statusConfig[status] || statusConfig.offline;
@@ -90,6 +94,11 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
     }
   };
 
+  const handleConnect = () => {
+    setIsNavigating(true);
+    onConnect(datalogger);
+  };
+
   // Build display name from datalogger_type and device_id
   const deviceName = datalogger.device_id
     ? `${datalogger.datalogger_type}/${datalogger.device_id}`
@@ -100,29 +109,32 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
       <Card className="card-standard">
         <CardContent className="card-content-standard">
           <div className="flex items-center justify-between gap-4">
-            {/* Left: Main Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-1">
+            {/* Left: Icon + Label + Info */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="p-1 rounded bg-blue-500/10 flex-shrink-0">
+                <HardDrive className="h-3 w-3 text-blue-500" />
+              </div>
+              <div className="min-w-0 flex-1">
                 <InlineLabelEditor
                   label={datalogger.label}
                   onUpdate={handleLabelUpdate}
-                  size="md"
-                  className="font-semibold text-base"
+                  size="sm"
+                  className="font-semibold text-sm truncate"
                 />
-                <Badge
-                  variant={config.variant}
-                  className={`text-xs flex-shrink-0 ${config.className}`}
-                >
-                  {config.label}
-                </Badge>
+                <div className="text-xs text-muted-foreground truncate">
+                  {datalogger.serial_number}
+                </div>
               </div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="truncate">{deviceName}</span>
-                <span className="font-mono">{datalogger.serial_number}</span>
-                {datalogger.ip_address && (
-                  <span className="font-mono hidden sm:inline">{datalogger.ip_address}</span>
-                )}
-              </div>
+            </div>
+
+            {/* Center: Status Badge */}
+            <div className="flex items-center gap-3">
+              <Badge
+                variant={config.variant}
+                className={`text-xs flex-shrink-0 ${config.className}`}
+              >
+                {config.label}
+              </Badge>
             </div>
 
             {/* Center: Metrics */}
@@ -143,11 +155,19 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
 
             {/* Right: Connect Button */}
             <Button
-              onClick={() => onConnect(datalogger)}
+              onClick={handleConnect}
+              disabled={isNavigating}
               size="sm"
               className="h-8 px-4 text-xs cursor-pointer flex-shrink-0"
             >
-              {isOnline ? "Connetti" : "Visualizza"}
+              {isNavigating ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Caricamento...
+                </>
+              ) : (
+                "Visualizza"
+              )}
             </Button>
           </div>
 
@@ -183,8 +203,8 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
             <InlineLabelEditor
               label={datalogger.label}
               onUpdate={handleLabelUpdate}
-              size="lg"
-              className="text-lg font-bold"
+              size="sm"
+              className="text-sm font-semibold truncate"
             />
           </div>
           <Badge
@@ -257,10 +277,18 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
         </div>
 
         <Button
-          onClick={() => onConnect(datalogger)}
+          onClick={handleConnect}
+          disabled={isNavigating}
           className="w-full cursor-pointer"
         >
-          {isOnline ? "Connetti" : "Visualizza"}
+          {isNavigating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Caricamento...
+            </>
+          ) : (
+            "Visualizza"
+          )}
         </Button>
       </CardContent>
     </Card>

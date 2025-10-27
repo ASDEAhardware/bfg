@@ -31,4 +31,8 @@ urlpatterns = [
     path('sensors/by_datalogger/', datalogger_views.sensors_by_datalogger, name='sensors_by_datalogger'),
     path('sensors/<int:sensor_id>/', datalogger_views.sensor_detail, name='sensor_detail'),
     path('sensors/<int:sensor_id>/update_label/', datalogger_views.update_sensor_label, name='update_sensor_label'),
+
+    # Datalogger Control - MQTT publish/subscribe
+    path('sites/<int:site_id>/publish/', views.publish_mqtt_message, name='publish_mqtt_message'),
+    path('sites/<int:site_id>/subscribe/', views.subscribe_mqtt_topic, name='subscribe_mqtt_topic'),
 ]

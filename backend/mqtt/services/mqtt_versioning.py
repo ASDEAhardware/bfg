@@ -37,15 +37,26 @@ class MqttApiVersion:
         self.string = version_string
 
     def _parse(self, version: str) -> Tuple[int, int, int]:
-        """Parse 'v1.2.3' -> (1, 2, 3) or 'v1' -> (1, 0, 0)"""
+        """Parse 'v1.2.3' or '1.2.3' -> (1, 2, 3) or 'v1' -> (1, 0, 0)"""
         try:
-            # Try full format first: v1.2.3
+            # Try full format with 'v' prefix: v1.2.3
             match = re.match(r'v(\d+)\.(\d+)\.(\d+)', version)
             if match:
                 return tuple(map(int, match.groups()))
 
-            # Try short format: v1
+            # Try full format without 'v' prefix: 1.2.3
+            match = re.match(r'(\d+)\.(\d+)\.(\d+)', version)
+            if match:
+                return tuple(map(int, match.groups()))
+
+            # Try short format with 'v' prefix: v1
             match = re.match(r'v(\d+)$', version)
+            if match:
+                major = int(match.group(1))
+                return (major, 0, 0)
+
+            # Try short format without 'v' prefix: 1
+            match = re.match(r'(\d+)$', version)
             if match:
                 major = int(match.group(1))
                 return (major, 0, 0)
