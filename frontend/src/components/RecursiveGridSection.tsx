@@ -1,6 +1,7 @@
 "use client"
 import React from 'react'
 import { GridSection as GridSectionType, useGridStore } from '@/store/gridStore'
+import { GridSectionWithProvider } from '@/components/GridSectionWithProvider'
 import { useSettingsStore } from '@/store/settingsStore' // Importa il nuovo store
 import { GridSection } from '@/components/GridSection'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
@@ -36,7 +37,7 @@ export function RecursiveGridSection({
   // Se la sezione non ha children, renderizza una sezione normale
   if (!section.children || section.children.length === 0) {
     return (
-      <GridSection
+      <GridSectionWithProvider
         section={section}
         isActive={activeSectionId === section.id}
         canSplitHorizontal={canSplitHorizontal}

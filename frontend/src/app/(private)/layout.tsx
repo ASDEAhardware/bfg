@@ -2,13 +2,14 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { TabContent } from "@/components/TabContent"
 import { TabNavigationHandler } from "@/components/TabNavigationHandler"
 import { ConditionalTabBar } from "@/components/ConditionalTabBar"
+import { RefreshIndicator } from "@/components/RefreshIndicator"
 import {
     SidebarInset,
     SidebarProvider,
 } from "@/components/ui/sidebar"
-import { StatusBar } from "@/components/StatusBar"
 import { HeaderComponent } from "@/components/HeaderComponent"
 import { SiteProvider } from "@/contexts/SiteContext"
+import { StatusBarProvider } from "@/components/ContextualStatusBar"
 
 
 
@@ -22,16 +23,18 @@ export default async function Layout({
     return (
         <SidebarProvider>
             <SiteProvider>
-                <AppSidebar />
-                <SidebarInset>
-                    <TabNavigationHandler />
-                    <HeaderComponent />
-                    <ConditionalTabBar />
-                    <TabContent>
-                        <main className="flex flex-1 flex-col pb-12">{children}</main>
-                    </TabContent>
-                    <StatusBar />
-                </SidebarInset>
+                <StatusBarProvider>
+                    <RefreshIndicator />
+                    <AppSidebar />
+                    <SidebarInset>
+                        <TabNavigationHandler />
+                        <HeaderComponent />
+                        <ConditionalTabBar />
+                        <TabContent>
+                            <main className="flex flex-1 flex-col">{children}</main>
+                        </TabContent>
+                    </SidebarInset>
+                </StatusBarProvider>
             </SiteProvider>
         </SidebarProvider>
     )

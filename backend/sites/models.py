@@ -1,7 +1,7 @@
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
-from decimal import Decimal
 
 
 User = get_user_model()
@@ -19,6 +19,7 @@ class SiteType(models.TextChoices):
 
 class Site(models.Model):
     name = models.CharField(max_length=255, unique=True)
+    code = models.CharField(max_length=50, unique=True, null=True, help_text="Unique immutable site code for database queries")
     site_type = models.CharField(
         max_length=20,
         choices=SiteType.choices,
@@ -84,3 +85,5 @@ class UserSiteAccess(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.site.name}"
+
+

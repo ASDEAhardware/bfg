@@ -1,9 +1,6 @@
 "use client"
 
 import {
-  BadgeCheck,
-  Bell,
-  ChevronsUpDown,
   LogOut,
   Settings2,
 } from "lucide-react"
@@ -33,30 +30,30 @@ import { useLogout } from "@/hooks/useAuth"
 import { Link } from "@/components/ui/link"
 import { User } from "@/types/user"
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-
+import { useRouter } from "next/router"
 
 export function NavUser({
   user,
   isLoading,
   error,
-  tooltip
+  onSettingsClick,
 }: {
   user?: User,
   isLoading?: boolean,
   error?: string,
-  tooltip?: string
+  onSettingsClick?: () => void,
 }) {
-  const { isMobile, state } = useSidebar() // Assicurati che isSidebarCollapsed sia disponibile
+  const { isMobile, state } = useSidebar()
   const logout = useLogout()
+  const isCollapsed = state === "collapsed"
 
-  // Definisci qui errorMessage
   const errorMessage = error && error !== "undefined" ? error : "";
 
   if (isLoading) {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-12 w-full rounded-none" />
         </SidebarMenuItem>
       </SidebarMenu>
     )
@@ -77,7 +74,6 @@ export function NavUser({
   }
 
   const getProfileImageUrl = (url: string) => {
-    //Funzione che converte l'url del container backend di docker con l'url effettivo del backend per permettere al frontend di recuperare e mostrare le immagini
     if (!url) return undefined;
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_CONTAINER_URL;
     const publicUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -87,31 +83,45 @@ export function NavUser({
     return url;
   }
 
-  const userComponent = (
+  const profile_section = (
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <Avatar className="h-8 w-8 rounded-lg">
+            <button className={`
+              flex items-center w-full h-12 px-2 rounded-none border-0 bg-transparent
+              hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
+              focus:outline-none focus:bg-sidebar-accent focus:text-sidebar-accent-foreground
+              transition-colors cursor-pointer
+              ${isCollapsed ? 'justify-center px-0' : 'justify-start gap-2'}
+            `}>
+              <Avatar className="h-8 w-8 rounded-lg flex-shrink-0">
                 <AvatarImage src={user.profile_image ? getProfileImageUrl(user.profile_image) : undefined} alt={user.username} />
                 <AvatarFallback className="text-lg">{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.username}</span>
-                <span className="truncate text-xs">{user.email}</span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4" />
-            </SidebarMenuButton>
+
+              {!isCollapsed && (
+                <>
+                  <div className="flex-1 text-left text-sm leading-tight min-w-0">
+                    <div className="truncate font-medium">{user.username}</div>
+                    <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+                  </div>
+                  <div className="w-4 h-4 flex-shrink-0">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                    </svg>
+                  </div>
+                </>
+              )}
+            </button>
           </DropdownMenuTrigger>
+
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            className="w-56 rounded-lg"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
+            alignOffset={isMobile ? 0 : 5}
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
@@ -127,12 +137,12 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <Link href={"/settings/"}>
+              <a href="/settings" onClick={(e) => { e.preventDefault(); if (onSettingsClick) onSettingsClick(); }}>
                 <DropdownMenuItem className="cursor-pointer">
                   <Settings2 />
                   Settings
                 </DropdownMenuItem>
-              </Link>
+              </a>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="cursor-pointer" onClick={() => logout.mutate()}>
@@ -145,19 +155,18 @@ export function NavUser({
     </SidebarMenu>
   )
 
-  // Mostra il tooltip solo se la sidebar è collapsed
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {userComponent}
-      </TooltipTrigger>
-      <TooltipContent side="right" align="center" hidden={state !== "collapsed" || isMobile}>
-        {tooltip}
-      </TooltipContent>
-    </Tooltip>
-  )
-  
+  if (isCollapsed) {
+    return (
+      <Tooltip>
+          <TooltipTrigger asChild>
+              {profile_section}
+          </TooltipTrigger>
+          <TooltipContent side="right" align="center">
+              Profile
+          </TooltipContent>
+      </Tooltip>
+    )
+  }
 
-  // Altrimenti mostra solo il componente utente senza tooltip
-  return userComponent
+  return profile_section
 }

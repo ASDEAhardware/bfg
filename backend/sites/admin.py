@@ -4,13 +4,13 @@ from .models import Site, UserSiteAccess
 
 @admin.register(Site)
 class SiteAdmin(admin.ModelAdmin):
-    list_display = ('name', 'site_type', 'customer_name', 'latitude', 'longitude', 'is_active', 'created_at')
+    list_display = ('name', 'code', 'site_type', 'customer_name', 'latitude', 'longitude', 'is_active', 'created_at')
     list_filter = ('site_type', 'is_active', 'customer_name', 'created_at')
-    search_fields = ('name', 'customer_name', 'description')
+    search_fields = ('name', 'code', 'customer_name', 'description')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('Basic Information', {
-            'fields': ('name', 'site_type', 'customer_name', 'description', 'is_active')
+            'fields': ('name', 'code', 'site_type', 'customer_name', 'description', 'is_active')
         }),
         ('Location', {
             'fields': ('latitude', 'longitude')

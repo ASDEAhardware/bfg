@@ -14,7 +14,6 @@ services:
       - db
     volumes:
       - media_data:/app/media
-      - ./resources/logs:/resources/logs
     environment:
       - API_KEY=${SECRET_API_KEY}
 

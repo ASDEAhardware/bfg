@@ -16,6 +16,12 @@ docs/
 │   ├── deployment.md            # Deploy e produzione
 │   ├── versioning.md            # Gestione versioning e release
 │   └── pull-request-process.md  # Processo di pull request
+├── mqtt/                        # Sistema MQTT
+│   ├── README.md                # Overview sistema MQTT
+│   ├── models.md                # Modelli database
+│   ├── api-endpoints.md         # Endpoint API REST
+│   ├── mqtt-protocol.md         # Protocollo e topic structure
+│   └── frontend-integration.md  # Integrazione frontend
 └── api/                         # Documentazione API
     ├── frontend-api.md          # API Frontend/BFF
     └── backend-api.md           # API Backend Django
@@ -27,6 +33,7 @@ docs/
 - **[Sistema Plugin](development/plugin-system.md)** - Come creare e gestire plugin modulari
 - **[Setup Sviluppo](development/setup-development.md)** - Configurazione ambiente locale
 - **[Architettura](development/architecture.md)** - Panoramica dell'architettura del sistema
+- **[Sistema MQTT](mqtt/README.md)** - Documentazione completa MQTT e IoT devices
 
 ### Per il Team
 - **[Versioning](guides/versioning.md)** - Regole di versionamento semantico
