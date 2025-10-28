@@ -4,6 +4,17 @@ Tutte le modifiche notevoli a questo progetto saranno documentate in questo file
 
 Il formato si basa su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2025-10-28
+
+### Added
+
+- **Settings Page**: Aggiunta la sezione "Appearance" (Aspetto), predisponendo l'area per la futura personalizzazione dell'interfaccia.
+
+### Fixed
+
+- **Grid Mode Navigation**: Risolto un bug per cui la pagina delle impostazioni non disattivava correttamente la visualizzazione "Grid Mode", impedendo il ritorno alla griglia principale.
+- **Tab Mode Navigation**: Risolto un bug analogo per cui la pagina delle impostazioni veniva nascosta dall'interfaccia a schede dopo la navigazione, uniformando il comportamento a quello delle altre pagine di sistema.
+
 ## [1.2.1] - 2025-10-08
 
 ### Added
