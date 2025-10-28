@@ -25,7 +25,7 @@ export const dataloggerPlugin: Plugin = {
     }
   ],
   permissions: {
-    role: 'staff' // Requires staff privileges
+    role: 'guest' // Requires guest privileges
   },
   enabled: true,
   initialize: () => {
