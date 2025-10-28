@@ -22,7 +22,7 @@ interface TabState {
   openTab: (url: string, title: string) => void
   openTabInBackground: (url: string, title: string) => string // Returns the tab ID
   closeTab: (tabId: string) => void
-  setActiveTab: (tabId: string) => void
+  setActiveTab: (tabId: string | null) => void
   renameTab: (tabId: string, newTitle: string) => void
   reorderTabs: (fromIndex: number, toIndex: number) => void
   clearAllTabs: () => void
@@ -186,7 +186,7 @@ export const useTabStore = create<TabState>()(
         })
       },
 
-      setActiveTab: (tabId: string) => {
+      setActiveTab: (tabId: string | null) => {
         set((state) => ({
           tabs: state.tabs.map(tab => ({
             ...tab,

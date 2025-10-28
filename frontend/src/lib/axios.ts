@@ -16,7 +16,9 @@ const processQueue = (error: AxiosError | null) => {
         if (error) {
             prom.reject(error);
         } else {
-            prom.resolve(api(error!.config!));
+            // Risolviamo la promessa senza un valore. Questo sbloccherà la coda
+            // e permetterà al .then() nell'interceptor di rieseguire la richiesta originale.
+            prom.resolve(undefined);
         }
     });
     failedQueue = [];

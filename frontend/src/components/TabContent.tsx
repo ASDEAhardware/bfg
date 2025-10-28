@@ -8,6 +8,8 @@ import { TabContentWithProvider } from '@/components/TabContentWithProvider'
 import { TabContextHeader } from '@/components/TabContextHeader'
 import { TabSiteProvider } from '@/contexts/TabSiteContext'
 
+const IGNORED_PATHS = ['/version', '/settings'];
+
 interface TabContentProps {
   children: React.ReactNode
 }
@@ -31,6 +33,12 @@ export function TabContent({ children }: TabContentProps) {
       setActiveTab('grid-tab')
     }
   }, [tabs, activeTabId, isGridModeEnabled, setActiveTab])
+
+  // Se il percorso corrente deve essere ignorato dalla logica delle schede,
+  // mostra semplicemente il contenuto della pagina (children).
+  if (IGNORED_PATHS.includes(pathname)) {
+    return <div className="flex-1 overflow-auto">{children}</div>;
+  }
 
   // Se modalità griglia attiva (con o senza schede)
   if (isGridModeEnabled && !isTabModeEnabled) {

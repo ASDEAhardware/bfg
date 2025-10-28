@@ -30,16 +30,18 @@ import { useLogout } from "@/hooks/useAuth"
 import { Link } from "@/components/ui/link"
 import { User } from "@/types/user"
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { useRouter } from "next/router"
 
 export function NavUser({
   user,
   isLoading,
   error,
+  onSettingsClick,
 }: {
   user?: User,
   isLoading?: boolean,
   error?: string,
-  tooltip?: string
+  onSettingsClick?: () => void,
 }) {
   const { isMobile, state } = useSidebar()
   const logout = useLogout()
@@ -135,12 +137,12 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <Link href={"/settings/"}>
+              <a href="/settings" onClick={(e) => { e.preventDefault(); if (onSettingsClick) onSettingsClick(); }}>
                 <DropdownMenuItem className="cursor-pointer">
                   <Settings2 />
                   Settings
                 </DropdownMenuItem>
-              </Link>
+              </a>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="cursor-pointer" onClick={() => logout.mutate()}>
