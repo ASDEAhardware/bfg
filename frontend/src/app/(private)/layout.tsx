@@ -10,6 +10,7 @@ import {
 import { HeaderComponent } from "@/components/HeaderComponent"
 import { SiteProvider } from "@/contexts/SiteContext"
 import { StatusBarProvider } from "@/components/ContextualStatusBar"
+import { GlobalConfirmationDialog } from "@/components/GlobalConfirmationDialog"
 
 
 
@@ -24,6 +25,7 @@ export default async function Layout({
         <SidebarProvider>
             <SiteProvider>
                 <StatusBarProvider>
+                    <GlobalConfirmationDialog />
                     <RefreshIndicator />
                     <AppSidebar />
                     <SidebarInset>

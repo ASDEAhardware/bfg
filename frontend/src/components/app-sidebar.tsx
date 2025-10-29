@@ -16,27 +16,57 @@ import {
 import { useUserInfo } from "@/hooks/useAuth"
 import { pluginRegistry, getUserPermissions } from "@/plugins"
 import { useTabStore } from "@/store/tabStore"
+import { useGridStore } from "@/store/gridStore"
+import { useConfirmationDialogStore } from "@/store/dialogStore"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: userData, isLoading, error } = useUserInfo()
   const { state } = useSidebar()
   const errorMessage = typeof error === "string" ? error : error ? String(error) : ""
 
-  const { setActiveTab } = useTabStore()
+  const { isTabModeEnabled, setActiveTab, toggleTabMode } = useTabStore()
+  const { isGridModeEnabled, toggleGridMode } = useGridStore()
+  const showConfirmationDialog = useConfirmationDialogStore((state) => state.show)
   const router = useRouter()
 
   const version = "1.2.1"
   const shortVersion = version.split(".").slice(0, 2).join(".")
 
+  const handleStandaloneNav = (path: string) => {
+    const isModeActive = isGridModeEnabled || isTabModeEnabled;
+
+    const navigate = () => {
+      // If grid mode is active, disable it.
+      if (isGridModeEnabled) {
+        toggleGridMode();
+      }
+      // If tab mode is active, disable it.
+      if (isTabModeEnabled) {
+        toggleTabMode();
+      }
+      // Always exit tab mode when navigating to a standalone page.
+      setActiveTab(null);
+      router.push(path);
+    };
+
+    if (isModeActive) {
+      showConfirmationDialog({
+        title: "Exit Current View?",
+        description: "Navigating to this page will close your current grid or tab view. Your layout will be saved and restored when you return.",
+        onConfirm: navigate,
+      });
+    } else {
+      navigate();
+    }
+  }
+
   const handleVersionClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault()
-    setActiveTab(null)
-    router.push("/version")
+    handleStandaloneNav("/version");
   }
 
   const handleSettingsClick = () => {
-    setActiveTab(null);
-    router.push("/settings");
+    handleStandaloneNav("/settings");
   }
 
   // Get plugin-based navigation items
@@ -74,10 +104,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={pluginNavItems} label="Platform" />
+        <NavMain items={pluginNavItems} label="Platform" onItemClick={handleStandaloneNav} />
         {adminPanelItems.length > 0 && (
           <>
-            <NavMain items={adminPanelItems} label="Staff Panel" />
+            <NavMain items={adminPanelItems} label="Staff Panel" onItemClick={handleStandaloneNav} />
           </>
         )}
       </SidebarContent>

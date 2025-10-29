@@ -19,13 +19,15 @@ import {
 export function NavMain({
   items,
   label,
+  onItemClick,
 }: {
   items: {
     title: string
     url: string
     icon?: LucideIcon
-  }[],
+  }[]
   label?: string
+  onItemClick?: (path: string) => void
 }) {
   const pathname = usePathname()
   const { state } = useSidebar()
@@ -70,16 +72,17 @@ export function NavMain({
                   </div>
                 )}
 
-                <Link
+                <a
                   href={item.url}
                   title={item.title}
+                  onClick={(e) => { e.preventDefault(); onItemClick?.(item.url); }}
                   className="flex items-center gap-1 flex-1"
                 >
                   <SidebarMenuButton tooltip={item.title} isActive={isActive}>
                     {item.icon && <item.icon className="shrink-0 size-4" />}
                     {state === "expanded" && <span>{item.title}</span>}
                   </SidebarMenuButton>
-                </Link>
+                </a>
 
                 {isTabModeEnabled && state === "expanded" && (
                   <Button
