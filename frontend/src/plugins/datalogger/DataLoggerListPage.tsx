@@ -64,6 +64,7 @@ interface Datalogger {
   last_heartbeat?: string;
   last_communication?: string;
   firmware_version?: string;
+  mqtt_api_version?: string;
   ip_address?: string;
   total_heartbeats: number;
   missed_heartbeats: number;
@@ -164,13 +165,15 @@ export default function DataLoggerListPage() {
     return matchesSearch && matchesOnlineFilter;
   });
 
-  const handleConnect = (datalogger: Datalogger) => {
+  const handleConnect = (datalogger: { id: string } & Omit<Datalogger, 'id'>) => { //type transformation: in questa riga diciamo al codice di trattare id come stringa e omettere il parametro "id" dell'interfaccia Datalogger (che originariamente è un numero) in quanto la prop che utilizza questa funzione si aspetta id come stringa.
     // Navigate to the detail page
     router.push(`/datalogger/${datalogger.id}`);
   };
 
-  const handleDataloggerLabelUpdate = async (datalogger: Datalogger, newLabel: string) => {
-    // Aggiorna la lista dei datalogger dopo il successo dell'API call
+  const handleDataloggerLabelUpdate = async (
+    datalogger: { id: string } & Omit<Datalogger, 'id'>, //type transformation: in questa riga diciamo al codice di trattare id come stringa e omettere il parametro "id" dell'interfaccia Datalogger (che originariamente è un numero) in quanto la prop che utilizza questa funzione si aspetta id come stringa.
+    newLabel: string
+  ) => {
     try {
       await refreshDataloggers();
     } catch (error) {
@@ -658,26 +661,26 @@ export default function DataLoggerListPage() {
                 label: 'Firmware',
                 value: systemInfo.firmware_versions.length > 0 ?
                   systemInfo.firmware_versions.length === 1 ?
-                    systemInfo.firmware_versions[0] :
+                    systemInfo.firmware_versions[0]! :
                     `${systemInfo.firmware_versions.length} versioni` : 'N/A',
                 color: 'default' as const
               },
               {
                 label: 'Tipi DL',
-                value: systemInfo.datalogger_types.join(', ') || 'N/A',
+                value: systemInfo.datalogger_types.length > 0 ? systemInfo.datalogger_types.join(', ') : 'N/A',
                 color: 'default' as const
               },
               {
                 label: 'API',
-                value: systemInfo.api_versions.join(', ') || 'v1.0.0',
+                value: systemInfo.api_versions.length > 0 ? systemInfo.api_versions.join(', ') : 'v1.0.0',
                 color: 'default' as const
               },
               {
                 label: 'Ultimo aggiornamento',
-                value: new Date(systemInfo.last_updated).toLocaleTimeString('it-IT', {
+                value: systemInfo.last_updated ? new Date(systemInfo.last_updated).toLocaleTimeString('it-IT', {
                   hour: '2-digit',
                   minute: '2-digit'
-                }),
+                }) : 'N/A',
                 color: 'default' as const
               }
             ] : [])

@@ -43,6 +43,7 @@ export interface Datalogger {
   last_heartbeat?: string;
   last_communication?: string;
   firmware_version?: string;
+  mqtt_api_version?: string;
   ip_address?: string;
   total_heartbeats: number;
   missed_heartbeats: number;
