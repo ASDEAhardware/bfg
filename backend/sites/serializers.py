@@ -1,4 +1,4 @@
-from rest_framework import serializers #type: ignore
+from rest_framework import serializers
 from .models import Site, UserSiteAccess
 
 
@@ -8,6 +8,7 @@ class SiteSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'name',
+            'code',
             'site_type',
             'latitude',
             'longitude',
@@ -24,7 +25,7 @@ class SiteListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for dropdown lists"""
     class Meta:
         model = Site
-        fields = ['id', 'name', 'customer_name', 'site_type']
+        fields = ['id', 'name', 'code', 'customer_name', 'site_type']
 
 
 class UserSiteAccessSerializer(serializers.ModelSerializer):
@@ -44,3 +45,4 @@ class UserSiteAccessSerializer(serializers.ModelSerializer):
             'granted_by_username'
         ]
         read_only_fields = ('id', 'granted_at')
+

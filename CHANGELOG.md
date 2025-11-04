@@ -4,6 +4,70 @@ Tutte le modifiche notevoli a questo progetto saranno documentate in questo file
 
 Il formato si basa su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-10-29
+
+### Added
+
+#### MQTT System Integration
+- **Real-time Communication**: Integrated a comprehensive MQTT system for real-time communication with dataloggers and sensors.
+- **Multi-site Connections**: Each site now has its own configurable MQTT connection.
+- **Auto-discovery**: Automatic discovery of topics and devices.
+- **API Versioning**: Support for different versions of the MQTT protocol.
+- **Dynamic Monitoring**: Automatic detection of offline devices.
+- **Real-time Updates**: Real-time updates of sensor data.
+
+#### Backend (Django)
+- **MQTT Services Layer**:
+    - `MqttManager`: Singleton to manage all active MQTT connections.
+    - `MqttConnectionHandler`: Handler for a single MQTT connection with automatic retries.
+    - `MessageProcessor`: Centralized processing of MQTT messages with multi-version support.
+    - `DynamicOfflineMonitor`: Intelligent monitoring of online/offline status of devices.
+- **API Endpoints**:
+    - MQTT connection control (start, stop, status).
+    - Datalogger and sensor data retrieval.
+    - Publishing messages to MQTT topics.
+- **Database Models**:
+    - `MqttConnection`: Configuration for MQTT connection per site.
+    - `MqttTopic`: Configurable MQTT topics for each connection.
+    - `DiscoveredTopic`: Automatic tracking of all discovered topics.
+    - `Gateway`: Main gateway system of the site.
+    - `Datalogger`: Datalogger device that acquires data from sensors.
+    - `SensorDevice`: Physical sensor connected to a datalogger.
+
+#### Frontend (React)
+- **MQTT Hooks**:
+    - `useMqttConnectionStatus`: Hook to monitor the MQTT connection status of a site.
+    - `useMqttControl`: Hook for MQTT connection control (for superusers).
+    - `useDataloggers`: Hook to retrieve the list of dataloggers.
+    - `useSensors`: Hook to retrieve the list of sensors.
+    - `useDataloggerControl`: Advanced hook for datalogger acquisition control.
+- **Zustand Store**:
+    - `dataloggerControlStore`: Store to manage datalogger control sessions.
+- **Components**:
+    - `DataloggerCard`: Card to display a datalogger in the list.
+    - `SensorCard`: Card to display a sensor.
+- **Pages**:
+    - `DataLoggerListPage`: List of all dataloggers for a site.
+    - `DataLoggerDetailPage`: Detail of a single datalogger with acquisition control.
+
+#### MQTT Protocol
+- **Topic Hierarchy**: Defined a clear topic hierarchy for multi-site and multi-device communication.
+- **Message Formats**: Standardized message formats for gateway/datalogger heartbeats, sensor data, and control commands.
+- **Versioning**: Explicit versioning in message payloads for backward compatibility.
+
+## [1.3.1] - 2025-10-28
+
+### Added
+
+- **Settings Page**: Aggiunta la sezione "Appearance" (Aspetto), predisponendo l'area per la futura personalizzazione dell'interfaccia.
+- **Confirmation Dialog**: Implementato un dialogo di conferma che avvisa l'utente quando la navigazione verso una pagina standalone (es. Settings, Version o qualsiasi elemento della navigazione principale) è richiesta mentre una modalità Grid o Tab è attiva. Questo previene la chiusura accidentale della vista corrente.
+
+### Fixed
+
+- **Grid Mode Navigation**: Risolto un bug per cui la pagina delle impostazioni non disattivava correttamente la visualizzazione "Grid Mode", impedendo il ritorno alla griglia principale.
+- **Tab Mode Navigation**: Risolto un bug analogo per cui la pagina delle impostazioni veniva oscurata dall'interfaccia a schede dopo la navigazione, uniformando il comportamento a quello delle altre pagine di sistema.
+- **Grid/Tab Mode Auto-Disable**: Implementata la disattivazione automatica delle modalità Grid e Tab quando l'utente conferma la navigazione verso una pagina standalone, garantendo che la vista sia correttamente chiusa e che lo stato del layout venga salvato in background.
+
 ## [1.2.1] - 2025-10-08
 
 ### Added

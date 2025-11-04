@@ -1,11 +1,13 @@
 "use client"
 import React, { useEffect } from 'react'
 import { useGridStore } from '@/store/gridStore'
+import { useSettingsStore } from '@/store/settingsStore'
 import { RecursiveGridSection } from '@/components/RecursiveGridSection'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 
 export function GridLayout() {
   const { currentLayout, activeSectionId, initializeGrid } = useGridStore()
+  const { showResizeHandle } = useSettingsStore()
 
   // Auto-initialize grid if it doesn't exist
   useEffect(() => {
@@ -62,7 +64,7 @@ export function GridLayout() {
                 canRemove={canRemove}
               />
             </ResizablePanel>
-            {index < sections.length - 1 && <ResizableHandle withHandle />}
+            {index < sections.length - 1 && <ResizableHandle withHandle={showResizeHandle} />}
           </React.Fragment>
         ))}
       </ResizablePanelGroup>

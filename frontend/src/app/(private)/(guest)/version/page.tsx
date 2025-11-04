@@ -345,13 +345,13 @@ export default function ChangelogPage() {
 
         <div className="flex">
           {/* Sidebar navigazione veloce */}
-          <div className="hidden md:block w-48 p-3 border-r border-border/50">
-            <div className="sticky top-20">
+          <div className="hidden md:block w-48 fixed top-[6rem] h-[calc(100vh-5rem)] z-0 p-3">
+            <div>
               <h3 className="font-medium mb-3 text-sm flex items-center gap-2">
                 <Hash className="h-3 w-3" />
                 Versioni
               </h3>
-              <ScrollArea className="h-[calc(100vh-120px)]">
+              <ScrollArea className="h-full">
                 <div className="space-y-1">
                   {changelogData.map((entry) => (
                     <button
@@ -379,7 +379,7 @@ export default function ChangelogPage() {
           </div>
 
           {/* Contenuto principale */}
-          <div className="flex-1 p-4">
+          <div className="flex-1 p-4 md:ml-48 md:border-l md:border-border/50">
 
             {/* Timeline compatto */}
             <div className="space-y-4">

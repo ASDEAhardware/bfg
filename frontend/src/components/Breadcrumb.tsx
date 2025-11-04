@@ -12,7 +12,15 @@ import {
 
 export default function Breadcrumb() {
     const pathname = usePathname();
-    const pathSegments = pathname.split('/').filter(Boolean); // Dividiamo l'URL in segmenti
+    const pathSegments = pathname.split('/').filter(Boolean);
+
+    // Mappa per titoli personalizzati
+    const segmentTitles: Record<string, string> = {
+        'datalogger': 'Datalogger',
+        'dashboard': 'Dashboard',
+        'staff-admin': 'Admin Panel',
+        'system': 'System Config'
+    };
 
     return (
         <BreadcrumbComponent>
@@ -20,12 +28,12 @@ export default function Breadcrumb() {
                 {pathSegments.map((segment, index) => {
                     const href = `/${pathSegments.slice(0, index + 1).join('/')}`;
                     const isLast = index === pathSegments.length - 1;
-                    const segmentTitle = segment === 'datalogger' ? 'Data Logger' :
+                    const segmentTitle = segmentTitles[segment] ||
                                         segment.charAt(0).toUpperCase() + segment.slice(1);
 
                     return (
                         <div key={href} className="flex items-center">
-                            <BreadcrumbItem className="hidden md:block">
+                            <BreadcrumbItem>
                                 {isLast ? (
                                     <BreadcrumbPage>{segmentTitle}</BreadcrumbPage>
                                 ) : (
@@ -34,7 +42,7 @@ export default function Breadcrumb() {
                                     </BreadcrumbLink>
                                 )}
                             </BreadcrumbItem>
-                            {!isLast && <BreadcrumbSeparator className="hidden md:block" />}
+                            {!isLast && <BreadcrumbSeparator />}
                         </div>
                     );
                 })}

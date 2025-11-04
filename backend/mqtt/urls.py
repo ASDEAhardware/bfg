@@ -1,18 +1,38 @@
-# mqtt/urls.py
-
+"""
+URL patterns per API MQTT
+"""
 from django.urls import path
-from .views import send_mqtt_command, get_datalogger_status, get_discovered_devices, start_subscriber, stop_subscriber, get_subscriber_status
+from .api import views
+from .api import datalogger_views
 
 app_name = 'mqtt'
 
 urlpatterns = [
-    # Datalogger operations
-    path('datalogger/control/', send_mqtt_command, name='datalogger-control'),
-    path('datalogger/status/', get_datalogger_status, name='datalogger-status'),
-    path('datalogger/devices/', get_discovered_devices, name='datalogger-devices'),
+    # Controllo connessioni per sito specifico
+    path('sites/<int:site_id>/start/', views.start_connection, name='start_connection'),
+    path('sites/<int:site_id>/stop/', views.stop_connection, name='stop_connection'),
+    path('sites/<int:site_id>/status/', views.connection_status, name='connection_status'),
+    path('sites/<int:site_id>/discover/', views.force_discovery, name='force_discovery'),
 
-    # Subscriber management
-    path('subscriber/start/', start_subscriber, name='subscriber-start'),
-    path('subscriber/stop/', stop_subscriber, name='subscriber-stop'),
-    path('subscriber/status/', get_subscriber_status, name='subscriber-status'),
+    # Stato generale manager
+    path('manager/status/', views.manager_status, name='manager_status'),
+    path('manager/restart/', views.restart_manager, name='restart_manager'),
+
+    # Lista e stato tutte le connessioni
+    path('connections/', views.connections_list, name='connections_list'),
+    path('connections/status/', views.all_connections_status, name='all_connections_status'),
+
+    # Datalogger endpoints
+    path('dataloggers/', datalogger_views.dataloggers_list, name='dataloggers_list'),
+    path('dataloggers/<int:datalogger_id>/', datalogger_views.datalogger_detail, name='datalogger_detail'),
+    path('dataloggers/<int:datalogger_id>/update_label/', datalogger_views.update_datalogger_label, name='update_datalogger_label'),
+
+    # Sensor endpoints
+    path('sensors/by_datalogger/', datalogger_views.sensors_by_datalogger, name='sensors_by_datalogger'),
+    path('sensors/<int:sensor_id>/', datalogger_views.sensor_detail, name='sensor_detail'),
+    path('sensors/<int:sensor_id>/update_label/', datalogger_views.update_sensor_label, name='update_sensor_label'),
+
+    # Datalogger Control - MQTT publish/subscribe
+    path('sites/<int:site_id>/publish/', views.publish_mqtt_message, name='publish_mqtt_message'),
+    path('sites/<int:site_id>/subscribe/', views.subscribe_mqtt_topic, name='subscribe_mqtt_topic'),
 ]

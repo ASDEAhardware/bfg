@@ -1,6 +1,7 @@
 "use client"
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { useTabSiteStore } from '@/contexts/TabSiteContext'
 
 export interface Tab {
   id: string
@@ -21,7 +22,7 @@ interface TabState {
   openTab: (url: string, title: string) => void
   openTabInBackground: (url: string, title: string) => string // Returns the tab ID
   closeTab: (tabId: string) => void
-  setActiveTab: (tabId: string) => void
+  setActiveTab: (tabId: string | null) => void
   renameTab: (tabId: string, newTitle: string) => void
   reorderTabs: (fromIndex: number, toIndex: number) => void
   clearAllTabs: () => void
@@ -155,6 +156,13 @@ export const useTabStore = create<TabState>()(
 
         if (tabIndex === -1) return
 
+        // Pulisci il contesto site della tab prima di chiuderla
+        try {
+          useTabSiteStore.getState().clearTabSiteId(tabId)
+        } catch (error) {
+          console.warn('Failed to clear tab site context:', error)
+        }
+
         const newTabs = state.tabs.filter(tab => tab.id !== tabId)
         let newActiveTabId = state.activeTabId
 
@@ -178,7 +186,7 @@ export const useTabStore = create<TabState>()(
         })
       },
 
-      setActiveTab: (tabId: string) => {
+      setActiveTab: (tabId: string | null) => {
         set((state) => ({
           tabs: state.tabs.map(tab => ({
             ...tab,
@@ -211,6 +219,17 @@ export const useTabStore = create<TabState>()(
       },
 
       clearAllTabs: () => {
+        const state = get()
+
+        // Pulisci tutti i contesti delle tab prima di chiuderle
+        try {
+          state.tabs.forEach(tab => {
+            useTabSiteStore.getState().clearTabSiteId(tab.id)
+          })
+        } catch (error) {
+          console.warn('Failed to clear tab site contexts:', error)
+        }
+
         set({
           tabs: [],
           activeTabId: null
@@ -221,6 +240,17 @@ export const useTabStore = create<TabState>()(
         const state = get()
         const keepTab = state.tabs.find(tab => tab.id === keepTabId)
         if (keepTab) {
+          // Pulisci i contesti di tutte le tab tranne quella da mantenere
+          try {
+            state.tabs.forEach(tab => {
+              if (tab.id !== keepTabId) {
+                useTabSiteStore.getState().clearTabSiteId(tab.id)
+              }
+            })
+          } catch (error) {
+            console.warn('Failed to clear tab site contexts:', error)
+          }
+
           set({
             tabs: [keepTab],
             activeTabId: keepTabId

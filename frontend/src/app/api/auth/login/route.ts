@@ -1,60 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { apiServer } from '@/lib/axios-server';
-import {
-    validateData,
-    checkRateLimit,
-    sanitizeInput,
-    validateSecurityHeaders,
-    LoginSchema
-} from '@/lib/validation';
 
-export async function POST(request: NextRequest) {
-    const startTime = Date.now(); // const che registra l'inizio della chiamata per monitorarne la durata.
 
+export async function POST(request: Request) {
     try {
-        // Extract IP address from headers or fallback
-        const ip =
-            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-            request.headers.get('x-real-ip') ||
-            'unknown';
-
-        // 1. Rate limiting check
-        const rateLimitResult = checkRateLimit(request, 'login');
-        if (!rateLimitResult.allowed) {
-            console.warn(`Login rate limit exceeded for IP: ${ip}`);
-            return NextResponse.json(
-                { error: rateLimitResult.error },
-                { status: 429 }
-            );
-        }
-
-        // 2. Security headers validation
-        const headerValidation = validateSecurityHeaders(request);
-        if (!headerValidation.valid) {
-            console.warn(`Invalid security headers from IP ${ip}:`, headerValidation.errors);
-            return NextResponse.json(
-                { error: 'Invalid request headers' },
-                { status: 400 }
-            );
-        }
-
-        // 3. Parse and sanitize input
-        const rawCredentials = await request.json();
-        const credentials = sanitizeInput(rawCredentials);
-
-        // 4. Validate input
-        const validation = validateData(credentials, LoginSchema);
-        if (!validation.isValid) {
-            console.warn(`Login validation failed for IP ${ip}:`, validation.errors);
-            return NextResponse.json(
-                {
-                    error: 'Validation failed',
-                    details: validation.errors
-                },
-                { status: 400 }
-            );
-        }
+        //Credenziali inserite dall'utente ottenute dalla richiesta utente e parsate in json()
+        const credentials = await request.json(); // il metodo .json() legge il body della richiesta e ritorna una Promise che si risolve con il risultato dell'analisi di JSON come input per produrre un oggetto JavaScript.
 
         // Utilizza Axios per inoltrare la richiesta di login al backend Django.
         const djangoResponse = await apiServer.post('api/v1/user/login/', credentials);
@@ -75,55 +27,25 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // 6. Cookie validation
+        // Se l'header dei cookie non è presente, c'è un problema nel backend
         if (!setCookieHeaders) {
-            console.error("Missing Set-Cookie headers from Django backend");
-            return NextResponse.json(
-                { error: 'Authentication service error' },
-                { status: 500 }
-            );
+            console.error("L'header 'Set-Cookie' non è presente nella risposta di Django. Controlla la configurazione dei cookie nel backend.");
         }
-
-        // 7. Log successful login
-        const duration = Date.now() - startTime;
-        console.log(`✅ Successful login for ${credentials.username} in ${duration}ms`);
-
-        // 8. Add security headers to response
-        response.headers.set('X-Content-Type-Options', 'nosniff');
-        response.headers.set('X-Frame-Options', 'DENY');
-        response.headers.set('X-XSS-Protection', '1; mode=block');
 
         return response;
-    } catch (error: any) {
-        const duration = Date.now() - startTime;
-        const ip =
-            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-            request.headers.get('x-real-ip') ||
-            'unknown';
 
+    } catch (error) {
         if (axios.isAxiosError(error) && error.response) {
-            // Log failed login attempt
-            console.warn(`❌ Failed login attempt from IP ${ip} in ${duration}ms:`, {
+            // Se Axios ha un errore di risposta (es. 400 Bad Request),
+            // inoltra l'errore al client.
+            return new NextResponse(JSON.stringify(error.response.data), {
                 status: error.response.status,
-                data: error.response.data
             });
-
-            return NextResponse.json(
-                {
-                    error: 'Authentication failed',
-                },
-                { status: error.response.status }
-            );
         }
 
-        // Log unexpected errors
-        console.error(`💥 Login error from IP ${ip} in ${duration}ms:`, error);
-
-        return NextResponse.json(
-            {
-                error: 'Internal server error',
-                message: 'Please try again later'
-            },
+        console.error("Errore durante il login:", error);
+        return new NextResponse(
+            JSON.stringify({ error: 'Errore interno del server.' }),
             { status: 500 }
         );
     }

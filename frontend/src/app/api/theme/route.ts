@@ -4,20 +4,19 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function PUT(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
     const accessToken = (await cookies()).get('access_token')?.value;
 
     if (!accessToken) {
-        return NextResponse.json({ error: 'Token non trovato nei cookie' }, { status: 401 });
+        return NextResponse.json({ error: 'Token not found in cookies' }, { status: 401 });
     }
 
     try {
         // Legge il body della richiesta in entrata dal frontend
         const payload = await request.json();
-        const { theme } = payload;
 
-        // Inoltra la richiesta PUT al backend Django
-        const djangoResponse = await apiServer.put('api/v1/user/theme-preferences/', payload, {
+        // Inoltra la richiesta PATCH al backend Django
+        const djangoResponse = await apiServer.patch('api/v1/user/theme-preferences/', payload, {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
             },
@@ -42,5 +41,3 @@ export async function PUT(request: NextRequest) {
         );
     }
 }
-    
-    
