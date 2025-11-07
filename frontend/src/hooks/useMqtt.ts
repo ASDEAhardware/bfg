@@ -333,3 +333,78 @@ export function useMqttStatusWithPolling(siteId: number | null, pollingInterval:
     dataloggers
   };
 }
+
+/**
+ * Hook for intelligent polling after Start/Stop operations
+ * Polls every 2.5s until status is stable or 40s timeout
+ */
+export function useMqttStatusPolling(
+  siteId: number | null,
+  refreshMqttStatus: () => Promise<void>,
+  refreshDataloggers: () => Promise<void>
+) {
+  const [isPolling, setIsPolling] = useState(false);
+  const [pollingTimeoutId, setPollingTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [pollingIntervalId, setPollingIntervalId] = useState<NodeJS.Timeout | null>(null);
+
+  const stopPolling = useCallback((onComplete?: () => void) => {
+    if (pollingIntervalId) {
+      clearInterval(pollingIntervalId);
+      setPollingIntervalId(null);
+    }
+    if (pollingTimeoutId) {
+      clearTimeout(pollingTimeoutId);
+      setPollingTimeoutId(null);
+    }
+    setIsPolling(false);
+
+    // Call completion callback if provided
+    if (onComplete) {
+      onComplete();
+    }
+  }, [pollingIntervalId, pollingTimeoutId]);
+
+  const startPolling = useCallback(async (
+    targetStatus: 'connected' | 'disconnected',
+    onComplete?: () => void
+  ) => {
+    if (!siteId) return;
+
+    // Stop any existing polling
+    stopPolling();
+
+    setIsPolling(true);
+
+    // Immediate first refresh
+    await Promise.all([refreshMqttStatus(), refreshDataloggers()]);
+
+    // Set up polling interval (2.5 seconds)
+    const intervalId = setInterval(async () => {
+      await refreshMqttStatus();
+    }, 2500);
+    setPollingIntervalId(intervalId);
+
+    // Set up timeout (40 seconds - longer than monitor's 30s check)
+    const timeoutId = setTimeout(() => {
+      console.log('[MqttPolling] Timeout reached (40s), stopping polling');
+      stopPolling(onComplete);
+      // Final refresh after timeout
+      Promise.all([refreshMqttStatus(), refreshDataloggers()]);
+    }, 40000);
+    setPollingTimeoutId(timeoutId);
+
+  }, [siteId, refreshMqttStatus, refreshDataloggers, stopPolling]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, [stopPolling]);
+
+  return {
+    isPolling,
+    startPolling,
+    stopPolling
+  };
+}

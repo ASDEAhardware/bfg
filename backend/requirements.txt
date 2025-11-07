@@ -5,6 +5,7 @@ djangorestframework-simplejwt>=5.3.1
 django-cors-headers
 dj-rest-auth
 gunicorn
+whitenoise>=6.5.0
 Pillow
 cryptography>=45.0.5
 paho-mqtt>=1.6.0

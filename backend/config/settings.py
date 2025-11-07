@@ -62,6 +62,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # ← Add WhiteNoise here
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -131,7 +132,16 @@ REST_FRAMEWORK = {
 }
 
 AUTH_USER_MODEL = 'user.CustomUser'
+
+# Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Directory where collectstatic collects files
+STATICFILES_DIRS = []  # Add custom static directories if needed
+
+# WhiteNoise configuration for better performance
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files (user uploads)
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
 

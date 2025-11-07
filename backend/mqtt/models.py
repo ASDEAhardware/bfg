@@ -43,6 +43,10 @@ class MqttConnection(models.Model):
     # SSL settings
     ssl_enabled = models.BooleanField(default=False)
     ca_cert_path = models.CharField(max_length=500, blank=True)
+    ssl_insecure = models.BooleanField(
+        default=False,
+        help_text="Se abilitato, disabilita la verifica del certificato SSL (insecure)"
+    )
 
     # Connection control
     is_enabled = models.BooleanField(
@@ -56,6 +60,10 @@ class MqttConnection(models.Model):
     last_heartbeat_at = models.DateTimeField(null=True, blank=True)
     connection_errors = models.IntegerField(default=0)
     error_message = models.TextField(blank=True)
+
+    # New fields for retry management
+    mqtt_retry_count = models.IntegerField(default=0, help_text='Current retry attempt count')
+    mqtt_next_retry = models.DateTimeField(null=True, blank=True, help_text='When to attempt next retry')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

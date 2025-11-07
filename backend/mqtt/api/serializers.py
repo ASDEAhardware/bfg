@@ -23,6 +23,10 @@ class MqttConnectionStatusSerializer(serializers.Serializer):
     handler_connected = serializers.BooleanField()
     retry_count = serializers.IntegerField()
     subscribed_topics = serializers.IntegerField()
+    # New fields from mqtt_service
+    mqtt_retry_count = serializers.IntegerField(required=False)
+    mqtt_next_retry = serializers.CharField(allow_null=True, required=False)
+    topics_list = serializers.ListField(child=serializers.CharField(), required=False)
 
 
 class MqttControlResponseSerializer(serializers.Serializer):

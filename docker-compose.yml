@@ -3,10 +3,11 @@ services:
   backend:
     build:
       context: ./backend
-      # dockerfile: Dockerfile fixare
-      # target: builder fixare
+      target: runtime
     container_name: bfg_backend
-    command: python manage.py runserver 0.0.0.0:8000
+    # In development, use runserver for hot reload:
+    # command: python manage.py runserver 0.0.0.0:8000
+    # In production (with Supervisor), comment the line above and use default CMD
     working_dir: /app
     volumes:
       - ./backend:/app
@@ -30,31 +31,6 @@ services:
       - "5432:5432"
     volumes:
       - bfg_postgres_data:/var/lib/postgresql/data
-
-  mqtt_service:
-    build:
-      context: ./backend
-    container_name: bfg_mqtt_service
-    command: sh -c "while true; do python manage.py run_mqtt --log-level INFO; echo 'MQTT service stopped, restarting in 5 seconds...'; sleep 5; done"
-    working_dir: /app
-    volumes:
-      - ./backend:/app
-      - mqtt_logs:/var/log
-    env_file:
-      - .env
-    environment:
-      - API_KEY=${SECRET_API_KEY}
-      - MQTT_LOG_FILE=/var/log/mqtt_service.log
-    depends_on:
-      - db
-      - backend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "manage.py", "run_mqtt", "--status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
   frontend:
     build:
@@ -88,4 +64,3 @@ services:
 
 volumes:
   bfg_postgres_data:
-  mqtt_logs:

@@ -8,9 +8,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.auth.decorators import user_passes_test
 
-from ..services.mqtt_manager import mqtt_manager
+from ..services.mqtt_service import mqtt_service
 from ..models import MqttConnection, Datalogger, Sensor, DiscoveredTopic
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -29,14 +28,8 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
-def is_superuser(user):
-    """Verifica che l'utente sia superuser."""
-    return user.is_superuser
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@user_passes_test(is_superuser)
 def start_connection(request, site_id):
     """
     Avvia connessione MQTT per un sito specifico.
@@ -44,9 +37,16 @@ def start_connection(request, site_id):
     POST /v1/mqtt/sites/{site_id}/start/
     """
     try:
+        # Check superuser permission
+        if not request.user.is_superuser:
+            return Response(
+                {'success': False, 'message': 'Superuser permission required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         logger.info(f"API request to start MQTT connection for site {site_id} by user {request.user}")
 
-        result = mqtt_manager.start_connection(site_id=int(site_id), manual=True)
+        result = mqtt_service.start_connection(site_id=int(site_id), manual=True)
 
         serializer = MqttControlResponseSerializer(data=result)
         if serializer.is_valid():
@@ -70,7 +70,6 @@ def start_connection(request, site_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@user_passes_test(is_superuser)
 def stop_connection(request, site_id):
     """
     Ferma connessione MQTT per un sito specifico.
@@ -78,9 +77,16 @@ def stop_connection(request, site_id):
     POST /v1/mqtt/sites/{site_id}/stop/
     """
     try:
+        # Check superuser permission
+        if not request.user.is_superuser:
+            return Response(
+                {'success': False, 'message': 'Superuser permission required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         logger.info(f"API request to stop MQTT connection for site {site_id} by user {request.user}")
 
-        result = mqtt_manager.stop_connection(site_id=int(site_id))
+        result = mqtt_service.stop_connection(site_id=int(site_id))
 
         serializer = MqttControlResponseSerializer(data=result)
         if serializer.is_valid():
@@ -111,7 +117,7 @@ def connection_status(request, site_id):
     GET /v1/mqtt/sites/{site_id}/status/
     """
     try:
-        connection_status_data = mqtt_manager.get_connection_status(site_id=int(site_id))
+        connection_status_data = mqtt_service.get_connection_status(site_id=int(site_id))
 
         if connection_status_data is None:
             return Response(
@@ -140,7 +146,6 @@ def connection_status(request, site_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-@user_passes_test(is_superuser)
 def manager_status(request):
     """
     Ottiene stato generale del manager MQTT.
@@ -148,7 +153,15 @@ def manager_status(request):
     GET /v1/mqtt/manager/status/
     """
     try:
-        all_connections = mqtt_manager.get_all_connections_status()
+        # Check superuser permission
+        if not request.user.is_superuser:
+            return Response(
+                {'error': 'Superuser permission required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+
+        all_connections = mqtt_service.get_all_connections_status()
 
         # Calcola statistiche
         total_connections = len(all_connections)
@@ -157,7 +170,7 @@ def manager_status(request):
         error_connections = len([c for c in all_connections if c.get('status') == 'error'])
 
         status_data = {
-            'is_running': mqtt_manager.is_running(),
+            'is_running': mqtt_service.is_running(),
             'total_connections': total_connections,
             'active_connections': active_connections,
             'connected_connections': connected_connections,
@@ -181,7 +194,6 @@ def manager_status(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-@user_passes_test(is_superuser)
 def all_connections_status(request):
     """
     Ottiene stato dettagliato di tutte le connessioni MQTT.
@@ -189,7 +201,15 @@ def all_connections_status(request):
     GET /v1/mqtt/connections/status/
     """
     try:
-        all_connections = mqtt_manager.get_all_connections_status()
+        # Check superuser permission
+        if not request.user.is_superuser:
+            return Response(
+                {'error': 'Superuser permission required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+
+        all_connections = mqtt_service.get_all_connections_status()
 
         # Serializza ogni connessione
         serialized_connections = []
@@ -216,7 +236,6 @@ def all_connections_status(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-@user_passes_test(is_superuser)
 def connections_list(request):
     """
     Lista tutte le connessioni MQTT configurate nel DB.
@@ -224,6 +243,14 @@ def connections_list(request):
     GET /v1/mqtt/connections/
     """
     try:
+        # Check superuser permission
+        if not request.user.is_superuser:
+            return Response(
+                {'error': 'Superuser permission required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+
         connections = MqttConnection.objects.select_related('site').all()
         serializer = MqttConnectionListSerializer(connections, many=True)
 
@@ -242,7 +269,6 @@ def connections_list(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@user_passes_test(is_superuser)
 def restart_manager(request):
     """
     Riavvia completamente il manager MQTT.
@@ -250,10 +276,17 @@ def restart_manager(request):
     POST /v1/mqtt/manager/restart/
     """
     try:
+        # Check superuser permission
+        if not request.user.is_superuser:
+            return Response(
+                {'success': False, 'message': 'Superuser permission required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         logger.info(f"API request to restart MQTT manager by user {request.user}")
 
         # Ferma manager
-        stop_success = mqtt_manager.stop()
+        stop_success = mqtt_service.stop()
         if not stop_success:
             return Response(
                 {'success': False, 'message': 'Failed to stop MQTT manager'},
@@ -265,7 +298,7 @@ def restart_manager(request):
         time.sleep(2)
 
         # Riavvia manager
-        start_success = mqtt_manager.start()
+        start_success = mqtt_service.start()
         if not start_success:
             return Response(
                 {'success': False, 'message': 'Failed to start MQTT manager'},
@@ -287,7 +320,6 @@ def restart_manager(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@user_passes_test(is_superuser)
 def force_discovery(request, site_id):
     """
     Forza refresh discovery per un sito - rilegge tutti i discovered topics
@@ -296,6 +328,13 @@ def force_discovery(request, site_id):
     POST /v1/mqtt/sites/{site_id}/discover/
     """
     try:
+        # Check superuser permission
+        if not request.user.is_superuser:
+            return Response(
+                {'success': False, 'message': 'Superuser permission required'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         logger.info(f"API request to force discovery refresh for site {site_id} by user {request.user}")
 
         from sites.models import Site
@@ -419,7 +458,7 @@ def publish_mqtt_message(request, site_id):
             )
 
         # Pubblica il messaggio tramite MQTT manager
-        result = mqtt_manager.publish_message(
+        result = mqtt_service.publish_message(
             site_id=site_id,
             topic=topic,
             message=message,
@@ -486,7 +525,7 @@ def subscribe_mqtt_topic(request, site_id):
             )
 
         # Sottoscrivi tramite MQTT manager
-        result = mqtt_manager.subscribe_topic(
+        result = mqtt_service.subscribe_topic(
             site_id=site_id,
             topic=topic,
             callback_url=callback_url
