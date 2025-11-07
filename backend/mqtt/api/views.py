@@ -46,7 +46,15 @@ def start_connection(request, site_id):
 
         logger.info(f"API request to start MQTT connection for site {site_id} by user {request.user}")
 
-        result = mqtt_service.start_connection(site_id=int(site_id), manual=True)
+        conn, created = MqttConnection.objects.update_or_create(
+            site_id=int(site_id),
+            defaults={'is_enabled': True}
+        )
+
+        result = {
+            'success': True,
+            'message': f'Site {site_id} enabled. Connection will be started by the monitor shortly.'
+        }
 
         serializer = MqttControlResponseSerializer(data=result)
         if serializer.is_valid():
@@ -86,7 +94,18 @@ def stop_connection(request, site_id):
 
         logger.info(f"API request to stop MQTT connection for site {site_id} by user {request.user}")
 
-        result = mqtt_service.stop_connection(site_id=int(site_id))
+        updated_count = MqttConnection.objects.filter(site_id=int(site_id)).update(is_enabled=False)
+
+        if updated_count == 0:
+            return Response(
+                {'success': False, 'message': f'Site {site_id} not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        result = {
+            'success': True,
+            'message': f'Site {site_id} disabled. Connection will be stopped by the monitor shortly.'
+        }
 
         serializer = MqttControlResponseSerializer(data=result)
         if serializer.is_valid():

@@ -172,9 +172,7 @@ class MQTTService:
         try:
             mqtt_conn = MqttConnection.objects.get(site_id=site_id)
 
-            # Disabilita nel DB
-            mqtt_conn.is_enabled = False
-            mqtt_conn.save(update_fields=['is_enabled'])
+
 
             # Ferma connessione attiva
             with self._connections_lock:
@@ -303,47 +301,7 @@ class MQTTService:
 
         while not self._should_stop:
             try:
-                # Controlla connessioni esistenti
-                with self._connections_lock:
-                    connection_ids = list(self.connections.keys())
 
-                for conn_id in connection_ids:
-                    manager = self.connections.get(conn_id)
-                    if manager and not manager.is_connected():
-                        try:
-                            # Check if connection is still establishing (grace period)
-                            connection_age = (datetime.now() - manager.created_at).total_seconds()
-
-                            if connection_age < GRACE_PERIOD_SECONDS:
-                                # Connection is still establishing, don't retry yet
-                                logger.debug(
-                                    f"[Connection {conn_id}] Not connected yet, "
-                                    f"but only {connection_age:.1f}s old. "
-                                    f"Waiting (grace period: {GRACE_PERIOD_SECONDS}s)..."
-                                )
-                                continue
-
-                            mqtt_conn = MqttConnection.objects.get(id=conn_id)
-                            logger.warning(
-                                f"[Connection {conn_id}] Lost connection (age: {connection_age:.1f}s), "
-                                f"retry {manager.retry_count}/{manager.MAX_RETRIES}"
-                            )
-
-                            # Se non ha superato max retry, riprova
-                            if manager.retry_count < manager.MAX_RETRIES and mqtt_conn.is_enabled:
-                                # Disconnetti completamente il vecchio manager per fermare loop paho-mqtt
-                                logger.debug(f"[Connection {conn_id}] Disconnecting old manager before retry")
-                                manager.disconnect()
-
-                                # Rimuovi manager vecchio dal registry
-                                with self._connections_lock:
-                                    self.connections.pop(conn_id, None)
-
-                                # Avvia nuovo tentativo (il nuovo manager leggerà retry_count dal DB)
-                                self.start_connection(mqtt_conn.site.id, manual=False)
-
-                        except Exception as e:
-                            logger.error(f"[Connection {conn_id}] Error handling lost connection: {e}")
 
                 # Cerca nuovi siti abilitati o quelli da retry
                 now = timezone.now()
