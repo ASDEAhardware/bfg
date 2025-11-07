@@ -10,7 +10,7 @@ import { ContextualStatusBar, useContextualStatusBar } from "@/components/Contex
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { useGridStore } from "@/store/gridStore";
 import { useUserInfo } from "@/hooks/useAuth";
-import { useMqttConnectionStatus, useMqttControl, useDataloggers, useMqttStatusPolling } from "@/hooks/useMqtt";
+import { useMqttConnectionStatus, useMqttControl, useDataloggers } from "@/hooks/useMqtt";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,7 +86,7 @@ export default function DataLoggerListPage() {
   const { connection: mqttConnection, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
   const { controlConnection, forceDiscovery } = useMqttControl();
   const { dataloggers, loading: dataloggerLoading, error: dataloggerError, refresh: refreshDataloggers } = useDataloggers(selectedSiteId);
-  const { isPolling, startPolling, stopPolling } = useMqttStatusPolling(selectedSiteId, refreshMqttStatus, refreshDataloggers);
+
 
   // System info from dataloggers aggregated
   const systemInfo = dataloggers.length > 0 ? {
@@ -134,7 +134,7 @@ export default function DataLoggerListPage() {
     if (!selectedSiteId) return null;
 
     // During start operation: show only "Connecting..."
-    if (lastAction === 'start' && (startLoading || isPolling)) {
+    if (lastAction === 'start' && startLoading) {
       return {
         variant: "secondary" as const,
         text: "Connecting...",
@@ -143,7 +143,7 @@ export default function DataLoggerListPage() {
     }
 
     // During stop operation: show only "Disconnecting..."
-    if (lastAction === 'stop' && (stopLoading || isPolling)) {
+    if (lastAction === 'stop' && stopLoading) {
       return {
         variant: "outline" as const,
         text: "Disconnecting...",
@@ -255,7 +255,7 @@ export default function DataLoggerListPage() {
 
   // MQTT Control Functions (superuser only)
   const handleMqttStart = async () => {
-    if (!selectedSiteId || !userData?.is_superuser || startLoading || isPolling) return;
+    if (!selectedSiteId || !userData?.is_superuser || startLoading) return;
 
     setStartLoading(true);
     setLastAction('start');
@@ -270,12 +270,8 @@ export default function DataLoggerListPage() {
           description: result.message,
           duration: 4000
         });
-
-        // Start polling and keep loading until complete
-        await startPolling('connected', () => {
-          setStartLoading(false);
-          setLastAction(null);
-        });
+        setStartLoading(false);
+        setLastAction(null);
       } else {
         throw new Error(result.message);
       }
@@ -289,11 +285,10 @@ export default function DataLoggerListPage() {
       setStartLoading(false);
       setLastAction(null);
     }
-    // Don't clear loading in finally - polling will do it
   };
 
   const handleMqttStop = async () => {
-    if (!selectedSiteId || !userData?.is_superuser || stopLoading || isPolling) return;
+    if (!selectedSiteId || !userData?.is_superuser || stopLoading) return;
 
     setStopLoading(true);
     setLastAction('stop');
@@ -308,12 +303,8 @@ export default function DataLoggerListPage() {
           description: result.message,
           duration: 4000
         });
-
-        // Start polling and keep loading until complete
-        await startPolling('disconnected', () => {
-          setStopLoading(false);
-          setLastAction(null);
-        });
+        setStopLoading(false);
+        setLastAction(null);
       } else {
         throw new Error(result.message);
       }
@@ -327,7 +318,6 @@ export default function DataLoggerListPage() {
       setStopLoading(false);
       setLastAction(null);
     }
-    // Don't clear loading in finally - polling will do it
   };
 
   // Force Discovery Function
@@ -368,7 +358,7 @@ export default function DataLoggerListPage() {
   };
 
   // Check if any MQTT operation is in progress (for disabling controls)
-  const isMqttOperationInProgress = startLoading || stopLoading || isPolling;
+  const isMqttOperationInProgress = startLoading || stopLoading;
 
   return (
     <div ref={containerRef} className="flex flex-col h-full relative">

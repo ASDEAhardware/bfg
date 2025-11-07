@@ -1,5 +1,7 @@
 Django>=4.2
 djangorestframework
+channels
+daphne
 psycopg2-binary
 djangorestframework-simplejwt>=5.3.1
 django-cors-headers
