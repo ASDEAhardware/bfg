@@ -17,6 +17,7 @@ urlpatterns = [
     # Stato generale manager
     path('manager/status/', views.manager_status, name='manager_status'),
     path('manager/restart/', views.restart_manager, name='restart_manager'),
+    path('health/', views.mqtt_service_health, name='service_health'),
 
     # Lista e stato tutte le connessioni
     path('connections/', views.connections_list, name='connections_list'),

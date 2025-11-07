@@ -19,6 +19,12 @@ services:
       - db
     environment:
       - API_KEY=${SECRET_API_KEY}
+      # MQTT Service Configuration
+      - MQTT_INSTANCE_ID=bfg_back
+      - MQTT_CLEAN_SESSION=true
+      - MQTT_LWT_ENABLED=true
+      - MQTT_KEEP_ALIVE=60
+      - MQTT_SHUTDOWN_TIMEOUT=5
 
   db:
     image: postgres:15

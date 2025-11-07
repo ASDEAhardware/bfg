@@ -289,4 +289,16 @@ LOGGING = {
     },
 }
 
+# MQTT Service Configuration
+import socket
+
+MQTT_CONFIG = {
+    'INSTANCE_ID': os.getenv('MQTT_INSTANCE_ID', socket.gethostname()[:8]),
+    'KEEP_ALIVE': int(os.getenv('MQTT_KEEP_ALIVE', '60')),
+    'CLEAN_SESSION': os.getenv('MQTT_CLEAN_SESSION', 'true').lower() == 'true',
+    'LWT_ENABLED': os.getenv('MQTT_LWT_ENABLED', 'true').lower() == 'true',
+    'SHUTDOWN_TIMEOUT': int(os.getenv('MQTT_SHUTDOWN_TIMEOUT', '5')),
+    'RECONNECT_MAX_DELAY': int(os.getenv('MQTT_RECONNECT_MAX_DELAY', '300')),
+}
+
 

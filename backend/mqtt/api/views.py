@@ -7,7 +7,7 @@ from datetime import datetime
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from ..services.mqtt_service import mqtt_service
 from ..models import MqttConnection, Datalogger, Sensor, DiscoveredTopic
@@ -615,3 +615,89 @@ def datalogger_mqtt_callback(request, datalogger_id):
             {'success': False, 'message': f'Internal error: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def mqtt_service_health(request):
+    """
+    Health check endpoint per monitoring MQTT Service
+
+    Returns:
+        JSON con stato servizio e metriche connessioni
+    """
+    try:
+        from ..services.mqtt_service import mqtt_service
+        from django.conf import settings
+        import subprocess
+
+        # Check if mqtt_service supervisord program is running
+        # (MQTT service runs in separate process, so we can't use mqtt_service.is_running())
+        try:
+            result = subprocess.run(
+                ['supervisorctl', 'status', 'mqtt_service'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            is_running = 'RUNNING' in result.stdout
+        except Exception as e:
+            logger.warning(f"Could not check supervisord status: {e}")
+            is_running = False
+
+        # Query database directly since connections run in separate process
+        from ..models import MqttConnection
+        all_connections = MqttConnection.objects.all()
+
+        total = all_connections.count()
+        enabled = all_connections.filter(is_enabled=True).count()
+        healthy = all_connections.filter(is_enabled=True, status='connected').count()
+
+        # Build connections list for verbose mode
+        connections = []
+        if request.GET.get('verbose') == 'true':
+            for conn in all_connections:
+                connections.append({
+                    'site_id': conn.site_id,
+                    'site_name': conn.site.name,
+                    'status': conn.status,
+                    'is_enabled': conn.is_enabled,
+                    'last_connected_at': conn.last_connected_at.isoformat() if conn.last_connected_at else None,
+                    'error_message': conn.error_message if conn.error_message else None
+                })
+
+        # Determina health status globale
+        if not is_running:
+            health_status = 'critical'
+        elif total == 0:
+            health_status = 'warning'  # No connections configured
+        elif healthy == enabled:
+            health_status = 'healthy'
+        elif healthy > 0:
+            health_status = 'degraded'
+        else:
+            health_status = 'critical'
+
+        return Response({
+            'status': health_status,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'service': {
+                'running': is_running,
+                'instance_id': settings.MQTT_CONFIG.get('INSTANCE_ID', 'unknown')
+            },
+            'connections': {
+                'total': total,
+                'enabled': enabled,
+                'healthy': healthy,
+                'unhealthy': enabled - healthy
+            },
+            'details': connections if connections else None
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error in mqtt_service_health: {e}", exc_info=True)
+        return Response({
+            'status': 'error',
+            'message': f'Health check failed: {str(e)}',
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

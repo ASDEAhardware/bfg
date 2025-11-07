@@ -1,6 +1,7 @@
 """
 MQTT Connection Manager - Gestisce una singola connessione MQTT per un sito
 """
+import json
 import logging
 import threading
 import time
@@ -42,6 +43,7 @@ class MQTTConnectionManager:
         # Track connection lifecycle for duplicate prevention
         self.created_at = datetime.now()  # When manager was created
         self.last_connected_at = None  # When connection was successfully established
+        self.reconnect_cooldown_until = None  # Prevent reconnect loops (code 7)
 
     def _get_retry_delay(self) -> int:
         """Calcola delay esponenziale con cap"""
@@ -107,9 +109,45 @@ class MQTTConnectionManager:
         if rc == 0:
             # Mark successful connection timestamp
             self.last_connected_at = datetime.now()
+            # Clear cooldown on successful connection
+            self.reconnect_cooldown_until = None
 
             logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Connected successfully")
             self._update_connection_status('connected')
+
+            # Pubblica status "online" (contrario del LWT "offline")
+            from .mqtt_service import mqtt_service
+            from mqtt.models import MqttConnection
+            from django.conf import settings
+
+            try:
+                mqtt_conn = MqttConnection.objects.get(id=self.mqtt_connection_id)
+
+                if settings.MQTT_CONFIG.get('LWT_ENABLED', True):
+                    lwt_topic = f"{mqtt_conn.client_id_prefix}/backend/status"
+                    online_payload = json.dumps({
+                        "status": "online",
+                        "instance_id": mqtt_service.instance_id,
+                        "client_id": client._client_id.decode() if hasattr(client._client_id, 'decode') else str(client._client_id),
+                        "timestamp": datetime.utcnow().isoformat() + "Z"
+                    })
+
+                    client.publish(
+                        topic=lwt_topic,
+                        payload=online_payload,
+                        qos=1,
+                        retain=True
+                    )
+
+                    logger.info(
+                        f"[MQTT Connection {self.mqtt_connection_id}] "
+                        f"Published online status to {lwt_topic}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"[MQTT Connection {self.mqtt_connection_id}] "
+                    f"Failed to publish online status: {e}"
+                )
 
             # Sottoscrivi ai topic configurati
             self._subscribe_to_topics()
@@ -129,10 +167,25 @@ class MQTTConnectionManager:
     def _on_disconnect(self, client, userdata, rc):
         """Callback disconnessione"""
         if rc != 0:
-            logger.warning(
-                f"[MQTT Connection {self.mqtt_connection_id}] "
-                f"Unexpected disconnect (code {rc})"
-            )
+            # Code 7 = connection lost/closed by broker (often "client already connected")
+            if rc == 7:
+                logger.warning(
+                    f"[MQTT Connection {self.mqtt_connection_id}] "
+                    f"Broker closed connection (code {rc}) - likely duplicate client ID. "
+                    f"Setting 30s cooldown to prevent reconnect loop."
+                )
+                # Set cooldown to prevent immediate reconnect loop
+                self.reconnect_cooldown_until = datetime.now() + timedelta(seconds=30)
+                # Force disconnect to stop loop_start from reconnecting
+                try:
+                    self.client.disconnect()
+                except Exception:
+                    pass
+            else:
+                logger.warning(
+                    f"[MQTT Connection {self.mqtt_connection_id}] "
+                    f"Unexpected disconnect (code {rc})"
+                )
             self._update_connection_status('disconnected', f"Unexpected disconnect: {rc}")
         else:
             logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Disconnected cleanly")
@@ -213,6 +266,15 @@ class MQTTConnectionManager:
             bool: True se avviata con successo, False altrimenti
         """
         with self._lock:
+            # Check reconnect cooldown (prevent code 7 loops)
+            if self.reconnect_cooldown_until and datetime.now() < self.reconnect_cooldown_until:
+                remaining = (self.reconnect_cooldown_until - datetime.now()).total_seconds()
+                logger.info(
+                    f"[MQTT Connection {self.mqtt_connection_id}] "
+                    f"In cooldown period, {remaining:.1f}s remaining"
+                )
+                return False
+
             if self.is_running:
                 logger.warning(f"[MQTT Connection {self.mqtt_connection_id}] Already running")
                 return False
@@ -228,11 +290,25 @@ class MQTTConnectionManager:
 
                 self.site_id = mqtt_conn.site.id
 
-                # Crea client MQTT con instance UUID per unicità tra istanze multiple
+                # Crea client MQTT con instance ID fisso per unicità tra istanze multiple
                 from .mqtt_service import mqtt_service
+                from django.conf import settings
+
                 client_id = f"{mqtt_conn.client_id_prefix}_i{mqtt_service.instance_id}"
-                logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Using client ID: {client_id}")
-                self.client = mqtt.Client(client_id=client_id, protocol=mqtt.MQTTv311)
+
+                # Clean session elimina sessioni zombie sul broker
+                clean_session = settings.MQTT_CONFIG.get('CLEAN_SESSION', True)
+
+                logger.info(
+                    f"[MQTT Connection {self.mqtt_connection_id}] "
+                    f"Using client ID: {client_id} (clean_session={clean_session})"
+                )
+
+                self.client = mqtt.Client(
+                    client_id=client_id,
+                    clean_session=clean_session,
+                    protocol=mqtt.MQTTv311
+                )
 
                 # Imposta callbacks
                 self.client.on_connect = self._on_connect
@@ -262,6 +338,29 @@ class MQTTConnectionManager:
                     logger.info(
                         f"[MQTT Connection {self.mqtt_connection_id}] "
                         f"SSL/TLS enabled{' with custom CA' if mqtt_conn.ca_cert_path else ''}"
+                    )
+
+                # Last Will and Testament (LWT) - notifica disconnessioni impreviste
+                if settings.MQTT_CONFIG.get('LWT_ENABLED', True):
+                    lwt_topic = f"{mqtt_conn.client_id_prefix}/backend/status"
+                    lwt_payload = json.dumps({
+                        "status": "offline",
+                        "instance_id": mqtt_service.instance_id,
+                        "client_id": client_id,
+                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "reason": "unexpected_disconnect"
+                    })
+
+                    self.client.will_set(
+                        topic=lwt_topic,
+                        payload=lwt_payload,
+                        qos=1,
+                        retain=True
+                    )
+
+                    logger.info(
+                        f"[MQTT Connection {self.mqtt_connection_id}] "
+                        f"LWT configured: {lwt_topic}"
                     )
 
                 # Keep alive
@@ -300,11 +399,11 @@ class MQTTConnectionManager:
             try:
                 logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Disconnecting...")
 
-                # Stop loop with timeout (don't block forever)
+                # Stop loop (non-blocking)
                 try:
-                    self.client.loop_stop(timeout=2.0)  # 2 seconds max
+                    self.client.loop_stop()  # Stops the background thread
                 except Exception as e:
-                    logger.warning(f"[MQTT Connection {self.mqtt_connection_id}] loop_stop timeout/error: {e}")
+                    logger.warning(f"[MQTT Connection {self.mqtt_connection_id}] loop_stop error: {e}")
 
                 # Disconnect (best effort, don't block on network issues)
                 try:

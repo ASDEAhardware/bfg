@@ -2,9 +2,10 @@
 MQTT Service - Singleton che gestisce tutte le connessioni MQTT
 """
 import logging
+import os
+import socket
 import threading
 import time
-import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from django.db.models import Q
@@ -34,9 +35,13 @@ class MQTTService:
         if self._initialized:
             return
 
-        # Instance UUID - univoco per questa istanza del servizio
+        # Instance ID - basato su hostname container (fisso tra restart del processo)
         # Usato per garantire client_id MQTT unici tra istanze multiple
-        self.instance_id = uuid.uuid4().hex[:8]
+        # Permette client takeover sul broker in caso di restart
+        self.instance_id = os.getenv(
+            'MQTT_INSTANCE_ID',
+            socket.gethostname()[:8]  # Limita a 8 char per compatibilità
+        )
 
         # Registry delle connessioni attive {mqtt_connection_id: MQTTConnectionManager}
         self.connections: Dict[int, MQTTConnectionManager] = {}
@@ -428,24 +433,50 @@ class MQTTService:
         self._should_stop = True
         self.running = False
 
-        # Disconnetti tutte le connessioni
-        with self._connections_lock:
-            connection_ids = list(self.connections.keys())
+        start_time = time.time()
 
-        for conn_id in connection_ids:
-            try:
-                mqtt_conn = MqttConnection.objects.get(id=conn_id)
-                self.stop_connection(mqtt_conn.site.id)
-            except Exception as e:
-                logger.error(f"Error stopping connection {conn_id}: {e}")
+        # Disconnetti tutte le connessioni IN PARALLELO
+        with self._connections_lock:
+            connection_managers = list(self.connections.values())
+
+        if connection_managers:
+            logger.info(f"Disconnecting {len(connection_managers)} connections in parallel...")
+
+            # Disconnessioni parallele con threading
+            disconnect_threads = []
+            for conn_manager in connection_managers:
+                thread = threading.Thread(
+                    target=conn_manager.disconnect,
+                    daemon=True  # Non bloccare shutdown se thread non termina
+                )
+                thread.start()
+                disconnect_threads.append(thread)
+
+            # Aspetta completamento con timeout globale di 5s
+            max_wait = 5.0
+            for thread in disconnect_threads:
+                remaining = max_wait - (time.time() - start_time)
+                if remaining > 0:
+                    thread.join(timeout=remaining)
+                else:
+                    logger.warning("Disconnect timeout reached, forcing shutdown")
+                    break
+
+            elapsed = time.time() - start_time
+            logger.info(f"All connections disconnected in {elapsed:.2f}s")
+        else:
+            logger.info("No active connections to disconnect")
 
         # Aspetta che il monitor thread finisca
         if self.monitor_thread and self.monitor_thread.is_alive():
-            self.monitor_thread.join(timeout=10.0)
+            remaining = 5.0 - (time.time() - start_time)
+            if remaining > 0:
+                self.monitor_thread.join(timeout=remaining)
             if self.monitor_thread.is_alive():
                 logger.warning("Monitor thread did not terminate cleanly")
 
-        logger.info("MQTT Service stopped")
+        total_elapsed = time.time() - start_time
+        logger.info(f"MQTT Service stopped (total time: {total_elapsed:.2f}s)")
         return True
 
     def is_running(self) -> bool:
