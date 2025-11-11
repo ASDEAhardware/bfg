@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useContainerWidth } from "@/hooks/useContainerWidth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { DataloggerCard } from "@/components/DataloggerCard";
 import { ContextualStatusBar, useContextualStatusBar } from "@/components/ContextualStatusBar";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
@@ -41,7 +40,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -84,7 +82,7 @@ export default function DataLoggerListPage() {
 
   // MQTT hooks
   const { connection: mqttConnection, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
-  const { controlConnection, forceDiscovery } = useMqttControl();
+  const { startConnection, stopConnection, forceDiscovery, loading: isMqttControlLoading } = useMqttControl();
   const { dataloggers, loading: dataloggerLoading, error: dataloggerError, refresh: refreshDataloggers } = useDataloggers(selectedSiteId);
 
 
@@ -103,10 +101,6 @@ export default function DataLoggerListPage() {
     last_updated: Math.max(...dataloggers.map(d => new Date(d.updated_at).getTime()))
   } : null;
 
-  const [startLoading, setStartLoading] = useState(false);
-  const [stopLoading, setStopLoading] = useState(false);
-  const [discoveryLoading, setDiscoveryLoading] = useState(false);
-  const [lastAction, setLastAction] = useState<'start' | 'stop' | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -133,24 +127,6 @@ export default function DataLoggerListPage() {
   const getMqttStatusBadge = () => {
     if (!selectedSiteId) return null;
 
-    // During start operation: show only "Connecting..."
-    if (lastAction === 'start' && startLoading) {
-      return {
-        variant: "secondary" as const,
-        text: "Connecting...",
-        className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 animate-pulse"
-      };
-    }
-
-    // During stop operation: show only "Disconnecting..."
-    if (lastAction === 'stop' && stopLoading) {
-      return {
-        variant: "outline" as const,
-        text: "Disconnecting...",
-        className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100 animate-pulse"
-      };
-    }
-
     if (!mqttConnection) {
       return { variant: "secondary" as const, text: "MQTT not configured", className: "bg-muted text-muted-foreground" };
     }
@@ -159,9 +135,11 @@ export default function DataLoggerListPage() {
       case 'connected':
         return { variant: "default" as const, text: "MQTT connected", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" };
       case 'connecting':
-        return { variant: "secondary" as const, text: "Connecting...", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" };
+        return { variant: "secondary" as const, text: "Connecting...", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 animate-pulse" };
       case 'disconnected':
         return { variant: "outline" as const, text: "MQTT disconnected", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100" };
+      case 'disabled':
+        return { variant: "outline" as const, text: "Disconnecting...", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100 animate-pulse" };
       case 'error':
         // Distinguish between real errors and heartbeat timeout
         if (isHeartbeatTimeout) {
@@ -254,111 +232,21 @@ export default function DataLoggerListPage() {
   }, [selectedSiteId]);
 
   // MQTT Control Functions (superuser only)
-  const handleMqttStart = async () => {
-    if (!selectedSiteId || !userData?.is_superuser || startLoading) return;
-
-    setStartLoading(true);
-    setLastAction('start');
-    toast.loading("Starting MQTT connection...", { id: "mqtt-control" });
-
-    try {
-      const result = await controlConnection(selectedSiteId, 'start');
-
-      if (result.success) {
-        toast.success(`MQTT Connection Started`, {
-          id: "mqtt-control",
-          description: result.message,
-          duration: 4000
-        });
-        setStartLoading(false);
-        setLastAction(null);
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      toast.error(`Failed to start MQTT`, {
-        id: "mqtt-control",
-        description: error instanceof Error ? error.message : 'Connection error',
-        duration: 5000
-      });
-      await refreshMqttStatus();
-      setStartLoading(false);
-      setLastAction(null);
-    }
+  const handleMqttStart = () => {
+    if (!selectedSiteId || !userData?.is_superuser || isMqttControlLoading) return;
+    startConnection(selectedSiteId);
   };
 
-  const handleMqttStop = async () => {
-    if (!selectedSiteId || !userData?.is_superuser || stopLoading) return;
-
-    setStopLoading(true);
-    setLastAction('stop');
-    toast.loading("Stopping MQTT connection...", { id: "mqtt-control" });
-
-    try {
-      const result = await controlConnection(selectedSiteId, 'stop');
-
-      if (result.success) {
-        toast.success(`MQTT Connection Stopped`, {
-          id: "mqtt-control",
-          description: result.message,
-          duration: 4000
-        });
-        setStopLoading(false);
-        setLastAction(null);
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      toast.error(`Failed to stop MQTT`, {
-        id: "mqtt-control",
-        description: error instanceof Error ? error.message : 'Connection error',
-        duration: 5000
-      });
-      await refreshMqttStatus();
-      setStopLoading(false);
-      setLastAction(null);
-    }
+  const handleMqttStop = () => {
+    if (!selectedSiteId || !userData?.is_superuser || isMqttControlLoading) return;
+    stopConnection(selectedSiteId);
   };
 
   // Force Discovery Function
-  const handleForceDiscovery = async () => {
-    if (!selectedSiteId || !userData?.is_superuser || discoveryLoading) return;
-
-    setDiscoveryLoading(true);
-    toast.loading("Forcing topic discovery refresh...", { id: "discovery-control" });
-
-    try {
-      const result = await forceDiscovery(selectedSiteId);
-
-      if (result.success) {
-        toast.success(`Discovery Refresh Complete`, {
-          id: "discovery-control",
-          description: `${result.success_count} topics processed successfully` +
-            (result.error_count > 0 ? `, ${result.error_count} errors` : '')
-        });
-
-        // Refresh everything after successful discovery
-        setTimeout(async () => {
-          await Promise.all([
-            refreshMqttStatus(),
-            refreshDataloggers()
-          ]);
-        }, 1000);
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      toast.error(`Discovery refresh failed`, {
-        id: "discovery-control",
-        description: error instanceof Error ? error.message : 'Discovery error'
-      });
-    } finally {
-      setDiscoveryLoading(false);
-    }
+  const handleForceDiscovery = () => {
+    if (!selectedSiteId || !userData?.is_superuser || isMqttControlLoading) return;
+    forceDiscovery(selectedSiteId);
   };
-
-  // Check if any MQTT operation is in progress (for disabling controls)
-  const isMqttOperationInProgress = startLoading || stopLoading;
 
   return (
     <div ref={containerRef} className="flex flex-col h-full relative">
@@ -387,9 +275,9 @@ export default function DataLoggerListPage() {
                             size="sm"
                             className="h-6 w-6 p-0"
                             title="Admin Controls"
-                            disabled={isMqttOperationInProgress}
+                            disabled={isMqttControlLoading || mqttConnection?.status === 'connecting' || mqttConnection?.status === 'disabled'}
                           >
-                            {isMqttOperationInProgress ? (
+                            {(isMqttControlLoading || mqttConnection?.status === 'connecting' || mqttConnection?.status === 'disabled') ? (
                               <RefreshCw className="h-4 w-4 animate-spin" />
                             ) : (
                               <Shield className="h-4 w-4" />
@@ -406,10 +294,10 @@ export default function DataLoggerListPage() {
                                 setIsAdminMenuOpen(false);
                                 setShowStartConfirm(true);
                               }}
-                              disabled={isMqttOperationInProgress || discoveryLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting'}
+                              disabled={isMqttControlLoading || mqttConnection?.status === 'connected' || mqttConnection?.status === 'connecting'}
                               className="w-full justify-start gap-2"
                             >
-                              {startLoading ? (
+                              {isMqttControlLoading && mqttConnection?.status === 'connecting' ? (
                                 <RefreshCw className="h-3 w-3 animate-spin" />
                               ) : (
                                 <Play className="h-3 w-3" />
@@ -425,10 +313,10 @@ export default function DataLoggerListPage() {
                                 setIsAdminMenuOpen(false);
                                 setShowStopConfirm(true);
                               }}
-                              disabled={isMqttOperationInProgress || discoveryLoading || mqttConnection?.status !== 'connected'}
+                              disabled={isMqttControlLoading || mqttConnection?.status !== 'connected'}
                               className="w-full justify-start gap-2"
                             >
-                              {stopLoading ? (
+                              {isMqttControlLoading && mqttConnection?.status === 'disabled' ? (
                                 <RefreshCw className="h-3 w-3 animate-spin" />
                               ) : (
                                 <Square className="h-3 w-3" />
@@ -444,10 +332,10 @@ export default function DataLoggerListPage() {
                                 setIsAdminMenuOpen(false);
                                 handleForceDiscovery();
                               }}
-                              disabled={isMqttOperationInProgress || discoveryLoading || mqttConnection?.status !== 'connected'}
+                              disabled={isMqttControlLoading || mqttConnection?.status !== 'connected'}
                               className="w-full justify-start gap-2"
                             >
-                              {discoveryLoading ? (
+                              {isMqttControlLoading ? (
                                 <RefreshCw className="h-3 w-3 animate-spin" />
                               ) : (
                                 <RefreshCw className="h-3 w-3" />
@@ -511,7 +399,7 @@ export default function DataLoggerListPage() {
                   variant="outline"
                   size="sm"
                   onClick={refreshDataloggers}
-                  disabled={dataloggerLoading || isMqttOperationInProgress}
+                  disabled={dataloggerLoading || isMqttControlLoading}
                   className="h-6 px-2"
                   title="Refresh datalogger"
                 >

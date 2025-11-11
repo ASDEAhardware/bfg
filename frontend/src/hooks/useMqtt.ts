@@ -2,7 +2,9 @@
  * Modern MQTT hooks with best practices
  * Replaces the old useMqttStatus.ts with clean, type-safe implementation
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { api } from '@/lib/axios';
 
 // Types
@@ -83,38 +85,22 @@ export interface Sensor {
 
 // MQTT Connection Status Hook
 export function useMqttConnectionStatus(siteId: number | null) {
-  const [connection, setConnection] = useState<MqttConnectionStatus | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStatus = useCallback(async () => {
-    if (!siteId) {
-      setConnection(null);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
+  const { data: connection, isLoading: loading, error: queryError, refetch: refresh } = useQuery<MqttConnectionStatus, Error>({
+    queryKey: ['mqttConnectionStatus', siteId],
+    queryFn: async () => {
+      if (!siteId) {
+        throw new Error('Site ID is required');
+      }
       const response = await api.get(`v1/mqtt/sites/${siteId}/status/`);
-      setConnection(response.data);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch MQTT status';
-      setError(errorMessage);
-      setConnection(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [siteId]);
+      return response.data;
+    },
+    enabled: !!siteId, // Abilita la query solo se siteId è presente
+    staleTime: 5 * 60 * 1000, // I dati sono considerati 'freschi' per 5 minuti
+    refetchOnWindowFocus: false, // Non fare refetch automatico al focus della finestra
+    retry: 1, // Riprova una volta in caso di errore
+  });
 
-  useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
-
-  const refresh = useCallback(() => {
-    return fetchStatus();
-  }, [fetchStatus]);
+  const error = queryError ? queryError.message : null;
 
   // Helper computed values
   const isHeartbeatTimeout = connection && connection.last_heartbeat_at
@@ -122,7 +108,7 @@ export function useMqttConnectionStatus(siteId: number | null) {
     : false;
 
   return {
-    connection,
+    connection: connection || null,
     loading,
     error,
     isHeartbeatTimeout,
@@ -132,113 +118,143 @@ export function useMqttConnectionStatus(siteId: number | null) {
 
 // MQTT Control Hook
 export function useMqttControl() {
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
-  const controlConnection = useCallback(async (siteId: number, action: 'start' | 'stop'): Promise<MqttControlResponse> => {
-    setLoading(true);
+  const mutation = useMutation<MqttControlResponse, Error, { siteId: number; action: 'start' | 'stop' }>({
+    mutationFn: ({ siteId, action }) => {
+      return api.post(`v1/mqtt/sites/${siteId}/${action}/`);
+    },
+    onMutate: async ({ siteId, action }) => {
+      toast.loading(`${action === 'start' ? 'Starting' : 'Stopping'} MQTT connection...`, { id: 'mqtt-control' });
+      await queryClient.cancelQueries({ queryKey: ['mqttConnectionStatus', siteId] });
+      const previousStatus = queryClient.getQueryData(['mqttConnectionStatus', siteId]);
+      queryClient.setQueryData(['mqttConnectionStatus', siteId], (old: any) => {
+        if (!old) return undefined;
+        return {
+          ...old,
+          status: action === 'start' ? 'connecting' : 'disabled',
+          is_enabled: action === 'start',
+        };
+      });
+      return { previousStatus, siteId };
+    },
+    onSuccess: (data, variables) => {
+      toast.success(`MQTT Connection ${variables.action === 'start' ? 'Started' : 'Stopped'}`, {
+        id: 'mqtt-control',
+        description: data.message,
+        duration: 4000,
+      });
+    },
+    onError: (err, variables, context) => {
+      toast.error(`Failed to ${variables.action} MQTT`, {
+        id: 'mqtt-control',
+        description: err.message,
+        duration: 5000,
+      });
+      if (context?.previousStatus) {
+        queryClient.setQueryData(['mqttConnectionStatus', context.siteId], context.previousStatus);
+      }
+    },
+    onSettled: (data, error, variables) => {
+      // No longer invalidating here; the WebSocket message is the source of truth.
+    },
+  });
 
-    try {
-      const response = await api.post(`v1/mqtt/sites/${siteId}/${action}/`);
-      return response.data;
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || `Failed to ${action} MQTT connection`;
-      throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const controlConnection = useCallback((siteId: number, action: 'start' | 'stop') => {
+    return mutation.mutate({ siteId, action });
+  }, [mutation]);
 
   const startConnection = useCallback((siteId: number) => {
-    return controlConnection(siteId, 'start');
+    controlConnection(siteId, 'start');
   }, [controlConnection]);
 
   const stopConnection = useCallback((siteId: number) => {
-    return controlConnection(siteId, 'stop');
+    controlConnection(siteId, 'stop');
   }, [controlConnection]);
 
-  const forceDiscovery = useCallback(async (siteId: number) => {
-    setLoading(true);
-
-    try {
-      const response = await api.post(`v1/mqtt/sites/${siteId}/discover/`);
-      return response.data;
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to force discovery';
-      throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
+  const discoveryMutation = useMutation<MqttControlResponse, Error, { siteId: number }>({
+    mutationFn: ({ siteId }) => {
+      return api.post(`v1/mqtt/sites/${siteId}/discover/`);
+    },
+    onMutate: () => {
+      toast.loading('Forcing topic discovery refresh...', { id: 'discovery-control' });
+    },
+    onSuccess: (data: any) => {
+      toast.success('Discovery Refresh Complete', {
+        id: 'discovery-control',
+        description: `${data.success_count} topics processed successfully` +
+          (data.error_count > 0 ? `, ${data.error_count} errors` : ''),
+      });
+    },
+    onError: (err) => {
+      toast.error('Discovery refresh failed', {
+        id: 'discovery-control',
+        description: err.message,
+      });
+    },
+    onSettled: (data, error, variables) => {
+      // The WebSocket message will trigger the invalidation.
+      // Forcing a delayed invalidation as a fallback.
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['mqttConnectionStatus', variables.siteId] });
+        queryClient.invalidateQueries({ queryKey: ['dataloggers', variables.siteId] });
+      }, 1000);
     }
-  }, []);
+  });
+
+  const forceDiscovery = useCallback((siteId: number) => {
+    return discoveryMutation.mutate({ siteId });
+  }, [discoveryMutation]);
 
   return {
     controlConnection,
     startConnection,
     stopConnection,
     forceDiscovery,
-    loading
+    loading: mutation.isPending || discoveryMutation.isPending,
   };
 }
 
 // Dataloggers Hook
 export function useDataloggers(siteId: number | null, onlineOnly: boolean = false) {
-  const [dataloggers, setDataloggers] = useState<Datalogger[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchDataloggers = useCallback(async () => {
-    if (!siteId) {
-      setDataloggers([]);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
+  const { data: dataloggers, isLoading: loading, error: queryError, refetch: refresh } = useQuery<Datalogger[], Error>({
+    queryKey: ['dataloggers', siteId, onlineOnly],
+    queryFn: async () => {
+      if (!siteId) {
+        throw new Error('Site ID is required');
+      }
       const params = new URLSearchParams({
         site_id: siteId.toString(),
         ...(onlineOnly && { online_only: 'true' })
       });
-
       const response = await api.get(`v1/mqtt/dataloggers/?${params}`);
-      setDataloggers(response.data.dataloggers || []);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch dataloggers';
-      setError(errorMessage);
-      setDataloggers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [siteId, onlineOnly]);
+      return response.data.dataloggers || [];
+    },
+    enabled: !!siteId, // Abilita la query solo se siteId è presente
+    staleTime: 5 * 60 * 1000, // I dati sono considerati 'freschi' per 5 minuti
+    refetchOnWindowFocus: false, // Non fare refetch automatico al focus della finestra
+    retry: 1, // Riprova una volta in caso di errore
+    select: (data) => data.map(d => ({ ...d, id: d.id.toString() })) // Assicurati che l'ID sia una stringa
+  });
 
-  useEffect(() => {
-    fetchDataloggers();
-  }, [fetchDataloggers]);
-
-  const refresh = useCallback(() => {
-    return fetchDataloggers();
-  }, [fetchDataloggers]);
+  const error = queryError ? queryError.message : null;
 
   const updateDataloggerLabel = useCallback(async (datalogger: Datalogger, newLabel: string) => {
     try {
       const response = await api.patch(`v1/mqtt/dataloggers/${datalogger.id}/update_label/`, {
         label: newLabel
       });
-
-      // Update local state
-      setDataloggers(prev => prev.map(d =>
-        d.id === datalogger.id ? { ...d, label: newLabel } : d
-      ));
-
+      // Invalida la query per forzare un refetch e aggiornare la UI
+      refresh();
       return response.data;
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || err.message || 'Failed to update datalogger label';
       throw new Error(errorMessage);
     }
-  }, []);
+  }, [refresh]);
 
   return {
-    dataloggers,
+    dataloggers: dataloggers || [],
     loading,
     error,
     refresh,
@@ -307,104 +323,5 @@ export function useSensors(datalogger: Datalogger | null) {
     error,
     refresh,
     updateSensorLabel
-  };
-}
-
-/**
- * Hook combinato per status MQTT e polling automatico
- */
-export function useMqttStatusWithPolling(siteId: number | null, pollingInterval: number = 30000) {
-  const mqttStatus = useMqttConnectionStatus(siteId);
-  const dataloggers = useDataloggers(siteId);
-
-  useEffect(() => {
-    if (!siteId) return;
-
-    const interval = setInterval(() => {
-      mqttStatus.refresh();
-      dataloggers.refresh();
-    }, pollingInterval);
-
-    return () => clearInterval(interval);
-  }, [siteId, pollingInterval, mqttStatus.refresh, dataloggers.refresh]);
-
-  return {
-    mqtt: mqttStatus,
-    dataloggers
-  };
-}
-
-/**
- * Hook for intelligent polling after Start/Stop operations
- * Polls every 2.5s until status is stable or 40s timeout
- */
-export function useMqttStatusPolling(
-  siteId: number | null,
-  refreshMqttStatus: () => Promise<void>,
-  refreshDataloggers: () => Promise<void>
-) {
-  const [isPolling, setIsPolling] = useState(false);
-  const [pollingTimeoutId, setPollingTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  const [pollingIntervalId, setPollingIntervalId] = useState<NodeJS.Timeout | null>(null);
-
-  const stopPolling = useCallback((onComplete?: () => void) => {
-    if (pollingIntervalId) {
-      clearInterval(pollingIntervalId);
-      setPollingIntervalId(null);
-    }
-    if (pollingTimeoutId) {
-      clearTimeout(pollingTimeoutId);
-      setPollingTimeoutId(null);
-    }
-    setIsPolling(false);
-
-    // Call completion callback if provided
-    if (onComplete) {
-      onComplete();
-    }
-  }, [pollingIntervalId, pollingTimeoutId]);
-
-  const startPolling = useCallback(async (
-    targetStatus: 'connected' | 'disconnected',
-    onComplete?: () => void
-  ) => {
-    if (!siteId) return;
-
-    // Stop any existing polling
-    stopPolling();
-
-    setIsPolling(true);
-
-    // Immediate first refresh
-    await Promise.all([refreshMqttStatus(), refreshDataloggers()]);
-
-    // Set up polling interval (2.5 seconds)
-    const intervalId = setInterval(async () => {
-      await refreshMqttStatus();
-    }, 2500);
-    setPollingIntervalId(intervalId);
-
-    // Set up timeout (40 seconds - longer than monitor's 30s check)
-    const timeoutId = setTimeout(() => {
-      console.log('[MqttPolling] Timeout reached (40s), stopping polling');
-      stopPolling(onComplete);
-      // Final refresh after timeout
-      Promise.all([refreshMqttStatus(), refreshDataloggers()]);
-    }, 40000);
-    setPollingTimeoutId(timeoutId);
-
-  }, [siteId, refreshMqttStatus, refreshDataloggers, stopPolling]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopPolling();
-    };
-  }, [stopPolling]);
-
-  return {
-    isPolling,
-    startPolling,
-    stopPolling
   };
 }

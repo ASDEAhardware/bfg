@@ -53,26 +53,12 @@ export const useMqttStatusSocket = () => {
         // Invalida e/o aggiorna la cache di react-query per i datalogger e lo stato MQTT
         // Questo farà sì che i componenti che usano questi dati si aggiornino automaticamente
 
-        // Aggiorna lo stato della connessione MQTT per il sito specifico
-        queryClient.setQueryData(['mqttConnectionStatus', site_id], (oldData: any) => {
-          if (oldData) {
-            return { ...oldData, status, is_enabled };
-          }
-          return oldData; // Se non c'è oldData, non facciamo nulla per ora
-        });
+        // Invalida la query per lo stato della connessione MQTT per il sito specifico
+        // Questo farà sì che react-query esegua un refetch dell'API
+        queryClient.invalidateQueries({ queryKey: ['mqttConnectionStatus', site_id] });
 
-        // Aggiorna lo stato is_online per i datalogger associati a quel sito
-        queryClient.setQueryData(['dataloggers', site_id], (oldData: any) => {
-          if (oldData && Array.isArray(oldData.dataloggers)) {
-            return {
-              ...oldData,
-              dataloggers: oldData.dataloggers.map((d: any) =>
-                d.site_id === site_id ? { ...d, is_online: is_enabled } : d
-              ),
-            };
-          }
-          return oldData;
-        });
+        // Invalida anche la query per i datalogger, dato che is_online potrebbe essere cambiato
+        queryClient.invalidateQueries({ queryKey: ['dataloggers', site_id] });
 
         toast.info(`Site ${site_id} MQTT status: ${status}`, { duration: 2000 });
       }

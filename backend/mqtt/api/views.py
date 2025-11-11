@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.shortcuts import get_object_or_404
 
 from ..services.mqtt_service import mqtt_service
 from ..models import MqttConnection, Datalogger, Sensor, DiscoveredTopic
@@ -94,13 +95,9 @@ def stop_connection(request, site_id):
 
         logger.info(f"API request to stop MQTT connection for site {site_id} by user {request.user}")
 
-        updated_count = MqttConnection.objects.filter(site_id=int(site_id)).update(is_enabled=False)
-
-        if updated_count == 0:
-            return Response(
-                {'success': False, 'message': f'Site {site_id} not found.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        connection = get_object_or_404(MqttConnection, site_id=int(site_id))
+        connection.is_enabled = False
+        connection.save()
 
         result = {
             'success': True,
@@ -109,11 +106,15 @@ def stop_connection(request, site_id):
 
         serializer = MqttControlResponseSerializer(data=result)
         if serializer.is_valid():
-            response_status = status.HTTP_200_OK if result['success'] else status.HTTP_400_BAD_REQUEST
-            return Response(serializer.data, status=response_status)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    except MqttConnection.DoesNotExist:
+        return Response(
+            {'success': False, 'message': f'Site {site_id} not found.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
     except ValueError:
         return Response(
             {'success': False, 'message': 'Invalid site_id'},
