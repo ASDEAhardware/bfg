@@ -294,7 +294,7 @@ class MQTTConnectionManager:
                 from .mqtt_service import mqtt_service
                 from django.conf import settings
 
-                client_id = f"{mqtt_conn.client_id_prefix}_i{mqtt_service.instance_id}"
+                client_id = f"{mqtt_conn.client_id_prefix}_{mqtt_service.instance_id}"
 
                 # Clean session elimina sessioni zombie sul broker
                 clean_session = settings.MQTT_CONFIG.get('CLEAN_SESSION', True)
