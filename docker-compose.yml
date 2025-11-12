@@ -22,7 +22,7 @@ services:
     environment:
       - API_KEY=${SECRET_API_KEY}
       # MQTT Service Configuration
-      - MQTT_INSTANCE_ID=bfg_back
+      - MQTT_INSTANCE_ID=andrea
       - MQTT_CLEAN_SESSION=true
       - MQTT_LWT_ENABLED=true
       - MQTT_KEEP_ALIVE=60

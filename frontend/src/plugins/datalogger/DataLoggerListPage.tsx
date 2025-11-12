@@ -103,7 +103,6 @@ export default function DataLoggerListPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showSystemInfoModal, setShowSystemInfoModal] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
@@ -121,6 +120,19 @@ export default function DataLoggerListPage() {
 
   // Hook per rilevare la larghezza del container
   const [containerRef, { isMobile, width }] = useContainerWidth();
+
+
+    /**
+   * 
+   * @param enabled 
+   * Funzione che, al toggle del refresh automatico, chiude la sidebar automaticamente, altrimenti quando il toggle viene disabilitato deve essere chiusa manualmente
+   */
+  const handleAutoRefreshChange = (enabled: boolean) => {
+    setAutoRefreshEnabled(enabled);
+    if (enabled) {
+      setIsSettingsOpen(false);
+    }
+  };
 
 
   // Helper function to get MQTT status badge variant and text
@@ -466,7 +478,7 @@ export default function DataLoggerListPage() {
             </div>
           ) : (
             // Datalogger grid
-            <div className={viewMode === 'grid' ? 'grid-responsive-cards' : 'grid-responsive-list'}>
+            <div className='grid-responsive-cards'>
               {filteredDataloggers.map((datalogger) => (
                 <DataloggerCard
                   key={datalogger.id}
@@ -476,7 +488,6 @@ export default function DataLoggerListPage() {
                   }}
                   onConnect={handleConnect}
                   onLabelUpdate={handleDataloggerLabelUpdate}
-                  compact={viewMode === 'list'}
                 />
               ))}
             </div>
@@ -734,7 +745,7 @@ export default function DataLoggerListPage() {
                 <Switch
                   id="auto-refresh"
                   checked={autoRefreshEnabled}
-                  onCheckedChange={setAutoRefreshEnabled}
+                  onCheckedChange={handleAutoRefreshChange}
                 />
               </div>
 
@@ -748,31 +759,6 @@ export default function DataLoggerListPage() {
                   checked={showOnlineOnly}
                   onCheckedChange={setShowOnlineOnly}
                 />
-              </div>
-
-              {/* View Mode Toggle */}
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium text-foreground">
-                  Visualizzazione
-                </Label>
-                <div className="flex rounded-md border border-border overflow-hidden">
-                  <Button
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('grid')}
-                    className="h-6 w-6 p-0 rounded-none border-0"
-                  >
-                    <Grid3X3 className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'list' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('list')}
-                    className="h-6 w-6 p-0 rounded-none border-0 border-l border-border"
-                  >
-                    <List className="h-3 w-3" />
-                  </Button>
-                </div>
               </div>
             </div>
           </div>

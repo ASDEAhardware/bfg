@@ -75,8 +75,6 @@ function SettingsPanel({
   setAutoRefreshEnabled,
   showOnlineOnly,
   setShowOnlineOnly,
-  viewMode,
-  setViewMode,
   chartOpacity,
   setChartOpacity,
   isAdjustingOpacity,
@@ -88,15 +86,11 @@ function SettingsPanel({
   setAutoRefreshEnabled: (enabled: boolean) => void;
   showOnlineOnly: boolean;
   setShowOnlineOnly: (enabled: boolean) => void;
-  viewMode: 'grid' | 'list';
-  setViewMode: (mode: 'grid' | 'list') => void;
   chartOpacity: number;
   setChartOpacity: (opacity: number) => void;
   isAdjustingOpacity: boolean;
   setIsAdjustingOpacity: (adjusting: boolean) => void;
 }) {
-  if (!isOpen) return null;
-
   return (
     <>
       {!isAdjustingOpacity && (
@@ -144,31 +138,6 @@ function SettingsPanel({
                 checked={showOnlineOnly}
                 onCheckedChange={setShowOnlineOnly}
               />
-            </div>
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium text-foreground">
-                Visualizzazione
-              </Label>
-              <div className="flex rounded-md border border-border overflow-hidden">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="h-6 w-6 p-0 rounded-none border-0"
-                >
-                  <Grid3X3 className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="h-6 w-6 p-0 rounded-none border-0 border-l border-border"
-                >
-                  <List className="h-3 w-3" />
-                </Button>
-              </div>
             </div>
 
             {/* Chart Opacity Slider */}
@@ -246,8 +215,20 @@ export default function DataLoggerDetailPage() {
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const skeletonTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
+  /**
+   * 
+   * @param enabled 
+   * Funzione che, al toggle del refresh automatico, chiude la sidebar automaticamente, altrimenti quando il toggle viene disabilitato deve essere chiusa manualmente
+   */
+  const handleAutoRefreshChange = (enabled: boolean) => {
+    setAutoRefreshEnabled(enabled);
+    if (enabled) {
+      setIsSettingsOpen(false);
+    }
+  };
+
   // MQTT hooks
-  const { mqttStatus } = useMqttConnectionStatus(selectedSiteId);
+  // const { mqttStatus } = useMqttConnectionStatus(selectedSiteId);
   const { dataloggers } = useDataloggers(selectedSiteId);
 
   // Find the current datalogger
@@ -274,7 +255,7 @@ export default function DataLoggerDetailPage() {
     clearSession,
     clearPending
   } = useDataloggerControl({
-    datalogger: selectedLogger,
+    datalogger: selectedLogger || null,
     siteId: selectedSiteId
   });
 
@@ -610,7 +591,7 @@ export default function DataLoggerDetailPage() {
                     max="60"
                     value={autoRefreshInterval}
                     onChange={(e) => setAutoRefreshInterval(parseInt(e.target.value) || 5)}
-                    className="w-8 h-4 text-xs text-center px-1 border-0 bg-transparent text-foreground font-medium"
+                    className="w-12 h-4 text-xs text-center px-1 border-0 bg-transparent text-foreground font-medium"
                     title="Intervallo auto-refresh in secondi"
                   />
                   <span className="text-xs text-muted-foreground">s</span>
@@ -688,11 +669,9 @@ export default function DataLoggerDetailPage() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         autoRefreshEnabled={autoRefreshEnabled}
-        setAutoRefreshEnabled={setAutoRefreshEnabled}
+        setAutoRefreshEnabled={handleAutoRefreshChange}
         showOnlineOnly={showOnlineOnly}
         setShowOnlineOnly={setShowOnlineOnly}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
         chartOpacity={chartOpacity}
         setChartOpacity={setChartOpacity}
         isAdjustingOpacity={isAdjustingOpacity}
