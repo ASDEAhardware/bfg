@@ -28,7 +28,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-&s%0j(121)s-qw($41%dpj2_q4bd&w0@!9&@lnvrnlw=8bltg3'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
@@ -307,7 +307,7 @@ MQTT_CONFIG = {
 # CHANNEL_LAYERS configuration for Django Channels
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "BACKEND": "channels_redis.core.RedisChannelLayer", #Dice a Django Channels di usare Redis come "channel layer", ovvero come message broker per gestire la comunicazione in tempo reale
         "CONFIG": {
             "hosts": [("redis", 6379)],
         },

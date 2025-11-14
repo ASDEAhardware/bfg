@@ -10,10 +10,10 @@ export function HorizontalLine({ top, position, lineColorClass, className }: Hor
     <div className={className}>
       {/* Horizontal line */}
       <div
-        className={`absolute h-0.5 w-20 ${lineColorClass}`}
+        className={`absolute h-0.5 w-17 ${lineColorClass}`}
         style={{
           top: top,
-          [position === "left" ? "right" : "left"]: "80%",
+          [position === "left" ? "right" : "left"]: "87%",
         }}
       />
 
@@ -22,7 +22,7 @@ export function HorizontalLine({ top, position, lineColorClass, className }: Hor
         className={`absolute w-2 h-2 rounded-full ${lineColorClass}`}
         style={{
           top: `calc(${top} - 3px)`,
-          [position === "left" ? "right" : "left"]: `calc(80% - 4px)`,
+          [position === "left" ? "right" : "left"]: `calc(87% - 4px)`,
         }}
       />
 
