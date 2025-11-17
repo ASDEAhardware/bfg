@@ -19,7 +19,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 
-interface DataloggerCardProps {
+interface DeviceCardProps {
   datalogger: {
     id: string;
     site_id: number;
@@ -42,8 +42,8 @@ interface DataloggerCardProps {
     created_at: string;
     updated_at: string;
   };
-  onConnect: (datalogger: DataloggerCardProps['datalogger']) => void;
-  onLabelUpdate?: (datalogger: DataloggerCardProps['datalogger'], newLabel: string) => void;
+  onConnect: (datalogger: DeviceCardProps['datalogger']) => void;
+  onLabelUpdate?: (datalogger: DeviceCardProps['datalogger'], newLabel: string) => void;
   compact?: boolean;
 }
 
@@ -60,7 +60,7 @@ const statusConfig = {
   }
 };
 
-export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact = false }: DataloggerCardProps) {
+export function DeviceCard({ datalogger, onConnect, onLabelUpdate, compact = false }: DeviceCardProps) {
   const [isNavigating, setIsNavigating] = useState(false);
 
   // Determine status based on is_online field
@@ -80,7 +80,7 @@ export function DataloggerCard({ datalogger, onConnect, onLabelUpdate, compact =
 
   const handleLabelUpdate = async (newLabel: string) => {
     try {
-      await api.patch(`/v1/mqtt/dataloggers/${datalogger.id}/update_label/`, {
+      await api.patch(`/v1/mqtt/devices/${datalogger.id}/update_label/`, {
         label: newLabel
       });
 

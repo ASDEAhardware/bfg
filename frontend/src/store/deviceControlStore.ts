@@ -2,8 +2,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-// Types for datalogger control
-export interface DataloggerSession {
+// Types for device control
+export interface DeviceSession {
   datalogger_id: number
   session_id: string | null
   status: 'running' | 'stopped' | 'terminated forcibly' | 'no process running' | 'unknown'
@@ -21,9 +21,9 @@ export interface DataloggerSession {
   error_message: string | null
 }
 
-export interface DataloggerControlState {
-  // Sessions per datalogger
-  sessions: Record<number, DataloggerSession>
+export interface DeviceControlState {
+  // Sessions per device
+  sessions: Record<number, DeviceSession>
 
   // Pending commands tracking
   pendingCommands: Record<number, {
@@ -34,17 +34,17 @@ export interface DataloggerControlState {
 
   // Actions
   initializeSession: (datalogger_id: number) => void
-  updateSessionStatus: (datalogger_id: number, data: Partial<DataloggerSession>) => void
-  setSessionFromMqttMessage: (datalogger_id: number, message: any) => void
+  updateSessionStatus: (datalogger_id: number, data: Partial<DeviceSession>) => void
+  setSessionFromMqttMessage: (datalogger_id: number, message: Record<string, unknown>) => void
   setPendingCommand: (datalogger_id: number, command: string) => void
   clearPendingCommand: (datalogger_id: number) => void
-  getSession: (datalogger_id: number) => DataloggerSession | null
+  getSession: (datalogger_id: number) => DeviceSession | null
   isLogging: (datalogger_id: number) => boolean
   hasPendingCommand: (datalogger_id: number) => string | null
   clearSessionData: (datalogger_id: number) => void
 }
 
-const createDefaultSession = (datalogger_id: number): DataloggerSession => ({
+const createDefaultSession = (datalogger_id: number): DeviceSession => ({
   datalogger_id,
   session_id: null,
   status: 'unknown',
@@ -58,7 +58,7 @@ const createDefaultSession = (datalogger_id: number): DataloggerSession => ({
   error_message: null
 })
 
-export const useDataloggerControlStore = create<DataloggerControlState>()(
+export const useDeviceControlStore = create<DeviceControlState>()(
   persist(
     (set, get) => ({
         sessions: {},
@@ -76,7 +76,7 @@ export const useDataloggerControlStore = create<DataloggerControlState>()(
           }
         },
 
-        updateSessionStatus: (datalogger_id: number, data: Partial<DataloggerSession>) => {
+        updateSessionStatus: (datalogger_id: number, data: Partial<DeviceSession>) => {
           const state = get()
           const existingSession = state.sessions[datalogger_id] || createDefaultSession(datalogger_id)
 
@@ -92,11 +92,11 @@ export const useDataloggerControlStore = create<DataloggerControlState>()(
           })
         },
 
-        setSessionFromMqttMessage: (datalogger_id: number, message: any) => {
+        setSessionFromMqttMessage: (datalogger_id: number, message: Record<string, unknown>) => {
           const state = get()
           const existingSession = state.sessions[datalogger_id] || createDefaultSession(datalogger_id)
 
-          const updates: Partial<DataloggerSession> = {
+          const updates: Partial<DeviceSession> = {
             last_heartbeat: new Date().toISOString()
           }
 
@@ -214,7 +214,7 @@ export const useDataloggerControlStore = create<DataloggerControlState>()(
         }
       }),
     {
-      name: 'datalogger-control-storage',
+      name: 'device-control-storage',
       partialize: (state) => ({
         sessions: state.sessions
         // Non persistiamo pendingCommands perché hanno timeout

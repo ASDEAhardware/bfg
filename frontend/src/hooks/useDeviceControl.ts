@@ -1,19 +1,19 @@
 /**
- * Hook for controlling datalogger start/stop operations via MQTT
+ * Hook for controlling device start/stop operations via MQTT
  * Follows project patterns and integrates with existing MQTT system
  */
 import { useCallback, useEffect, useState } from 'react'
-import { useDataloggerControlStore } from '@/store/dataloggerControlStore'
+import { useDeviceControlStore } from '@/store/deviceControlStore'
 import { api } from '@/lib/axios'
 import { toast } from 'sonner'
 import type { Datalogger } from './useMqtt'
 
-interface DataloggerControlHookProps {
+interface DeviceControlHookProps {
   datalogger: Datalogger | null
   siteId: number | null
 }
 
-export function useDataloggerControl({ datalogger, siteId }: DataloggerControlHookProps) {
+export function useDeviceControl({ datalogger, siteId }: DeviceControlHookProps) {
   const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,7 +27,7 @@ export function useDataloggerControl({ datalogger, siteId }: DataloggerControlHo
     isLogging,
     hasPendingCommand,
     clearSessionData
-  } = useDataloggerControlStore()
+  } = useDeviceControlStore()
 
   // Initialize session when datalogger changes
   useEffect(() => {
