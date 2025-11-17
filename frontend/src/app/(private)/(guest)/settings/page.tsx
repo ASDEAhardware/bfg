@@ -19,37 +19,40 @@ import axios from "axios"
 import { useUserPreferences, useUpdateUserPreferences } from "@/hooks/useUserPreferences";
 import { useSettingsStore } from "@/store/settingsStore"
 import { useTheme } from "next-themes";
-
-const settingsNavigation = [
-    {
-        id: "profile",
-        name: "Profile",
-        icon: User,
-    },
-    {
-        id: "password",
-        name: "Password",
-        icon: Lock,
-    },
-    {
-        id: "appearance",
-        name: "Appearance",
-        icon: Palette,
-    },
-    //{
-    //     id: "notifications",
-    //     name: "Notifiche",
-    //     icon: Bell,
-    // },
-    // {
-    //     id: "privacy",
-    //     name: "Privacy",
-    //     icon: Shield,
-    // },
-]
+import { useTranslations } from 'next-intl';
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState("profile")
+    const t = useTranslations('settings');
+
+    const settingsNavigation = [
+        {
+            id: "profile",
+            name: t('profile'),
+            icon: User,
+        },
+        {
+            id: "password",
+            name: t('password'),
+            icon: Lock,
+        },
+        {
+            id: "appearance",
+            name: t('appearance'),
+            icon: Palette,
+        },
+        //{
+        //     id: "notifications",
+        //     name: "Notifiche",
+        //     icon: Bell,
+        // },
+        // {
+        //     id: "privacy",
+        //     name: "Privacy",
+        //     icon: Shield,
+        // },
+    ]
+
 
     return (
         <div className="flex justify-center min-h-screen bg-background">
@@ -445,16 +448,23 @@ function PrivacySection() {
 }
 
 
+import { useLocaleStore } from "@/store/localeStore";
+import { useRouter } from "next/navigation";
+
 function AppearanceSection() {
     const queryClient = useQueryClient();
     const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
     const mutation = useUpdateUserPreferences();
+    const t = useTranslations('settings');
+    const router = useRouter();
 
     // Initialize local states for the form
     const [localTheme, setLocalTheme] = useState(preferences?.theme || 'system');
     const [accelerometerUnit, setAccelerometerUnit] = useState(preferences?.accelerometer_unit || 'ms2');
     const [inclinometerUnit, setInclinometerUnit] = useState(preferences?.inclinometer_unit || 'deg');
     const [localShowResizeHandle, setLocalShowResizeHandle] = useState(preferences?.show_resize_handle || 'show');
+
+    const { locale, setLocale } = useLocaleStore();
 
     // Sync local form state with remote data from the query
     useEffect(() => {
@@ -476,12 +486,19 @@ function AppearanceSection() {
         });
     };
 
+    const handleLanguageChange = (newLanguage: string) => {
+      if (locale === newLanguage) return;
+
+      setLocale(newLanguage as any);
+      router.refresh();
+    }
+
     if (isLoadingPreferences) {
         return (
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-bold">Appearance</h1>
-                    <p className="text-muted-foreground">Customize the appearance of the interface.</p>
+                    <h1 className="text-2xl font-bold">{t('appearance')}</h1>
+                    <p className="text-muted-foreground">{t('appearance_description')}</p>
                 </div>
                 <Card className="border border-border">
                     <CardHeader>
@@ -512,15 +529,15 @@ function AppearanceSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Appearance</h1>
-                <p className="text-muted-foreground">Customize the appearance of the interface.</p>
+                <h1 className="text-2xl font-bold">{t('appearance')}</h1>
+                <p className="text-muted-foreground">{t('appearance_description')}</p>
             </div>
 
             {/* Theme selection card */}
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Theme</CardTitle>
-                    <CardDescription>Select the theme for your interface.</CardDescription>
+                    <CardTitle>{t('theme')}</CardTitle>
+                    <CardDescription>{t('theme_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <RadioGroup value={localTheme || 'system'} onValueChange={setLocalTheme} className="space-y-3">
@@ -529,8 +546,8 @@ function AppearanceSection() {
                             <Label htmlFor="light" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Sun className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">Light</div>
-                                    <div className="text-sm text-muted-foreground">Light theme for the interface</div>
+                                    <div className="font-medium">{t('light')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('light_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -539,8 +556,8 @@ function AppearanceSection() {
                             <Label htmlFor="dark" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Moon className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">Dark</div>
-                                    <div className="text-sm text-muted-foreground">Dark theme for the interface</div>
+                                    <div className="font-medium">{t('dark')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('dark_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -550,13 +567,44 @@ function AppearanceSection() {
                             <Label htmlFor="system" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Monitor className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">System</div>
-                                    <div className="text-sm text-muted-foreground">Use system settings</div>
+                                    <div className="font-medium">{t('system')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('system_description')}</div>
                                 </div>
                             </Label>
                         </div>
                     </RadioGroup>
                 </CardContent>
+            </Card>
+
+            {/* Language selection card */}
+            <Card className="border border-border">
+              <CardHeader>
+                <CardTitle>{t('language')}</CardTitle>
+                <CardDescription>{t('language_description')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <RadioGroup value={locale} onValueChange={handleLanguageChange} className="space-y-3">
+                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                    <RadioGroupItem value="en" id="english" />
+                    <Label htmlFor="english" className="cursor-pointer flex-1">
+                      <div>
+                        <div className="font-medium">{t('english')}</div>
+                        <div className="text-sm text-muted-foreground">{t('english_description')}</div>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                    <RadioGroupItem value="it" id="italian" />
+                    <Label htmlFor="italian" className="cursor-pointer flex-1">
+                      <div>
+                        <div className="font-medium">{t('italian')}</div>
+                        <div className="text-sm text-muted-foreground">{t('italian_description')}</div>
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
             </Card>
 
             {/* Grid Layout settings card */}
@@ -598,21 +646,21 @@ function AppearanceSection() {
             {/* Measurement unit selection card */}
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Unit of Measurement</CardTitle>
-                    <CardDescription>Choose which unit of measurement to display in the application.</CardDescription>
+                    <CardTitle>{t('measurement_units')}</CardTitle>
+                    <CardDescription>{t('measurement_units_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
 
                     {/* Accelerometer unit selection */}
                     <div className="space-y-3">
-                        <Label className="text-base font-medium"> <CircleGauge /> Accelerometers</Label>
+                        <Label className="text-base font-medium"> <CircleGauge /> {t('accelerometers')}</Label>
                         <RadioGroup value={accelerometerUnit} onValueChange={setAccelerometerUnit} className="space-y-3">
                             <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                                 <RadioGroupItem value="ms2" id="ms2" />
                                 <Label htmlFor="ms2" className="cursor-pointer flex-1">
                                     <div>
-                                        <div className="font-medium">m/s²</div>
-                                        <div className="text-sm text-muted-foreground">Meters per second squared</div>
+                                        <div className="font-medium">{t('ms2')}</div>
+                                        <div className="text-sm text-muted-foreground">{t('ms2_description')}</div>
                                     </div>
                                 </Label>
                             </div>
@@ -620,8 +668,8 @@ function AppearanceSection() {
                                 <RadioGroupItem value="g" id="g" />
                                 <Label htmlFor="g" className="cursor-pointer flex-1">
                                     <div>
-                                        <div className="font-medium">g</div>
-                                        <div className="text-sm text-muted-foreground">Acceleration due to gravity (9.81 m/s²)</div>
+                                        <div className="font-medium">{t('g')}</div>
+                                        <div className="text-sm text-muted-foreground">{t('g_description')}</div>
                                     </div>
                                 </Label>
                             </div>
@@ -632,14 +680,14 @@ function AppearanceSection() {
 
                     {/* Inclinometer unit selection */}
                     <div className="space-y-3">
-                        <Label className="text-base font-medium"> <TriangleRight /> Inclinometers</Label>
+                        <Label className="text-base font-medium"> <TriangleRight /> {t('inclinometers')}</Label>
                         <RadioGroup value={inclinometerUnit} onValueChange={setInclinometerUnit} className="space-y-3">
                             <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                                 <RadioGroupItem value="deg" id="deg" />
                                 <Label htmlFor="deg" className="cursor-pointer flex-1">
                                     <div>
-                                        <div className="font-medium">deg (°)</div>
-                                        <div className="text-sm text-muted-foreground">Degrees (0° - 360°)</div>
+                                        <div className="font-medium">{t('deg')}</div>
+                                        <div className="text-sm text-muted-foreground">{t('deg_description')}</div>
                                     </div>
                                 </Label>
                             </div>
@@ -647,8 +695,8 @@ function AppearanceSection() {
                                 <RadioGroupItem value="rad" id="rad" />
                                 <Label htmlFor="rad" className="cursor-pointer flex-1">
                                     <div>
-                                        <div className="font-medium">rad</div>
-                                        <div className="text-sm text-muted-foreground">Radiant (0 - 2π)</div>
+                                        <div className="font-medium">{t('rad')}</div>
+                                        <div className="text-sm text-muted-foreground">{t('rad_description')}</div>
                                     </div>
                                 </Label>
                             </div>
@@ -663,7 +711,7 @@ function AppearanceSection() {
                     {mutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : null}
-                    Save All Preferences
+                    {t('save_preferences')}
                 </Button>
             </div>
         </div>
