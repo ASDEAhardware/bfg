@@ -37,8 +37,8 @@ export default function SettingsPage() {
             icon: Lock,
         },
         {
-            id: "appearance",
-            name: t('appearance'),
+            id: "preferences",
+            name: t('preferences'),
             icon: Palette,
         },
         //{
@@ -116,7 +116,7 @@ export default function SettingsPage() {
                         {activeSection === "password" && <PasswordSection />}
                         {activeSection === "notifications" && <NotificationsSection />}
                         {activeSection === "privacy" && <PrivacySection />}
-                        {activeSection === "appearance" && <AppearanceSection />}
+                        {activeSection === "preferences" && <PreferencesSection />}
                     </div>
                 </div>
             </div>
@@ -248,7 +248,8 @@ function ProfileSection() {
                         )}
 
                         <div className="space-y-2">
-                            <Button
+                            {/*Button per permettere all'utente di cambiare la sua immagine profilo*/}
+                            {/* <Button
                                 className="cursor-pointer"
                                 variant="outline"
                                 size="sm"
@@ -259,7 +260,7 @@ function ProfileSection() {
                                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                                 ) : null}
                                 Change Picture
-                            </Button>
+                            </Button> */}
                             {/* !!!! SBLOCCA QUESTO INPUT PER FARLO FUNZIONARE !!!! */}
                             {/* <input
                                 type="file"
@@ -268,7 +269,7 @@ function ProfileSection() {
                                 onChange={handleFileChange} // 6.
                                 accept="image/jpeg,image/png,image/gif"
                             /> */}
-                            <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p>
+                            {/* <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p> */}
                         </div>
                     </div>
 
@@ -451,7 +452,7 @@ function PrivacySection() {
 import { useLocaleStore } from "@/store/localeStore";
 import { useRouter } from "next/navigation";
 
-function AppearanceSection() {
+function PreferencesSection() {
     const queryClient = useQueryClient();
     const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
     const mutation = useUpdateUserPreferences();
@@ -476,7 +477,7 @@ function AppearanceSection() {
         }
     }, [preferences]);
 
-    const handleSaveAppearanceSettings = () => {
+    const handleSavePreferencesSettings = () => {
         if (!localTheme) return;
         mutation.mutate({
             theme: localTheme,
@@ -497,8 +498,8 @@ function AppearanceSection() {
         return (
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-bold">{t('appearance')}</h1>
-                    <p className="text-muted-foreground">{t('appearance_description')}</p>
+                    <h1 className="text-2xl font-bold">{t('preferences')}</h1>
+                    <p className="text-muted-foreground">{t('preferences_description')}</p>
                 </div>
                 <Card className="border border-border">
                     <CardHeader>
@@ -519,7 +520,7 @@ function AppearanceSection() {
         return (
             <div className="flex flex-col items-center h-40 justify-center">
                 <span className="text-red-500 mb-2">
-                    Error loading appearance settings.
+                    Error loading preferences settings.
                 </span>
                 <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['userPreferences'] })}>Try Again</Button>
             </div>
@@ -529,8 +530,8 @@ function AppearanceSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">{t('appearance')}</h1>
-                <p className="text-muted-foreground">{t('appearance_description')}</p>
+                <h1 className="text-2xl font-bold">{t('preferences')}</h1>
+                <p className="text-muted-foreground">{t('preferences_description')}</p>
             </div>
 
             {/* Theme selection card */}
@@ -610,8 +611,8 @@ function AppearanceSection() {
             {/* Grid Layout settings card */}
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Grid Layout</CardTitle>
-                    <CardDescription>Customize the grid mode behavior.</CardDescription>
+                    <CardTitle>{t('grid_layout')}</CardTitle>
+                    <CardDescription>{t('grid_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <RadioGroup
@@ -619,13 +620,13 @@ function AppearanceSection() {
                         onValueChange={setLocalShowResizeHandle}
                         className="space-y-3"
                     >
-                        <Label className="text-base font-medium"> <GripVertical /> Resize Handle</Label>
+                        <Label className="text-base font-medium"> <GripVertical />{t('resize_handle')}</Label>
                         <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                             <RadioGroupItem value="show" id="show-handle" />
                             <Label htmlFor="show-handle" className="cursor-pointer flex-1">
                                 <div>
-                                    <div className="font-medium">Show</div>
-                                    <div className="text-sm text-muted-foreground">Display a visual handle for resizing sections.</div>
+                                    <div className="font-medium">{t('resize_handle_show')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('resize_handle_show_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -634,8 +635,8 @@ function AppearanceSection() {
                             <RadioGroupItem value="hide" id="hide-handle" />
                             <Label htmlFor="hide-handle" className="cursor-pointer flex-1">
                                 <div>
-                                    <div className="font-medium">Hide</div>
-                                    <div className="text-sm text-muted-foreground">Hide the visual handle for a cleaner interface.</div>
+                                    <div className="font-medium">{t('resize_handle_hide')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('resize_handle_hide_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -707,7 +708,7 @@ function AppearanceSection() {
 
             {/* Unified Save Button */}
             <div className="flex justify-end pt-4">
-                <Button onClick={handleSaveAppearanceSettings} disabled={mutation.isPending}>
+                <Button onClick={handleSavePreferencesSettings} disabled={mutation.isPending}>
                     {mutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : null}

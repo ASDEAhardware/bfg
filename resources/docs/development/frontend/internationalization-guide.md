@@ -21,6 +21,86 @@ L'architettura si basa su un flusso di dati reattivo:
 
 ---
 
+## Workflow Dettagliato (Come funziona la "Magia")
+
+La "magia" che si osserva non è una singola funzione, ma una perfetta collaborazione tra Zustand, React e la libreria `next-intl`.
+
+Ecco il workflow passo dopo passo.
+
+### Il Ruolo Distinto del Cookie e dello Store Zustand
+
+Prima di tutto, è fondamentale capire perché esistono entrambi e che ruoli diversi hanno:
+
+1.  **Cookie (`NEXT_LOCALE`):** Il suo scopo principale è comunicare la lingua scelta al **server**. Quando richiedi una pagina per la prima volta (o fai un hard reload), il server Next.js legge questo cookie. Grazie a questa informazione, può pre-renderizzare la pagina (SSR - Server-Side Rendering) direttamente nella lingua corretta. Questo è vitale per la SEO e per evitare che la pagina appaia in inglese per un istante per poi "switchare" alla lingua scelta.
+
+2.  **Store Zustand (`useLocaleStore`):** Il suo scopo è gestire lo stato della lingua **sul client**, una volta che la pagina è stata caricata e l'applicazione è interattiva. È il "cuore pulsante" che permette di cambiare la lingua dinamicamente *senza* dover ricaricare la pagina.
+
+---
+
+### Il Workflow Completo (dall'interazione al re-render)
+
+Ecco la sequenza di eventi che permette l'aggiornamento istantaneo:
+
+#### Fase 1: Setup Iniziale
+
+Il componente provider per la gestione dell'internazionalizzazione è `IntlClientProvider`, e si trova all'interno di `@frontend/src/app/providers.tsx`. Questo componente è il responsabile di fornire le traduzioni e la lingua corrente a tutti i componenti figli.
+
+La sua configurazione è la seguente:
+
+```tsx
+// In /frontend/src/app/providers.tsx
+
+'use client';
+
+import { ReactNode, useEffect } from 'react';
+import { IntlClientProvider } from '@/lib/IntlClientProvider'; // Il tuo provider personalizzato
+
+interface ProvidersProps {
+    children: ReactNode;
+}
+
+export function Providers({ children }: ProvidersProps) {
+    // ... (altri provider e logica)
+
+    return (
+        <IntlClientProvider>
+            {/* Qui vengono avvolti gli altri provider e i children dell'applicazione */}
+            {children}
+        </IntlClientProvider>
+    );
+}
+```
+All'interno di `@/lib/IntlClientProvider`, viene effettivamente utilizzato il `NextIntlClientProvider` di `next-intl` per gestire il contesto delle traduzioni. Questo componente ottiene la `locale` dallo `useLocaleStore` e carica i `messages` dinamicamente tramite `getMessagesForLocale`.
+
+#### Fase 2: L'Utente Cambia Lingua
+
+1.  L'utente va nelle impostazioni e seleziona una lingua.
+2.  Un gestore di eventi (es. `onClick`) chiama la funzione `setLocale` dello store Zustand: `useLocaleStore.getState().setLocale('it');`.
+3.  Il middleware `persist` configurato nello store fa due cose:
+    *   Aggiorna lo stato interno di Zustand: `locale` diventa `'it'`.
+    *   Chiama lo `storage` custom, che a sua volta aggiorna il cookie `NEXT_LOCALE` a `'it'`. Questo assicura che il prossimo hard reload della pagina avvenga già in italiano.
+
+#### Fase 3: La "Magia" della Reattività di React
+
+1.  **Zustand Notifica il Cambiamento:** Zustand, essendo basato sui React Hooks, notifica a tutti i componenti che usano il hook `useLocaleStore()` che lo stato è cambiato.
+
+2.  **Il Provider si Aggiorna:** Il componente che renderizza `NextIntlClientProvider` sta usando `useLocaleStore()`. Riceve la notifica, si ri-renderizza e ora passa il nuovo valore `locale="it"` al `NextIntlClientProvider`.
+
+3.  **`next-intl` Propaga il Contesto:** `NextIntlClientProvider` aggiorna il suo "contesto" interno. Il contesto in React è un meccanismo per passare dati in profondità nell'albero dei componenti senza doverli passare manualmente tramite le props.
+
+4.  **I Componenti si Ri-traducono:** Qualsiasi componente nell'applicazione che mostra del testo tradotto userà quasi certamente il hook `useTranslations()` di `next-intl` (es. `const t = useTranslations('HomePage');`).
+    *   Questo hook `useTranslations` è "abbonato" al contesto fornito da `NextIntlClientProvider`.
+    *   Quando il contesto cambia (perché la `locale` è passata da `'en'` a `'it'`), React automaticamente ri-renderizza **tutti** i componenti che dipendono da quel contesto.
+    *   Durante il nuovo render, il hook `useTranslations()` sa che deve pescare le traduzioni dal file `it.json` (che `NextIntlClientProvider` ha a disposizione) invece che da `en.json`.
+
+**In Sintesi:**
+
+> **Utente Clicca -> Zustand Store si aggiorna -> Il Provider `NextIntlClientProvider` riceve la nuova lingua -> Il Contesto di `next-intl` cambia -> Tutti i componenti che usano `useTranslations()` si ri-renderizzano con le nuove traduzioni.**
+
+Questo è il pattern standard "Provider/Consumer" (o "Provider/Hook") che sta alla base di quasi tutta la gestione dello stato moderna in React. Zustand agisce come una sorgente di stato globale e centralizzata, e `next-intl` si integra perfettamente in questo ecosistema per rendere le traduzioni reattive.
+
+---
+
 ## 2. Componenti Chiave
 
 Il sistema è composto dai seguenti file che lavorano in sinergia:
