@@ -1,4 +1,3 @@
-
 services:
   backend:
     build:
@@ -78,6 +77,34 @@ services:
     depends_on:
       - db
 
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    container_name: bfg_bookstack
+    env_file:
+      - bookstack.env
+    volumes:
+      - bookstack_config:/config
+    ports:
+      - "6875:80"
+    restart: unless-stopped
+    depends_on:
+      - bookstack_db
+
+  bookstack_db:
+    image: lscr.io/linuxserver/mariadb:latest
+    container_name: bfg_bookstack_db
+    env_file:
+      - bookstack.env
+    volumes:
+      - bookstack_db_data:/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 60s
+      retries: 20
+
 volumes:
   bfg_postgres_data:
   bfg_redis_data:
+  bookstack_config:
+  bookstack_db_data:
