@@ -19,37 +19,40 @@ import axios from "axios"
 import { useUserPreferences, useUpdateUserPreferences } from "@/hooks/useUserPreferences";
 import { useSettingsStore } from "@/store/settingsStore"
 import { useTheme } from "next-themes";
-
-const settingsNavigation = [
-    {
-        id: "profile",
-        name: "Profile",
-        icon: User,
-    },
-    {
-        id: "password",
-        name: "Password",
-        icon: Lock,
-    },
-    {
-        id: "appearance",
-        name: "Appearance",
-        icon: Palette,
-    },
-    //{
-    //     id: "notifications",
-    //     name: "Notifiche",
-    //     icon: Bell,
-    // },
-    // {
-    //     id: "privacy",
-    //     name: "Privacy",
-    //     icon: Shield,
-    // },
-]
+import { useTranslations } from 'next-intl';
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState("profile")
+    const t = useTranslations('settings');
+
+    const settingsNavigation = [
+        {
+            id: "profile",
+            name: t('profile'),
+            icon: User,
+        },
+        {
+            id: "password",
+            name: t('password'),
+            icon: Lock,
+        },
+        {
+            id: "preferences",
+            name: t('preferences'),
+            icon: Palette,
+        },
+        // {
+        //     id: "notifications",
+        //     name: t('notifications'),
+        //     icon: Bell,
+        // },
+        // {
+        //     id: "privacy",
+        //     name: t('privacy'),
+        //     icon: Shield,
+        // },
+    ]
+
 
     return (
         <div className="flex justify-center min-h-screen bg-background">
@@ -60,7 +63,7 @@ export default function SettingsPage() {
                     <div className="p-4 md:p-4">
                         <div className="flex items-center gap-2 mb-6">
                             <Settings className="h-5 w-5" />
-                            <h2 className="text-lg font-semibold">Settings</h2>
+                            <h2 className="text-lg font-semibold">{t('title')}</h2>
                         </div>
                         <nav className="space-y-2">
                             {settingsNavigation.map((item) => {
@@ -113,7 +116,7 @@ export default function SettingsPage() {
                         {activeSection === "password" && <PasswordSection />}
                         {activeSection === "notifications" && <NotificationsSection />}
                         {activeSection === "privacy" && <PrivacySection />}
-                        {activeSection === "appearance" && <AppearanceSection />}
+                        {activeSection === "preferences" && <PreferencesSection />}
                     </div>
                 </div>
             </div>
@@ -123,6 +126,7 @@ export default function SettingsPage() {
 
 function ProfileSection() {
 
+    const t = useTranslations('settings');
     const { data, isLoading, isError } = useUserInfo();
 
     // Istanziamo il queryClient
@@ -220,14 +224,14 @@ function ProfileSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Profile</h1>
-                <p className="text-muted-foreground">Manage your profile information and account preferences.</p>
+                <h1 className="text-2xl font-bold">{t('profile')}</h1>
+                <p className="text-muted-foreground">{t('profile_description')}</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Personal Information</CardTitle>
-                    <CardDescription>Update your profile picture and personal details here.</CardDescription>
+                    <CardTitle>{t('personal_information')}</CardTitle>
+                    <CardDescription>{t('personal_information_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="flex items-center gap-6">
@@ -245,7 +249,8 @@ function ProfileSection() {
                         )}
 
                         <div className="space-y-2">
-                            <Button
+                            {/*Button per permettere all'utente di cambiare la sua immagine profilo*/}
+                            {/* <Button
                                 className="cursor-pointer"
                                 variant="outline"
                                 size="sm"
@@ -256,7 +261,7 @@ function ProfileSection() {
                                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                                 ) : null}
                                 Change Picture
-                            </Button>
+                            </Button> */}
                             {/* !!!! SBLOCCA QUESTO INPUT PER FARLO FUNZIONARE !!!! */}
                             {/* <input
                                 type="file"
@@ -265,7 +270,7 @@ function ProfileSection() {
                                 onChange={handleFileChange} // 6.
                                 accept="image/jpeg,image/png,image/gif"
                             /> */}
-                            <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p>
+                            {/* <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p> */}
                         </div>
                     </div>
 
@@ -295,7 +300,7 @@ function ProfileSection() {
                     {/* </div> */}
 
                     <div className="flex justify-end">
-                        <Button className="cursor-pointer">Save Changes</Button>
+                        <Button className="cursor-pointer">{t('save_changes_button')}</Button>
                     </div>
                 </CardContent>
             </Card>
@@ -304,6 +309,8 @@ function ProfileSection() {
 }
 
 function PasswordSection() {
+
+    const t = useTranslations('settings');
 
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword1, setNewPassword1] = useState('');
@@ -335,64 +342,64 @@ function PasswordSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Password</h1>
-                <p className="text-muted-foreground">Update your password to keep your account secure.</p>
+                <h1 className="text-2xl font-bold">{t('password')}</h1>
+                <p className="text-muted-foreground">{t('password_description')}</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Change Password</CardTitle>
-                    <CardDescription>Make sure your new password is strong and secure.</CardDescription>
+                    <CardTitle>{t('change_password')}</CardTitle>
+                    <CardDescription>{t('change_password_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <form onSubmit={handleSubmit} className="space-y-2">
                         <div className="space-y-2">
-                            <Label htmlFor="old-password">Current Password</Label>
+                            <Label htmlFor="old-password">{t('current_password')}</Label>
                             <Input
                                 id="old-password"
                                 type="password"
                                 required
                                 value={oldPassword}
                                 onChange={(e) => setOldPassword(e.target.value)}
-                                placeholder="Inserisci la password attuale" />
+                                placeholder={t('current_password_placeholder')} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password1">New password</Label>
+                            <Label htmlFor="new-password1">{t('new_password')}</Label>
                             <Input
                                 id="new-password1"
                                 type="password"
                                 required
                                 value={newPassword1}
                                 onChange={(e) => setNewPassword1(e.target.value)}
-                                placeholder="Inserisci la nuova password" />
+                                placeholder={t('new_password_placeholder')} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password2">Confirm new password</Label>
+                            <Label htmlFor="new-password2">{t('confirm_new_password')}</Label>
                             <Input
                                 id="new-password2"
                                 type="password"
                                 required
                                 value={newPassword2}
                                 onChange={(e) => setNewPassword2(e.target.value)}
-                                placeholder="Conferma la nuova password" />
+                                placeholder={t('confirm_new_password_placeholder')} />
                         </div>
 
                         <Separator />
 
                         <div className="bg-muted/50 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium mb-2">Password Requirements:</h4>
+                            <h4 className="text-sm font-medium mb-2">{t('password_requirements')}:</h4>
                             <ul className="text-xs text-muted-foreground space-y-1">
-                                <li>• At least 8 characters</li>
-                                <li>• At least one capital letter</li>
-                                <li>• At least one lowercase letter</li>
-                                <li>• At least one number</li>
-                                <li>• At least one special character</li>
+                                <li>• {t('password_number_characters')}</li>
+                                <li>• {t('password_capital_letter')}</li>
+                                <li>• {t('password_lowercase_letter')}</li>
+                                <li>• {t('password_number')}</li>
+                                <li>• {t('password_special_character')}</li>
                             </ul>
                         </div>
 
                         <div className="flex justify-end">
                             <Button className="cursor-pointer" type="submit" disabled={mutation.isPending}>
-                                {mutation.isPending ? 'Updating...' : 'Update Password'}
+                                {mutation.isPending ? t('update_password_button_status') : t('update_password_button')}
                             </Button>
                         </div>
                     </form>
@@ -403,17 +410,20 @@ function PasswordSection() {
 }
 
 function NotificationsSection() {
+
+    const t = useTranslations('settings');
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Notifications</h1>
-                <p className="text-muted-foreground">Configure how and when to receive notifications.</p>
+                <h1 className="text-2xl font-bold">{t('notifications')}</h1>
+                <p className="text-muted-foreground">{t('notifications_description')}</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Notification Preferences</CardTitle>
-                    <CardDescription>Choose which notifications you want to receive.</CardDescription>
+                    <CardTitle>{t('notifications_preferences')}</CardTitle>
+                    <CardDescription>{t('notifications_preferences_description')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">Section under development...</p>
@@ -424,17 +434,20 @@ function NotificationsSection() {
 }
 
 function PrivacySection() {
+
+    const t = useTranslations('settings');
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Privacy</h1>
-                <p className="text-muted-foreground">Manage your privacy and security settings.</p>
+                <h1 className="text-2xl font-bold">{t('privacy')}</h1>
+                <p className="text-muted-foreground">{t('privacy_description')}</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Privacy settings</CardTitle>
-                    <CardDescription>Control who can see your information.</CardDescription>
+                    <CardTitle>{t('privacy_settings')}</CardTitle>
+                    <CardDescription>{t('privacy_settings_description')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">Section under development...</p>
@@ -445,16 +458,23 @@ function PrivacySection() {
 }
 
 
-function AppearanceSection() {
+import { useLocaleStore } from "@/store/localeStore";
+import { useRouter } from "next/navigation";
+
+function PreferencesSection() {
     const queryClient = useQueryClient();
     const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
     const mutation = useUpdateUserPreferences();
+    const t = useTranslations('settings');
+    const router = useRouter();
 
     // Initialize local states for the form
     const [localTheme, setLocalTheme] = useState(preferences?.theme || 'system');
     const [accelerometerUnit, setAccelerometerUnit] = useState(preferences?.accelerometer_unit || 'ms2');
     const [inclinometerUnit, setInclinometerUnit] = useState(preferences?.inclinometer_unit || 'deg');
     const [localShowResizeHandle, setLocalShowResizeHandle] = useState(preferences?.show_resize_handle || 'show');
+
+    const { locale, setLocale } = useLocaleStore();
 
     // Sync local form state with remote data from the query
     useEffect(() => {
@@ -466,7 +486,7 @@ function AppearanceSection() {
         }
     }, [preferences]);
 
-    const handleSaveAppearanceSettings = () => {
+    const handleSavePreferencesSettings = () => {
         if (!localTheme) return;
         mutation.mutate({
             theme: localTheme,
@@ -476,12 +496,19 @@ function AppearanceSection() {
         });
     };
 
+    const handleLanguageChange = (newLanguage: string) => {
+      if (locale === newLanguage) return;
+
+      setLocale(newLanguage as any);
+      router.refresh();
+    }
+
     if (isLoadingPreferences) {
         return (
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-bold">Appearance</h1>
-                    <p className="text-muted-foreground">Customize the appearance of the interface.</p>
+                    <h1 className="text-2xl font-bold">{t('preferences')}</h1>
+                    <p className="text-muted-foreground">{t('preferences_description')}</p>
                 </div>
                 <Card className="border border-border">
                     <CardHeader>
@@ -502,7 +529,7 @@ function AppearanceSection() {
         return (
             <div className="flex flex-col items-center h-40 justify-center">
                 <span className="text-red-500 mb-2">
-                    Error loading appearance settings.
+                    Error loading preferences settings.
                 </span>
                 <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['userPreferences'] })}>Try Again</Button>
             </div>
@@ -512,15 +539,15 @@ function AppearanceSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Appearance</h1>
-                <p className="text-muted-foreground">Customize the appearance of the interface.</p>
+                <h1 className="text-2xl font-bold">{t('preferences')}</h1>
+                <p className="text-muted-foreground">{t('preferences_description')}</p>
             </div>
 
             {/* Theme selection card */}
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Theme</CardTitle>
-                    <CardDescription>Select the theme for your interface.</CardDescription>
+                    <CardTitle>{t('theme')}</CardTitle>
+                    <CardDescription>{t('theme_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <RadioGroup value={localTheme || 'system'} onValueChange={setLocalTheme} className="space-y-3">
@@ -529,8 +556,8 @@ function AppearanceSection() {
                             <Label htmlFor="light" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Sun className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">Light</div>
-                                    <div className="text-sm text-muted-foreground">Light theme for the interface</div>
+                                    <div className="font-medium">{t('light')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('light_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -539,8 +566,8 @@ function AppearanceSection() {
                             <Label htmlFor="dark" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Moon className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">Dark</div>
-                                    <div className="text-sm text-muted-foreground">Dark theme for the interface</div>
+                                    <div className="font-medium">{t('dark')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('dark_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -550,8 +577,8 @@ function AppearanceSection() {
                             <Label htmlFor="system" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Monitor className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">System</div>
-                                    <div className="text-sm text-muted-foreground">Use system settings</div>
+                                    <div className="font-medium">{t('system')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('system_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -559,11 +586,42 @@ function AppearanceSection() {
                 </CardContent>
             </Card>
 
+            {/* Language selection card */}
+            <Card className="border border-border">
+              <CardHeader>
+                <CardTitle>{t('language')}</CardTitle>
+                <CardDescription>{t('language_description')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <RadioGroup value={locale} onValueChange={handleLanguageChange} className="space-y-3">
+                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                    <RadioGroupItem value="en" id="english" />
+                    <Label htmlFor="english" className="cursor-pointer flex-1">
+                      <div>
+                        <div className="font-medium">{t('english')}</div>
+                        <div className="text-sm text-muted-foreground">{t('english_description')}</div>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                    <RadioGroupItem value="it" id="italian" />
+                    <Label htmlFor="italian" className="cursor-pointer flex-1">
+                      <div>
+                        <div className="font-medium">{t('italian')}</div>
+                        <div className="text-sm text-muted-foreground">{t('italian_description')}</div>
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+
             {/* Grid Layout settings card */}
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Grid Layout</CardTitle>
-                    <CardDescription>Customize the grid mode behavior.</CardDescription>
+                    <CardTitle>{t('grid_layout')}</CardTitle>
+                    <CardDescription>{t('grid_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <RadioGroup
@@ -571,13 +629,13 @@ function AppearanceSection() {
                         onValueChange={setLocalShowResizeHandle}
                         className="space-y-3"
                     >
-                        <Label className="text-base font-medium"> <GripVertical /> Resize Handle</Label>
+                        <Label className="text-base font-medium"> <GripVertical />{t('resize_handle')}</Label>
                         <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                             <RadioGroupItem value="show" id="show-handle" />
                             <Label htmlFor="show-handle" className="cursor-pointer flex-1">
                                 <div>
-                                    <div className="font-medium">Show</div>
-                                    <div className="text-sm text-muted-foreground">Display a visual handle for resizing sections.</div>
+                                    <div className="font-medium">{t('resize_handle_show')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('resize_handle_show_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -586,8 +644,8 @@ function AppearanceSection() {
                             <RadioGroupItem value="hide" id="hide-handle" />
                             <Label htmlFor="hide-handle" className="cursor-pointer flex-1">
                                 <div>
-                                    <div className="font-medium">Hide</div>
-                                    <div className="text-sm text-muted-foreground">Hide the visual handle for a cleaner interface.</div>
+                                    <div className="font-medium">{t('resize_handle_hide')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('resize_handle_hide_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -598,21 +656,21 @@ function AppearanceSection() {
             {/* Measurement unit selection card */}
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Unit of Measurement</CardTitle>
-                    <CardDescription>Choose which unit of measurement to display in the application.</CardDescription>
+                    <CardTitle>{t('measurement_units')}</CardTitle>
+                    <CardDescription>{t('measurement_units_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
 
                     {/* Accelerometer unit selection */}
                     <div className="space-y-3">
-                        <Label className="text-base font-medium"> <CircleGauge /> Accelerometers</Label>
+                        <Label className="text-base font-medium"> <CircleGauge /> {t('accelerometers')}</Label>
                         <RadioGroup value={accelerometerUnit} onValueChange={setAccelerometerUnit} className="space-y-3">
                             <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                                 <RadioGroupItem value="ms2" id="ms2" />
                                 <Label htmlFor="ms2" className="cursor-pointer flex-1">
                                     <div>
-                                        <div className="font-medium">m/s²</div>
-                                        <div className="text-sm text-muted-foreground">Meters per second squared</div>
+                                        <div className="font-medium">{t('ms2')}</div>
+                                        <div className="text-sm text-muted-foreground">{t('ms2_description')}</div>
                                     </div>
                                 </Label>
                             </div>
@@ -620,8 +678,8 @@ function AppearanceSection() {
                                 <RadioGroupItem value="g" id="g" />
                                 <Label htmlFor="g" className="cursor-pointer flex-1">
                                     <div>
-                                        <div className="font-medium">g</div>
-                                        <div className="text-sm text-muted-foreground">Acceleration due to gravity (9.81 m/s²)</div>
+                                        <div className="font-medium">{t('g')}</div>
+                                        <div className="text-sm text-muted-foreground">{t('g_description')}</div>
                                     </div>
                                 </Label>
                             </div>
@@ -632,14 +690,14 @@ function AppearanceSection() {
 
                     {/* Inclinometer unit selection */}
                     <div className="space-y-3">
-                        <Label className="text-base font-medium"> <TriangleRight /> Inclinometers</Label>
+                        <Label className="text-base font-medium"> <TriangleRight /> {t('inclinometers')}</Label>
                         <RadioGroup value={inclinometerUnit} onValueChange={setInclinometerUnit} className="space-y-3">
                             <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                                 <RadioGroupItem value="deg" id="deg" />
                                 <Label htmlFor="deg" className="cursor-pointer flex-1">
                                     <div>
-                                        <div className="font-medium">deg (°)</div>
-                                        <div className="text-sm text-muted-foreground">Degrees (0° - 360°)</div>
+                                        <div className="font-medium">{t('deg')}</div>
+                                        <div className="text-sm text-muted-foreground">{t('deg_description')}</div>
                                     </div>
                                 </Label>
                             </div>
@@ -647,8 +705,8 @@ function AppearanceSection() {
                                 <RadioGroupItem value="rad" id="rad" />
                                 <Label htmlFor="rad" className="cursor-pointer flex-1">
                                     <div>
-                                        <div className="font-medium">rad</div>
-                                        <div className="text-sm text-muted-foreground">Radiant (0 - 2π)</div>
+                                        <div className="font-medium">{t('rad')}</div>
+                                        <div className="text-sm text-muted-foreground">{t('rad_description')}</div>
                                     </div>
                                 </Label>
                             </div>
@@ -659,11 +717,11 @@ function AppearanceSection() {
 
             {/* Unified Save Button */}
             <div className="flex justify-end pt-4">
-                <Button onClick={handleSaveAppearanceSettings} disabled={mutation.isPending}>
+                <Button onClick={handleSavePreferencesSettings} disabled={mutation.isPending}>
                     {mutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : null}
-                    Save All Preferences
+                    {t('save_preferences')}
                 </Button>
             </div>
         </div>

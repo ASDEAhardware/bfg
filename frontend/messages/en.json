@@ -1,0 +1,214 @@
+{
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "password": "Password",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "preferences": "Preferences",
+
+    "profile_description": "Manage your profile information and account preferences.",
+    "personal_information": "Personal Information",
+    "personal_information_description": "Update your profile picture and personal details here.",
+    "save_changes_button": "Save Changes",
+
+    "password_description": "Update your password to keep your account secure.",
+    "change_password": "Change Password",
+    "change_password_description": "Make sure your new password is strong and secure.",
+    "current_password": "Current Password",
+    "current_password_placeholder": "Enter your current password",
+    "new_password": "New Password",
+    "new_password_placeholder": "Enter yuor new password",
+    "confirm_new_password": "Confirm new password",
+    "confirm_new_password_placeholder": "Confirm new password",
+    "password_requirements": "Password Requirements",
+    "password_number_characters": "At least 8 characters",
+    "password_capital_letter": "At least one capital letter",
+    "password_lowercase_letter": "At least one lowercase letter",
+    "password_number": "At least one number",
+    "password_special_character": "At least one special character",
+    "update_password_button": "Update Password",
+    "update_password_button_status": "Updating...",
+ 
+    "notifications_description": "Configure how and when to receive notifications.",
+    "notifications_preferences": "Notifications Preferences",
+    "notifications_preferences_description": "Choose which notifications you want to receive.",
+
+    "privacy_description": "Manage your privacy and security settings.",
+    "privacy_settings": "Privacy settings",
+    "privacy_settings_description": "Control who can see your information.",
+
+
+
+    "preferences_description": "Customize the appearance of the interface.",
+    "theme": "Theme",
+    "theme_description": "Choose how you want the interface to appear.",
+    "light": "Light",
+    "light_description": "Light theme for the interface",
+    "dark": "Dark",
+    "dark_description": "Dark theme for the interface",
+    "system": "System",
+    "system_description": "Use your system settings",
+    "save_preferences": "Save preferences",
+    "language": "Language",
+    "language_description": "Choose your preferred language.",
+    "english": "English",
+    "english_description": "English language",
+    "italian": "Italian",
+    "italian_description": "Italian language",
+    "grid_layout": "Grid Layout",
+    "grid_description": "Customize the grid mode behavior.",
+    "resize_handle": "Resize Handle",
+    "resize_handle_show": "Show",
+    "resize_handle_show_description": "Display a visual handle for resizing sections.",
+    "resize_handle_hide": "Hide",
+    "resize_handle_hide_description": "Hide the visual handle for a cleaner interface.",
+    "measurement_units": "Measurement Units",
+    "measurement_units_description": "Choose measurement units for accelerometers and inclinometers.",
+    "accelerometers": "Accelerometers",
+    "ms2": "m/s²",
+    "ms2_description": "Meters per second squared",
+    "g": "g",
+    "g_description": "Acceleration due to gravity (9.81 m/s²)",
+    "inclinometers": "Inclinometers",
+    "deg": "deg (°)",
+    "deg_description": "Degrees (0° - 360°)",
+    "rad": "rad",
+    "rad_description": "Radians (0 - 2π)"
+  },
+
+  "sensors": {
+    "temperature_sensor": "Temperature sensor",
+    "humidity_sensor": "Humidity sensor",
+    "pressure_sensor": "Pressure sensor",
+    "co2_sensor": "CO2 sensor",
+    "motion_sensor": "Motion sensor",
+    "light_sensor": "Light sensor",
+    "no_sensors_available": "No sensors available"
+  },
+
+  "changelog": {
+    "title": "Changelog",
+    "back_button": "Back",
+    "latest_badge": "Latest",
+    "versions_title": "Versions",
+    "select_version": "Select Version",
+    "change_types": {
+      "feature": "New Features",
+      "bugfix": "Bug Fixes",
+      "improvement": "Improvements",
+      "security": "Security"
+    },
+    "version_1_2_1": {
+      "title": "Improvements and Fixes",
+      "description": "This version introduces app modularity in the frontend and resolves important race conditions related to tokens and themes.",
+      "changes": {
+        "feature_1": "Modularity: in the frontend, apps have been divided into modules through a specific architecture to facilitate the addition and detachment of the module.",
+        "feature_2": "Refresh token BFF Endpoint: the access_token refresh endpoint has been added to the BFF server as this API call must be made by the Client (which communicates obligatorily with the BFF server) and no longer by middleware.ts, respecting the rules of the BFF Pattern architecture.",
+        "feature_3": "Tooltips: Tooltips have been added to briefly explain the function of a given button on mouse hover.",
+        "bugfix_1": "Token race condition: the race condition for which the access_token was not refreshed correctly was fixed, so every 5 minutes, upon its refresh, users were redirected to `/dashboard`.",
+        "bugfix_2": "Save Theme race condition: the theme race condition was fixed via a `debouncer` for which the theme shown in the UI was not always synchronized with its respective value in the database.",
+        "bugfix_3": "Issue #6 Fixed: issue #6 was fixed as a 400 error could be displayed in the terminal during access_token refresh. This error was caused by the token race condition.",
+        "bugfix_4": "Scroll on Grid contents: scroll was fixed for page content that exceeded the available space during Grid Mode.",
+        "bugfix_5": "Header Version Page: the z-index of the page header was fixed to display the releases of the various versions, as it overlapped the sidebar header when scrolling.",
+        "bugfix_6": "nav-user.tsx: Fixed user typing in the file, using the `User` type defined in `/types/user.ts`."
+      }
+    },
+    "version_1_2_0": {
+      "title": "Grid System",
+      "description": "Full implementation of the grid system for multi-screen visualization and advanced layout management.",
+      "changes": {
+        "feature_1": "GridStore implementation with Zustand for complete grid state management",
+        "feature_2": "GridSection component for rendering and managing individual sections",
+        "feature_3": "Dynamic horizontal/vertical section splitting system",
+        "feature_4": "Full support for assigning tabs to grid sections",
+        "feature_5": "Virtual Pages system for dynamic content in sections",
+        "feature_6": "Drag & Drop for dragging tabs into sections",
+        "feature_7": "GridModeToggle component for grid mode control",
+        "feature_8": "PageSelector for assigning specific pages to sections",
+        "feature_9": "TabContentRenderer specialized for tab content in grid",
+        "feature_10": "Smart Navigation integration with active grid mode",
+        "details_1": "The grid system represents a qualitative leap in user experience, allowing simultaneous viewing of multiple contents with professional layout management.",
+        "improvement_1": "Responsive layout that automatically adapts to screen dimensions",
+        "improvement_2": "Optimized algorithms for section positioning and resizing",
+        "improvement_3": "Automatic persistence of grid state between user sessions",
+        "improvement_4": "Optimized performance for rendering complex layouts",
+        "security_1": "Robust validation of grid states to prevent layout corruption",
+        "security_2": "Secure memory management for complex layouts"
+      }
+    },
+    "version_1_1_0": {
+      "title": "Tab Navigation",
+      "description": "Added sidebar element navigation via tabs.",
+      "changes": {
+        "feature_1": "Components added to allow navigation with Tabs.",
+        "feature_2": "CSS added to hide the scrollbar without disabling scrolling.",
+        "feature_3": "Added alert dialog that is shown when disabling tab mode without closing them.",
+        "feature_4": "Zustand store added for tabs.",
+        "details_1": "The tab navigation system significantly improves user experience by allowing efficient multitasking.",
+        "improvement_1": "Performance optimizations for tab rendering",
+        "improvement_2": "Improved accessibility with keyboard navigation support",
+        "bugfix_1": "Resolved memory leak issues in tab management",
+        "bugfix_2": "Fixed state synchronization issue between components"
+      }
+    },
+    "version_1_0_0": {
+      "title": "Initial web application release",
+      "description": "First public version: containerized architecture, secure authentication, REST API, Next.js frontend with advanced state management and modern UI.",
+      "changes": {
+        "feature_1": "Fully containerized setup with Docker and Docker Compose for backend and frontend.",
+        "feature_2": "Next.js server as Backend for Frontend (BFF) with SSR rendering, API route protection and JWT validation.",
+        "feature_3": "Secure communication between frontend and backend containers via Docker network.",
+        "feature_4": "Backend developed with Django and Django REST Framework.",
+        "feature_5": "JWT authentication via dj-rest-auth and djangorestframework-simplejwt.",
+        "feature_6": "Asymmetric JWT validation strategy: private key signing, public endpoint for public key.",
+        "feature_7": "Secure storage of JWT tokens in cookies (refresh_token httpOnly, access_token standard).",
+        "feature_8": "API endpoints for registration, login, logout, password reset and user data retrieval.",
+        "feature_9": "Next.js frontend (App Router), React and TypeScript.",
+        "feature_10": "Global state management with Zustand.",
+        "feature_11": "Data fetching and caching with TanStack Query (React Query).",
+        "feature_12": "Axios API client to the BFF.",
+        "feature_13": "UI with Radix UI, Shadcn UI and Tailwind CSS.",
+        "feature_14": "Light/dark theme support with next-themes.",
+        "feature_15": "Role-based protected routing via Next.js directory and middleware.",
+        "feature_16": "Next.js middleware for private route protection.",
+        "feature_17": "Server-side JWT validation in BFF via jose.",
+        "improvement_1": "ESLint configured to maintain high frontend code standards.",
+        "improvement_2": "Example files for environment variables (example.env, example.env.local) for backend and frontend.",
+        "bugfix_1": "No significant bug fixes in this initial release."
+      }
+    }
+  },
+  
+  "dashboard": {
+    "welcome": "Welcome",
+    "loading_error": "Error loading user data.",
+    "wizard": {
+      "previous_button": "Previous",
+      "next_button": "Next",
+      "start_button": "Start using BFG",
+      "tips": {
+        "modularity": {
+          "title": "Modularity",
+          "description": "BFG is designed as a modular system by ASDEA. Each feature is an independent plugin that can be activated or deactivated according to your needs."
+        },
+        "customization": {
+          "title": "Customization",
+          "description": "Compose your engineering dashboard by choosing only the modules you need. Each project can have a different configuration."
+        },
+        "development": {
+          "title": "Future Development",
+          "description": "New modules are continuously developed by ASDEA. You will be able to expand the system's functionalities when they become available."
+        },
+        "flexibility": {
+          "title": "Flexibility",
+          "description": "The system adapts to your engineering needs, allowing for custom integrations and specific workflows for each project."
+        }
+      }
+    },
+    "main": {
+      "title": "BFG Dashboard",
+      "description": "Your modular engineering dashboard is ready to be customized. Explore the available modules in the side menu to get started."
+    }
+  }
+}

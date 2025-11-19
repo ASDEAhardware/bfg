@@ -1,0 +1,213 @@
+{
+  "settings": {
+    "title": "Impostazioni",
+    "profile": "Profilo",
+    "password": "Password",
+    "notifications": "Notifiche",
+    "privacy": "Privacy",
+    "preferences": "Preferenze",
+
+    "profile_description": "Gestisci le informazioni del tuo profilo e le preferenze dell'account.",
+    "personal_information": "Informazioni Personali",
+    "personal_information_description": "Aggiorna qui la tua immagine del profilo e i tuoi dati personali.",
+    "save_changes_button": "Salva le Modifiche",
+
+    "password_description": "Aggiorna la tua password per proteggere il tuo account.",
+    "change_password": "Cambia Password",
+    "change_password_description": "Assicurati che la tua nuova password sia forte e sicura.",
+    "current_password": "Password Attuale",
+    "current_password_placeholder": "Inserisci la password attuale",
+    "new_password": "Nuova Password",
+    "new_password_placeholder": "Inserisci la nuova password",
+    "confirm_new_password": "Conferma la nuova password",
+    "confirm_new_password_placeholder": "Conferma la nuova password",
+    "password_requirements": "Requisiti della Password",
+    "password_number_characters": "Almeno 8 caratteri",
+    "password_capital_letter": "Almeno una lettera maiuscola",
+    "password_lowercase_letter": "Almeno una lettera minuscola",
+    "password_number": "Almeno un numero",
+    "password_special_character": "Almeno un carattere speciale",
+    "update_password_button": "Aggiorna la Password",
+    "update_password_button_status": "Aggiornamento...",
+
+    "notifications_description": "Configura come e quando ricevere le notifiche.",
+    "notifications_preferences": "Preferenze di notifica",
+    "notifications_preferences_description": "Scegli quali notifiche desideri ricevere.",
+
+    "privacy_description": "Gestisci le tue impostazioni di privacy e sicurezza.",
+    "privacy_settings": "Impostazioni della Privacy",
+    "privacy_settings_description": "Controlla chi può vedere le tue informazioni",
+
+    
+    "preferences_description": "Personalizza l'aspetto dell'interfaccia.",
+    "theme": "Tema",
+    "theme_description": "Scegli come vuoi che appaia l'interfaccia.",
+    "light": "Chiaro",
+    "light_description": "Tema chiaro per l'interfaccia",
+    "dark": "Scuro",
+    "dark_description": "Tema scuro per l'interfaccia",
+    "system": "Sistema",
+    "system_description": "Usa le impostazioni del sistema",
+    "save_preferences": "Salva preferenze",
+    "language": "Lingua",
+    "language_description": "Scegli la tua lingua preferita.",
+    "english": "Inglese",
+    "english_description": "Lingua inglese",
+    "italian": "Italiano",
+    "italian_description": "Lingua italiana",
+    "grid_layout": "Layout a griglia",
+    "grid_description": "Personalizza il comportamento della modalità griglia.",
+    "resize_handle": "Maniglia di Ridimensionamento",
+    "resize_handle_show": "Mostra",
+    "resize_handle_show_description": "Visualizza una maniglia visiva per ridimensionare le sezioni.",
+    "resize_handle_hide": "Nascondi",
+    "resize_handle_hide_description": "Nascondi la maniglia visiva per un'interfaccia più pulita.",
+    "measurement_units": "Unità di Misura",
+    "measurement_units_description": "Scegli le unità di misura per accelerometri e inclinometri.",
+    "accelerometers": "Accelerometri",
+    "ms2": "m/s²",
+    "ms2_description": "Metri al secondo quadrato",
+    "g": "g",
+    "g_description": "Accelerazione di gravità (9.81 m/s²)",
+    "inclinometers": "Inclinometri",
+    "deg": "deg (°)",
+    "deg_description": "Gradi (0° - 360°)",
+    "rad": "rad",
+    "rad_description": "Radianti (0 - 2π)"
+  },
+
+  "sensors": {
+    "temperature_sensor": "Sensore di temperatura",
+    "humidity_sensor": "Sensore di umidità",
+    "pressure_sensor": "Sensore di pressione",
+    "co2_sensor": "Sensore di CO2",
+    "motion_sensor": "Sensore di movimento",
+    "light_sensor": "Sensore di luce",
+    "no_sensors_available": "Nessun sensore disponibile"
+  },
+
+  "changelog": {
+    "title": "Changelog",
+    "back_button": "Indietro",
+    "latest_badge": "Ultima",
+    "versions_title": "Versioni",
+    "select_version": "Seleziona Versione",
+    "change_types": {
+      "feature": "Nuove funzionalità",
+      "bugfix": "Correzioni",
+      "improvement": "Miglioramenti",
+      "security": "Sicurezza"
+    },
+    "version_1_2_1": {
+      "title": "Miglioramenti e Fix",
+      "description": "Questa versione introduce la modularità delle app nel frontend e risolve importanti race condition relative ai token e al tema.",
+      "changes": {
+        "feature_1": "Modularità: nel frontend le app sono state suddivise in moduli tramite un'apposita architettura per facilitarne l'aggiunta e lo sgancio del modulo.",
+        "feature_2": "Refresh token BFF Endpoint: è stato aggiunto l'endpoint del refresh dell'access_token nel server BFF in quanto questa chiamata API deve essere effettuata dal Client (che comunica obbligatoriamente con il server BFF) e non più dal middleware.ts, rispettando le regole dell'architettura BFF Pattern.",
+        "feature_3": "Tooltips: sono stati aggiunti dei Tooltips, per spiegare brevemente la funzione di un dato button all'hover del mouse.",
+        "bugfix_1": "Token race condition: è stata fixata la race condition per cui l'access_token non veniva refreshato correttamente per cui ogni 5 minuti, al suo refresh, si veniva redirectati alla `/dashboard`.",
+        "bugfix_2": "Save Theme race condition: fixata tramite un `debouncer` la race condition del tema per cui il tema mostrato nella UI non era sempre sincronizzato con il rispettivo valore all'interno del database.",
+        "bugfix_3": "Issue #6 Fixed: è stato fixato l'issue #6 aperto in quanto nel terminale poteva essere visualizzato un error 400 durante il refresh dell'access_token. Questo errore era causato dalla token race condition.",
+        "bugfix_4": "Scroll on Grid contents: è stato fixato lo scroll per il contenuto delle pagine che eccedevano lo spazio disponibile durante la Grid Mode.",
+        "bugfix_5": "Header Version Page: fixato lo z-index dell'header della pagina per visualizzare i rilasci delle varie versioni, in quanto scrollando si sovrapponeva all'header della sidebar.",
+        "bugfix_6": "nav-user.tsx: Fixata la tipizzazione di user nel file, utilizzando il tipo `User` definito in `/types/user.ts`."
+      }
+    },
+    "version_1_2_0": {
+      "title": "Grid System",
+      "description": "Implementazione completa del sistema di griglia per visualizzazione multi-schermo e gestione layout avanzata.",
+      "changes": {
+        "feature_1": "Implementazione GridStore con Zustand per gestione stato griglia completa",
+        "feature_2": "GridSection component per rendering e gestione sezioni individuali",
+        "feature_3": "Sistema di divisione dinamica orizzontale/verticale delle sezioni",
+        "feature_4": "Supporto completo per assegnazione tabs alle sezioni grid",
+        "feature_5": "Virtual Pages system per contenuti dinamici nelle sezioni",
+        "feature_6": "Drag & Drop per trascinamento schede nelle sezioni",
+        "feature_7": "GridModeToggle component per controllo modalità griglia",
+        "feature_8": "PageSelector per assegnazione pagine specifiche alle sezioni",
+        "feature_9": "TabContentRenderer specializzato per contenuti tab in grid",
+        "feature_10": "Smart Navigation integration con grid mode attivo",
+        "details_1": "Il grid system rappresenta un salto qualitativo nell'esperienza utente, permettendo visualizzazione contemporanea di contenuti multipli con gestione layout professionale.",
+        "improvement_1": "Layout responsive che si adatta automaticamente alle dimensioni schermo",
+        "improvement_2": "Algoritmi ottimizzati per posizionamento e ridimensionamento sezioni",
+        "improvement_3": "Persistenza automatica stato griglia tra sessioni utente",
+        "improvement_4": "Performance ottimizzate per rendering di layout complessi",
+        "security_1": "Validazione robusta degli stati grid per prevenire corruzioni layout",
+        "security_2": "Gestione sicura della memoria per layout complessi"
+      }
+    },
+    "version_1_1_0": {
+      "title": "Tab Navigation",
+      "description": "Aggiunta la navigazione degli elementi della sidebar tramite tabs.",
+      "changes": {
+        "feature_1": "Aggiunti i componenti per permettere la navigazione con le Tabs.",
+        "feature_2": "Aggiunto il css per nascondere la scrollbar senza disabilitare lo scroll.",
+        "feature_3": "Aggiunto l'alert dialog che viene mostrato quando si disabilita la modalità tabs senza averle chiuse.",
+        "feature_4": "Aggiunto lo store Zustand per le tabs.",
+        "details_1": "Il sistema di tab navigation migliora significativamente l'esperienza utente permettendo multitasking efficiente.",
+        "improvement_1": "Ottimizzazioni performance per rendering delle schede",
+        "improvement_2": "Migliorata accessibilità con supporto keyboard navigation",
+        "bugfix_1": "Risolti problemi di memory leak nella gestione delle schede",
+        "bugfix_2": "Fixato problema di sincronizzazione stato tra componenti"
+      }
+    },
+    "version_1_0_0": {
+      "title": "Release iniziale dell'applicazione web",
+      "description": "Prima versione pubblica: architettura containerizzata, autenticazione sicura, API REST, frontend Next.js con gestione stato avanzata e UI moderna.",
+      "changes": {
+        "feature_1": "Setup completamente containerizzato con Docker e Docker Compose per backend e frontend.",
+        "feature_2": "Server Next.js come Backend for Frontend (BFF) con rendering SSR, protezione API route e validazione JWT.",
+        "feature_3": "Comunicazione sicura tra container frontend e backend tramite rete Docker.",
+        "feature_4": "Backend sviluppato con Django e Django REST Framework.",
+        "feature_5": "Autenticazione JWT tramite dj-rest-auth e djangorestframework-simplejwt.",
+        "feature_6": "Strategia di validazione asimmetrica dei JWT: firma con chiave privata, endpoint pubblico per chiave pubblica.",
+        "feature_7": "Memorizzazione sicura dei token JWT in cookie (refresh_token httpOnly, access_token standard).",
+        "feature_8": "Endpoint API per registrazione, login, logout, reset password e recupero dati utente.",
+        "feature_9": "Frontend Next.js (App Router), React e TypeScript.",
+        "feature_10": "Gestione stato globale con Zustand.",
+        "feature_11": "Data fetching e caching con TanStack Query (React Query).",
+        "feature_12": "Axios API client verso il BFF.",
+        "feature_13": "UI con Radix UI, Shadcn UI e Tailwind CSS.",
+        "feature_14": "Supporto tema light/dark con next-themes.",
+        "feature_15": "Routing protetto basato su ruoli tramite directory e middleware Next.js.",
+        "feature_16": "Next.js middleware per private route protection.",
+        "feature_17": "Server-side JWT validation in BFF via jose.",
+        "improvement_1": "ESLint configurato per mantenere elevati standard di codice frontend.",
+        "improvement_2": "File di esempio per variabili d'ambiente (example.env, example.env.local) per backend e frontend.",
+        "bugfix_1": "Nessuna correzione bug rilevante in questa release iniziale."
+      }
+    }
+  },
+  
+  "dashboard": {
+    "welcome": "Benvenuto",
+    "loading_error": "Errore nel caricamento dei dati utente.",
+    "wizard": {
+      "previous_button": "Precedente",
+      "next_button": "Successivo",
+      "start_button": "Inizia ad usare BFG",
+      "tips": {
+        "modularity": {
+          "title": "Modularità",
+          "description": "BFG è progettato come sistema modulare da ASDEA. Ogni funzionalità è un plugin indipendente che può essere attivato o disattivato secondo le tue esigenze."
+        },
+        "customization": {
+          "title": "Personalizzazione",
+          "description": "Componi la tua dashboard ingegneristica scegliendo solo i moduli che ti servono. Ogni progetto può avere una configurazione diversa."
+        },
+        "development": {
+          "title": "Sviluppo Futuro",
+          "description": "Nuovi moduli vengono continuamente sviluppati da ASDEA. Potrai espandere le funzionalità del sistema quando saranno disponibili."
+        },
+        "flexibility": {
+          "title": "Flessibilità",
+          "description": "Il sistema si adatta alle tue necessità ingegneristiche, permettendo integrazioni personalizzate e workflow specifici per ogni progetto."
+        }
+      }
+    },
+    "main": {
+      "title": "Dashboard BFG",
+      "description": "La tua dashboard ingegneristica modulare è pronta per essere personalizzata. Esplora i moduli disponibili nel menu laterale per iniziare."
+    }
+  }
+}
