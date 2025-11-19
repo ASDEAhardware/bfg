@@ -6,6 +6,40 @@
     "notifications": "Notifications",
     "privacy": "Privacy",
     "preferences": "Preferences",
+
+    "profile_description": "Manage your profile information and account preferences.",
+    "personal_information": "Personal Information",
+    "personal_information_description": "Update your profile picture and personal details here.",
+    "save_changes_button": "Save Changes",
+
+    "password_description": "Update your password to keep your account secure.",
+    "change_password": "Change Password",
+    "change_password_description": "Make sure your new password is strong and secure.",
+    "current_password": "Current Password",
+    "current_password_placeholder": "Enter your current password",
+    "new_password": "New Password",
+    "new_password_placeholder": "Enter yuor new password",
+    "confirm_new_password": "Confirm new password",
+    "confirm_new_password_placeholder": "Confirm new password",
+    "password_requirements": "Password Requirements",
+    "password_number_characters": "At least 8 characters",
+    "password_capital_letter": "At least one capital letter",
+    "password_lowercase_letter": "At least one lowercase letter",
+    "password_number": "At least one number",
+    "password_special_character": "At least one special character",
+    "update_password_button": "Update Password",
+    "update_password_button_status": "Updating...",
+ 
+    "notifications_description": "Configure how and when to receive notifications.",
+    "notifications_preferences": "Notifications Preferences",
+    "notifications_preferences_description": "Choose which notifications you want to receive.",
+
+    "privacy_description": "Manage your privacy and security settings.",
+    "privacy_settings": "Privacy settings",
+    "privacy_settings_description": "Control who can see your information.",
+
+
+
     "preferences_description": "Customize the appearance of the interface.",
     "theme": "Theme",
     "theme_description": "Choose how you want the interface to appear.",
@@ -41,5 +75,37 @@
     "deg_description": "Degrees (0° - 360°)",
     "rad": "rad",
     "rad_description": "Radians (0 - 2π)"
+  },
+  
+  "dashboard": {
+    "welcome": "Welcome",
+    "loading_error": "Error loading user data.",
+    "wizard": {
+      "previous_button": "Previous",
+      "next_button": "Next",
+      "start_button": "Start using BFG",
+      "tips": {
+        "modularity": {
+          "title": "Modularity",
+          "description": "BFG is designed as a modular system by ASDEA. Each feature is an independent plugin that can be activated or deactivated according to your needs."
+        },
+        "customization": {
+          "title": "Customization",
+          "description": "Compose your engineering dashboard by choosing only the modules you need. Each project can have a different configuration."
+        },
+        "development": {
+          "title": "Future Development",
+          "description": "New modules are continuously developed by ASDEA. You will be able to expand the system's functionalities when they become available."
+        },
+        "flexibility": {
+          "title": "Flexibility",
+          "description": "The system adapts to your engineering needs, allowing for custom integrations and specific workflows for each project."
+        }
+      }
+    },
+    "main": {
+      "title": "BFG Dashboard",
+      "description": "Your modular engineering dashboard is ready to be customized. <br /> Explore the available modules in the side menu to get started."
+    }
   }
 }

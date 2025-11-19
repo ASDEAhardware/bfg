@@ -41,14 +41,14 @@ export default function SettingsPage() {
             name: t('preferences'),
             icon: Palette,
         },
-        //{
+        // {
         //     id: "notifications",
-        //     name: "Notifiche",
+        //     name: t('notifications'),
         //     icon: Bell,
         // },
         // {
         //     id: "privacy",
-        //     name: "Privacy",
+        //     name: t('privacy'),
         //     icon: Shield,
         // },
     ]
@@ -63,7 +63,7 @@ export default function SettingsPage() {
                     <div className="p-4 md:p-4">
                         <div className="flex items-center gap-2 mb-6">
                             <Settings className="h-5 w-5" />
-                            <h2 className="text-lg font-semibold">Settings</h2>
+                            <h2 className="text-lg font-semibold">{t('title')}</h2>
                         </div>
                         <nav className="space-y-2">
                             {settingsNavigation.map((item) => {
@@ -126,6 +126,7 @@ export default function SettingsPage() {
 
 function ProfileSection() {
 
+    const t = useTranslations('settings');
     const { data, isLoading, isError } = useUserInfo();
 
     // Istanziamo il queryClient
@@ -223,14 +224,14 @@ function ProfileSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Profile</h1>
-                <p className="text-muted-foreground">Manage your profile information and account preferences.</p>
+                <h1 className="text-2xl font-bold">{t('profile')}</h1>
+                <p className="text-muted-foreground">{t('profile_description')}</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Personal Information</CardTitle>
-                    <CardDescription>Update your profile picture and personal details here.</CardDescription>
+                    <CardTitle>{t('personal_information')}</CardTitle>
+                    <CardDescription>{t('personal_information_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="flex items-center gap-6">
@@ -299,7 +300,7 @@ function ProfileSection() {
                     {/* </div> */}
 
                     <div className="flex justify-end">
-                        <Button className="cursor-pointer">Save Changes</Button>
+                        <Button className="cursor-pointer">{t('save_changes_button')}</Button>
                     </div>
                 </CardContent>
             </Card>
@@ -308,6 +309,8 @@ function ProfileSection() {
 }
 
 function PasswordSection() {
+
+    const t = useTranslations('settings');
 
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword1, setNewPassword1] = useState('');
@@ -339,64 +342,64 @@ function PasswordSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Password</h1>
-                <p className="text-muted-foreground">Update your password to keep your account secure.</p>
+                <h1 className="text-2xl font-bold">{t('password')}</h1>
+                <p className="text-muted-foreground">{t('password_description')}</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Change Password</CardTitle>
-                    <CardDescription>Make sure your new password is strong and secure.</CardDescription>
+                    <CardTitle>{t('change_password')}</CardTitle>
+                    <CardDescription>{t('change_password_description')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <form onSubmit={handleSubmit} className="space-y-2">
                         <div className="space-y-2">
-                            <Label htmlFor="old-password">Current Password</Label>
+                            <Label htmlFor="old-password">{t('current_password')}</Label>
                             <Input
                                 id="old-password"
                                 type="password"
                                 required
                                 value={oldPassword}
                                 onChange={(e) => setOldPassword(e.target.value)}
-                                placeholder="Inserisci la password attuale" />
+                                placeholder={t('current_password_placeholder')} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password1">New password</Label>
+                            <Label htmlFor="new-password1">{t('new_password')}</Label>
                             <Input
                                 id="new-password1"
                                 type="password"
                                 required
                                 value={newPassword1}
                                 onChange={(e) => setNewPassword1(e.target.value)}
-                                placeholder="Inserisci la nuova password" />
+                                placeholder={t('new_password_placeholder')} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password2">Confirm new password</Label>
+                            <Label htmlFor="new-password2">{t('confirm_new_password')}</Label>
                             <Input
                                 id="new-password2"
                                 type="password"
                                 required
                                 value={newPassword2}
                                 onChange={(e) => setNewPassword2(e.target.value)}
-                                placeholder="Conferma la nuova password" />
+                                placeholder={t('confirm_new_password_placeholder')} />
                         </div>
 
                         <Separator />
 
                         <div className="bg-muted/50 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium mb-2">Password Requirements:</h4>
+                            <h4 className="text-sm font-medium mb-2">{t('password_requirements')}:</h4>
                             <ul className="text-xs text-muted-foreground space-y-1">
-                                <li>• At least 8 characters</li>
-                                <li>• At least one capital letter</li>
-                                <li>• At least one lowercase letter</li>
-                                <li>• At least one number</li>
-                                <li>• At least one special character</li>
+                                <li>• {t('password_number_characters')}</li>
+                                <li>• {t('password_capital_letter')}</li>
+                                <li>• {t('password_lowercase_letter')}</li>
+                                <li>• {t('password_number')}</li>
+                                <li>• {t('password_special_character')}</li>
                             </ul>
                         </div>
 
                         <div className="flex justify-end">
                             <Button className="cursor-pointer" type="submit" disabled={mutation.isPending}>
-                                {mutation.isPending ? 'Updating...' : 'Update Password'}
+                                {mutation.isPending ? t('update_password_button_status') : t('update_password_button')}
                             </Button>
                         </div>
                     </form>
@@ -407,17 +410,20 @@ function PasswordSection() {
 }
 
 function NotificationsSection() {
+
+    const t = useTranslations('settings');
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Notifications</h1>
-                <p className="text-muted-foreground">Configure how and when to receive notifications.</p>
+                <h1 className="text-2xl font-bold">{t('notifications')}</h1>
+                <p className="text-muted-foreground">{t('notifications_description')}</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Notification Preferences</CardTitle>
-                    <CardDescription>Choose which notifications you want to receive.</CardDescription>
+                    <CardTitle>{t('notifications_preferences')}</CardTitle>
+                    <CardDescription>{t('notifications_preferences_description')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">Section under development...</p>
@@ -428,17 +434,20 @@ function NotificationsSection() {
 }
 
 function PrivacySection() {
+
+    const t = useTranslations('settings');
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Privacy</h1>
-                <p className="text-muted-foreground">Manage your privacy and security settings.</p>
+                <h1 className="text-2xl font-bold">{t('privacy')}</h1>
+                <p className="text-muted-foreground">{t('privacy_description')}</p>
             </div>
 
             <Card className="border border-border">
                 <CardHeader>
-                    <CardTitle>Privacy settings</CardTitle>
-                    <CardDescription>Control who can see your information.</CardDescription>
+                    <CardTitle>{t('privacy_settings')}</CardTitle>
+                    <CardDescription>{t('privacy_settings_description')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">Section under development...</p>
