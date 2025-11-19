@@ -75,6 +75,16 @@
     "rad": "rad",
     "rad_description": "Radianti (0 - 2π)"
   },
+
+  "sensors": {
+    "temperature_sensor": "Sensore di temperatura",
+    "humidity_sensor": "Sensore di umidità",
+    "pressure_sensor": "Sensore di pressione",
+    "co2_sensor": "Sensore di CO2",
+    "motion_sensor": "Sensore di movimento",
+    "light_sensor": "Sensore di luce",
+    "no_sensors_available": "Nessun sensore disponibile"
+  },
   
   "dashboard": {
     "welcome": "Benvenuto",
@@ -104,7 +114,7 @@
     },
     "main": {
       "title": "Dashboard BFG",
-      "description": "La tua dashboard ingegneristica modulare è pronta per essere personalizzata. <br /> Esplora i moduli disponibili nel menu laterale per iniziare."
+      "description": "La tua dashboard ingegneristica modulare è pronta per essere personalizzata. Esplora i moduli disponibili nel menu laterale per iniziare."
     }
   }
 }

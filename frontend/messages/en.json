@@ -76,6 +76,16 @@
     "rad": "rad",
     "rad_description": "Radians (0 - 2π)"
   },
+
+  "sensors": {
+    "temperature_sensor": "Temperature sensor",
+    "humidity_sensor": "Humidity sensor",
+    "pressure_sensor": "Pressure sensor",
+    "co2_sensor": "CO2 sensor",
+    "motion_sensor": "Motion sensor",
+    "light_sensor": "Light sensor",
+    "no_sensors_available": "No sensors available"
+  },
   
   "dashboard": {
     "welcome": "Welcome",
@@ -105,7 +115,7 @@
     },
     "main": {
       "title": "BFG Dashboard",
-      "description": "Your modular engineering dashboard is ready to be customized. <br /> Explore the available modules in the side menu to get started."
+      "description": "Your modular engineering dashboard is ready to be customized. Explore the available modules in the side menu to get started."
     }
   }
 }
