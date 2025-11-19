@@ -6,7 +6,9 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends     gcc libpq-dev     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copia requirements
 COPY requirements.txt .
@@ -29,14 +31,29 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Installa Supervisor e dipendenze runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    supervisor \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copia i pacchetti Python installati
 COPY --from=builder /install /usr/local
 
 # Copia il progetto (codice, script, ecc.)
 COPY . .
 
+# Copy and prepare the entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Crea directory per logs Supervisor
+RUN mkdir -p /var/log/supervisor /var/log/mqtt
+
 EXPOSE 8000
 
-# Lasciare il comando di default, sarà sovrascritto da docker-compose
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "config.wsgi:application"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Default command: usa Supervisor per gestire gunicorn + mqtt service
+CMD ["/usr/bin/supervisord", "-c", "/app/supervisord.conf", "-n"]
 

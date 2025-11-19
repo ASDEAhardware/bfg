@@ -28,7 +28,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-&s%0j(121)s-qw($41%dpj2_q4bd&w0@!9&@lnvrnlw=8bltg3'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -62,6 +63,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # ← Add WhiteNoise here
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -96,6 +98,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
 
 
 # Database
@@ -131,7 +134,16 @@ REST_FRAMEWORK = {
 }
 
 AUTH_USER_MODEL = 'user.CustomUser'
+
+# Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Directory where collectstatic collects files
+STATICFILES_DIRS = []  # Add custom static directories if needed
+
+# WhiteNoise configuration for better performance
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files (user uploads)
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
 
@@ -279,4 +291,25 @@ LOGGING = {
     },
 }
 
+# MQTT Service Configuration
+import socket
 
+MQTT_CONFIG = {
+    'INSTANCE_ID': os.getenv('MQTT_INSTANCE_ID', socket.gethostname()[:8]),
+    'KEEP_ALIVE': int(os.getenv('MQTT_KEEP_ALIVE', '60')),
+    'CLEAN_SESSION': os.getenv('MQTT_CLEAN_SESSION', 'true').lower() == 'true',
+    'LWT_ENABLED': os.getenv('MQTT_LWT_ENABLED', 'true').lower() == 'true',
+    'SHUTDOWN_TIMEOUT': int(os.getenv('MQTT_SHUTDOWN_TIMEOUT', '5')),
+    'RECONNECT_MAX_DELAY': int(os.getenv('MQTT_RECONNECT_MAX_DELAY', '300')),
+}
+
+
+# CHANNEL_LAYERS configuration for Django Channels
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer", #Dice a Django Channels di usare Redis come "channel layer", ovvero come message broker per gestire la comunicazione in tempo reale
+        "CONFIG": {
+            "hosts": [("redis", 6379)],
+        },
+    },
+}

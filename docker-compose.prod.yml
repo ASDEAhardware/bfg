@@ -3,8 +3,7 @@ services:
   backend:
     build:
       context: ./backend
-      #dockerfile: Dockerfile  # multistage: builder + runner
-      #target: runner          # <-- specifica lo stage finale
+      target: runtime
     container_name: bfg_backend_prod
     ports:
       - "8000:8000"
@@ -16,6 +15,7 @@ services:
       - media_data:/app/media
     environment:
       - API_KEY=${SECRET_API_KEY}
+    restart: unless-stopped
 
 
   db:
@@ -45,6 +45,8 @@ services:
       - backend
 
 volumes:
-  bfg_postgres_data:
+  postgres_data:
+  media_data:
+
 # Per avviare in produzione, usa:
-# docker-compose -f docker-compose.prod.yml up --build 
+# podman-compose -f docker-compose.prod.yml up --build 

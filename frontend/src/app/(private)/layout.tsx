@@ -11,6 +11,7 @@ import { HeaderComponent } from "@/components/HeaderComponent"
 import { SiteProvider } from "@/contexts/SiteContext"
 import { StatusBarProvider } from "@/components/ContextualStatusBar"
 import { GlobalConfirmationDialog } from "@/components/GlobalConfirmationDialog"
+import { WebSocketInitializer } from "@/components/WebSocketInitializer"
 
 
 
@@ -26,6 +27,7 @@ export default async function Layout({
             <SiteProvider>
                 <StatusBarProvider>
                     <GlobalConfirmationDialog />
+                    <WebSocketInitializer />
                     <RefreshIndicator />
                     <AppSidebar />
                     <SidebarInset>

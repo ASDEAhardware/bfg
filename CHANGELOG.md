@@ -4,6 +4,39 @@ Tutte le modifiche notevoli a questo progetto saranno documentate in questo file
 
 Il formato si basa su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2025-11-18
+
+### Changed
+
+- **Automazione Avvio Backend**: Migliorato lo script `entrypoint.sh` del backend per automatizzare e rendere più robusto l'avvio del container.
+    - Aggiunto un "wait loop" che attende la piena disponibilità del database prima di eseguire qualsiasi comando.
+    - Aggiunta l'esecuzione automatica dei comandi `check` (per controlli di sistema) e `migrate` (per le migrazioni del database) all'avvio.
+
+### Fixed
+
+- **Configurazione Docker Backend**: Risolto un problema che impediva l'avvio del servizio backend a causa della mancata disponibilità delle variabili d'ambiente durante la fase di build.
+    - Spostata la raccolta dei file statici (`collectstatic`) dal Dockerfile allo script `entrypoint.sh`, per garantirne l'esecuzione con le corrette variabili d'ambiente a runtime.
+    - Aggiornato il Dockerfile per utilizzare il nuovo `entrypoint.sh`.
+
+### Added
+
+#### Bootstack
+- **Bootstack**: raggiungibile in dev http://localhost:6875/ credenziali di default Email: admin@admin.com Password: password
+
+
+## [1.5.0] - 2025-11-12
+
+### Added
+
+#### Sensor Configuration & Visualization
+- **Sensor Configuration Page**: Aggiunta una nuova pagina dedicata alla configurazione dei sensori, che permette agli utenti di gestire e personalizzare i parametri dei sensori.
+- **Sensor Diagram**: Implementato un componente per la visualizzazione dinamica di diagrammi di sensori, che mostra le connessioni e le relazioni tra i vari sensori.
+- **SVG as Components**: Abilitata la possibilità di importare file SVG come componenti React per una maggiore flessibilità nella visualizzazione di icone e diagrammi.
+- **Sensor Plugin**: Creato un nuovo plugin per il sensore per modularizzare e gestire la logica relativa ai sensori.
+- **State Management for Sensors**: Introdotto uno store Zustand (`sensorConfigStore`) per gestire lo stato della configurazione dei sensori.
+- **New Components**: Sviluppati nuovi componenti riutilizzabili come `SensorDiagram`, `SensorDiagramSkeleton`, `sensor-dropdown`, e `HorizontalLine`.
+- **Documentation**: Aggiunta una guida per lo sviluppo del diagramma dei sensori in `resources/docs/development/frontend/sensor-diagram-guide.md`.
+
 ## [1.4.0] - 2025-10-29
 
 ### Added

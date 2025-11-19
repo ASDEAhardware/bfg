@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
         aggregateTimeout: 300,
       };
     }
+    // ✅ Aggiungi regola per gestire i file SVG come componenti React
+    config.module.rules.push({
+      test: /\.svg$/i,
+      issuer: /\.[jt]sx?$/,
+      use: ["@svgr/webpack"],
+    });
     return config;
   },
 };

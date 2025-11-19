@@ -10,7 +10,7 @@ from django.db import transaction, models
 
 from ..models import MqttConnection, DiscoveredTopic, Gateway, Datalogger, Sensor
 from .mqtt_versioning import versioned_processor
-from .dynamic_offline_monitor import dynamic_monitor
+# dynamic_offline_monitor removed - offline checking now done in mqtt_service.py
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,8 @@ class MqttMessageProcessor:
         self.DATALOGGER_TIMEOUT_SECONDS = 15  # 3x heartbeat interval (5 sec)
         self.SENSOR_TIMEOUT_SECONDS = 15      # Stesso timeout per sensori
 
-        # Avvia il dynamic monitoring
-        dynamic_monitor.start_monitoring()
+        # Dynamic monitoring now handled by mqtt_service.py monitor thread
+        # No need to start separate monitor here
 
     def process_message(self, site_id: int, topic: str, payload: bytes, qos: int, retain: bool) -> bool:
         """
@@ -50,8 +50,13 @@ class MqttMessageProcessor:
             # Decodifica payload JSON
             payload_data = None
             try:
-                payload_data = json.loads(payload.decode('utf-8'))
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                # Gestisci sia bytes che str
+                if isinstance(payload, bytes):
+                    payload_str = payload.decode('utf-8')
+                else:
+                    payload_str = payload
+                payload_data = json.loads(payload_str)
+            except (json.JSONDecodeError, UnicodeDecodeError, AttributeError) as e:
                 logger.warning(f"Failed to decode MQTT payload for topic {topic}: {e}")
                 # Anche i payload non-JSON vanno loggati nel discovery
                 payload_data = {'error': 'invalid_json', 'raw_size': len(payload)}
@@ -109,20 +114,12 @@ class MqttMessageProcessor:
                 device_id = payload_data.get('serial_number')
                 device_type = 'datalogger'
 
-            # NUOVO: Registra nel dynamic monitoring se processato con successo
+            # Dynamic monitoring now handled by mqtt_service.py monitor thread
+            # No need to register heartbeats separately
+
+            # Update API version nel database if processed
             if processed and device_id and device_type:
-                dynamic_monitor.register_device_heartbeat(
-                    device_id=device_id,
-                    device_type=device_type,
-                    interval_seconds=message_interval,
-                    timestamp=timestamp,
-                    site_id=site_id
-                )
-
-                # Update API version nel database
                 self._update_device_api_version(device_id, device_type, api_version)
-
-                logger.debug(f"Registered {device_type} {device_id} for dynamic monitoring - interval: {message_interval}s")
 
             return processed
 

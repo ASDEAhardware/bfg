@@ -1,23 +1,31 @@
-
 services:
   backend:
     build:
       context: ./backend
-      # dockerfile: Dockerfile fixare
-      # target: builder fixare
+      target: runtime
     container_name: bfg_backend
-    command: python manage.py runserver 0.0.0.0:8000
+    # In development, use runserver for hot reload:
+    # command: python manage.py runserver 0.0.0.0:8000
+    # In production (with Supervisor), comment the line above and use default CMD
     working_dir: /app
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
+      - "8001:8001"
     env_file:
       - .env
     depends_on:
       - db
+      - redis
     environment:
       - API_KEY=${SECRET_API_KEY}
+      # MQTT Service Configuration
+      - MQTT_INSTANCE_ID=bkode
+      - MQTT_CLEAN_SESSION=true
+      - MQTT_LWT_ENABLED=true
+      - MQTT_KEEP_ALIVE=60
+      - MQTT_SHUTDOWN_TIMEOUT=5
 
   db:
     image: postgres:15
@@ -31,30 +39,13 @@ services:
     volumes:
       - bfg_postgres_data:/var/lib/postgresql/data
 
-  mqtt_service:
-    build:
-      context: ./backend
-    container_name: bfg_mqtt_service
-    command: sh -c "while true; do python manage.py run_mqtt --log-level INFO; echo 'MQTT service stopped, restarting in 5 seconds...'; sleep 5; done"
-    working_dir: /app
+  redis:
+    image: redis:7-alpine
+    container_name: bfg_redis
+    ports:
+      - "6379:6379"
     volumes:
-      - ./backend:/app
-      - mqtt_logs:/var/log
-    env_file:
-      - .env
-    environment:
-      - API_KEY=${SECRET_API_KEY}
-      - MQTT_LOG_FILE=/var/log/mqtt_service.log
-    depends_on:
-      - db
-      - backend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "manage.py", "run_mqtt", "--status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      - bfg_redis_data:/data
 
   frontend:
     build:
@@ -86,6 +77,34 @@ services:
     depends_on:
       - db
 
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    container_name: bfg_bookstack
+    env_file:
+      - bookstack.env
+    volumes:
+      - bookstack_config:/config
+    ports:
+      - "6875:80"
+    restart: unless-stopped
+    depends_on:
+      - bookstack_db
+
+  bookstack_db:
+    image: lscr.io/linuxserver/mariadb:latest
+    container_name: bfg_bookstack_db
+    env_file:
+      - bookstack.env
+    volumes:
+      - bookstack_db_data:/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 60s
+      retries: 20
+
 volumes:
   bfg_postgres_data:
-  mqtt_logs:
+  bfg_redis_data:
+  bookstack_config:
+  bookstack_db_data:

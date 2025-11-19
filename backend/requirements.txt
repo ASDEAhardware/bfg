@@ -1,10 +1,14 @@
 Django>=4.2
 djangorestframework
+channels
+channels-redis~=4.0.0
+daphne
 psycopg2-binary
 djangorestframework-simplejwt>=5.3.1
 django-cors-headers
 dj-rest-auth
 gunicorn
+whitenoise>=6.5.0
 Pillow
 cryptography>=45.0.5
 paho-mqtt>=1.6.0

@@ -61,6 +61,56 @@ class Site(models.Model):
             models.Index(fields=['is_active']),
         ]
 
+    def _generate_code_from_name(self, name):
+        """
+        Genera codice dalle consonanti del nome (senza spazi, in maiuscolo)
+        Esempio: "Ponte Cardarelli" -> "PNTCRDRLL"
+        """
+        vowels = 'aeiouAEIOUàèéìòùÀÈÉÌÒÙ'
+        # Rimuovi spazi e tieni solo lettere
+        letters = [char.upper() for char in name if char.isalpha()]
+        # Filtra solo le consonanti
+        consonants = [char for char in letters if char not in vowels]
+        # Se non ci sono consonanti, usa tutto il nome (solo lettere)
+        if not consonants:
+            consonants = letters
+        # Se ancora vuoto, usa un placeholder
+        if not consonants:
+            return 'SITE'
+        return ''.join(consonants)
+
+    def _get_unique_code(self):
+        """
+        Genera un codice univoco basato sul nome.
+        Se il codice base esiste già, aggiunge un numero incrementale (1, 2, 3...)
+        """
+        base_code = self._generate_code_from_name(self.name)
+
+        # Controlla se il codice base è disponibile
+        code = base_code
+        counter = 1
+
+        # Query che esclude l'istanza corrente se stiamo facendo update
+        queryset = Site.objects.filter(code=code)
+        if self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+
+        # Incrementa finché non trova un codice univoco
+        while queryset.exists():
+            code = f"{base_code}{counter}"
+            counter += 1
+            queryset = Site.objects.filter(code=code)
+            if self.pk:
+                queryset = queryset.exclude(pk=self.pk)
+
+        return code
+
+    def save(self, *args, **kwargs):
+        # Genera automaticamente il code se non è stato fornito
+        if not self.code:
+            self.code = self._get_unique_code()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.name} ({self.customer_name})"
 
