@@ -4,15 +4,18 @@ import { Layers, SquareChartGantt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTabStore } from '@/store/tabStore'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { useTranslations } from 'next-intl'
 
 export function TabModeToggle() {
   const { isTabModeEnabled, toggleTabMode } = useTabStore()
+
+  const t = useTranslations('components.header_buttons');
 
   const handleToggle = () => {
     toggleTabMode()
   }
 
-  const tooltipMessage = (isTabModeEnabled ? "Disable Tab Mode" : "Enable Tab Mode");
+  const tooltipMessage = (isTabModeEnabled ? t('disable_tab_mode') : t('enable_tab_mode'));
 
   const button =  (
     <Button
@@ -20,7 +23,6 @@ export function TabModeToggle() {
       size="icon"
       onClick={handleToggle}
       className={isTabModeEnabled ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
-      title={isTabModeEnabled ? "Disable Tab Mode" : "Enable Tab Mode"}
     >
       {isTabModeEnabled ? (
         <Layers className="h-[1.2rem] w-[1.2rem]" />

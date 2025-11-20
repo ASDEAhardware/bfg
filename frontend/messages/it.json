@@ -209,5 +209,24 @@
       "title": "Dashboard BFG",
       "description": "La tua dashboard ingegneristica modulare è pronta per essere personalizzata. Esplora i moduli disponibili nel menu laterale per iniziare."
     }
+  },
+
+  "components": {
+    "nav_user": {
+      "settings": "Impostazioni",
+      "logout": "Esci",
+      "profile": "Profilo"
+    },
+    "sidebar": {
+      "admin_panel": "Pannello Admin",
+      "system_config": "Configurazione di Sistema"
+    },
+    "header_buttons": {
+      "enable_grid_mode": "Abilita Griglia",
+      "disable_grid_mode": "Disabilita Griglia",
+      "enable_tab_mode": "Abilita Schede",
+      "disable_tab_mode": "Disabilita Schede",
+      "change_theme": "Cambia Tema"
+    }
   }
 }

@@ -18,6 +18,7 @@ import { pluginRegistry, getUserPermissions } from "@/plugins"
 import { useTabStore } from "@/store/tabStore"
 import { useGridStore } from "@/store/gridStore"
 import { useConfirmationDialogStore } from "@/store/dialogStore"
+import { useTranslations } from "next-intl"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: userData, isLoading, error } = useUserInfo()
@@ -28,6 +29,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isGridModeEnabled, toggleGridMode } = useGridStore()
   const showConfirmationDialog = useConfirmationDialogStore((state) => state.show)
   const router = useRouter()
+
+  const t = useTranslations('components');
 
   const version = "1.2.1"
   const shortVersion = version.split(".").slice(0, 2).join(".")
@@ -78,11 +81,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }, [userData])
 
   const staffItems = userData?.is_staff
-    ? [{ title: "Admin Panel", url: "/staff-admin", icon: Shield }]
+    ? [{ title: t('sidebar.admin_panel'), url: "/staff-admin", icon: Shield }]
     : []
 
   const superuserItems = userData?.is_superuser
-    ? [{ title: "System Config", url: "/system", icon: MonitorCog }]
+    ? [{ title: t('sidebar.system_config'), url: "/system", icon: MonitorCog }]
     : []
 
   const adminPanelItems = [...staffItems, ...superuserItems]
