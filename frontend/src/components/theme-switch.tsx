@@ -7,10 +7,13 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useSaveTheme } from "@/hooks/useSaveTheme";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { useTranslations } from "next-intl";
 
 export function ModeToggle() {
     const { theme, setTheme } = useTheme();
     const { mutate: saveTheme } = useSaveTheme();
+
+    const t = useTranslations('components.header_buttons');
 
     // Usiamo una ref per tenere traccia del timer del debounce
     const debounceTimer = React.useRef<NodeJS.Timeout | null>(null);
@@ -83,7 +86,7 @@ export function ModeToggle() {
                 {button}
             </TooltipTrigger>
             <TooltipContent side="bottom" align="center">
-                Change Theme
+                {t('change_theme')}
             </TooltipContent>
         </Tooltip>
     )

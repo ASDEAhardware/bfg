@@ -39,7 +39,6 @@
     "privacy_settings_description": "Control who can see your information.",
 
 
-
     "preferences_description": "Customize the appearance of the interface.",
     "theme": "Theme",
     "theme_description": "Choose how you want the interface to appear.",
@@ -209,6 +208,25 @@
     "main": {
       "title": "BFG Dashboard",
       "description": "Your modular engineering dashboard is ready to be customized. Explore the available modules in the side menu to get started."
+    }
+  },
+
+  "components": {
+    "nav_user": {
+      "settings": "Settings",
+      "logout": "Logout",
+      "profile": "Profile"
+    },
+    "sidebar": {
+      "admin_panel": "Admin Panel",
+      "system_config": "System Config"
+    },
+    "header_buttons": {
+      "enable_grid_mode": "Enable Grid Mode",
+      "disable_grid_mode": "Disable Grid Mode",
+      "enable_tab_mode": "Enable Tab Mode",
+      "disable_tab_mode": "Disable Tab Mode",
+      "change_theme": "Change Theme"
     }
   }
 }
