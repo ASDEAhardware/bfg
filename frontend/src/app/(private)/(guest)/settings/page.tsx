@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -228,55 +228,56 @@ function ProfileSection() {
                 <p className="text-muted-foreground">{t('profile_description')}</p>
             </div>
 
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>{t('personal_information')}</CardTitle>
-                    <CardDescription>{t('personal_information_description')}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="flex items-center gap-6">
-                        {isLoading ? (
-                            <Skeleton className="h-20 w-20 rounded-full" />
-                        ) : (
-                            <Avatar className="h-20 w-20">
-                                <AvatarImage
-                                    // 9. UTILIZZO DELLO STATO DELL'ANTEPRIMA
-                                    src={previewImage || "/user-profile-illustration.png"}
-                                    alt="Foto profilo"
-                                />
-                                <AvatarFallback className="text-lg">{data?.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                        )}
+            <Accordion type="single" collapsible defaultValue="personal-info">
+                <CollapsibleCard
+                    value="personal-info"
+                    title={t('personal_information')}
+                    description={t('personal_information_description')}
+                >
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-6">
+                            {isLoading ? (
+                                <Skeleton className="h-20 w-20 rounded-full" />
+                            ) : (
+                                <Avatar className="h-20 w-20">
+                                    <AvatarImage
+                                        // 9. UTILIZZO DELLO STATO DELL'ANTEPRIMA
+                                        src={previewImage || "/user-profile-illustration.png"}
+                                        alt="Foto profilo"
+                                    />
+                                    <AvatarFallback className="text-lg">{data?.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                            )}
 
-                        <div className="space-y-2">
-                            {/*Button per permettere all'utente di cambiare la sua immagine profilo*/}
-                            {/* <Button
-                                className="cursor-pointer"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleButtonClick} // 8.
-                                disabled={mutation.isPending}
-                            >
-                                {mutation.isPending ? (
-                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : null}
-                                Change Picture
-                            </Button> */}
-                            {/* !!!! SBLOCCA QUESTO INPUT PER FARLO FUNZIONARE !!!! */}
-                            {/* <input
-                                type="file"
-                                className="hidden"
-                                ref={fileInputRef}
-                                onChange={handleFileChange} // 6.
-                                accept="image/jpeg,image/png,image/gif"
-                            /> */}
-                            {/* <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p> */}
+                            <div className="space-y-2">
+                                {/*Button per permettere all'utente di cambiare la sua immagine profilo*/}
+                                {/* <Button
+                                    className="cursor-pointer"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleButtonClick} // 8.
+                                    disabled={mutation.isPending}
+                                >
+                                    {mutation.isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    ) : null}
+                                    Change Picture
+                                </Button> */}
+                                {/* !!!! SBLOCCA QUESTO INPUT PER FARLO FUNZIONARE !!!! */}
+                                {/* <input
+                                    type="file"
+                                    className="hidden"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange} // 6.
+                                    accept="image/jpeg,image/png,image/gif"
+                                /> */}
+                                {/* <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p> */}
+                            </div>
                         </div>
-                    </div>
 
-                    {/* <Separator /> */}
+                        {/* <Separator /> */}
 
-                    {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="username">Nome utente</Label>
               <Input id="username" placeholder="mario.rossi" />
@@ -289,7 +290,7 @@ function ProfileSection() {
                 placeholder="mario.rossi@example.com"
               />
             </div> */}
-                    {/* <div className="space-y-2">
+                        {/* <div className="space-y-2">
               <Label htmlFor="firstName">Nome</Label>
               <Input id="firstName" placeholder="Mario" defaultValue="Mario" />
             </div>
@@ -297,13 +298,14 @@ function ProfileSection() {
               <Label htmlFor="lastName">Cognome</Label>
               <Input id="lastName" placeholder="Rossi" defaultValue="Rossi" />
             </div> */}
-                    {/* </div> */}
+                        {/* </div> */}
 
-                    <div className="flex justify-end">
-                        <Button className="cursor-pointer">{t('save_changes_button')}</Button>
+                        <div className="flex justify-end">
+                            <Button className="cursor-pointer">{t('save_changes_button')}</Button>
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }
@@ -346,13 +348,13 @@ function PasswordSection() {
                 <p className="text-muted-foreground">{t('password_description')}</p>
             </div>
 
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>{t('change_password')}</CardTitle>
-                    <CardDescription>{t('change_password_description')}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <form onSubmit={handleSubmit} className="space-y-2">
+            <Accordion type="single" collapsible defaultValue="change-password">
+                <CollapsibleCard
+                    value="change-password"
+                    title={t('change_password')}
+                    description={t('change_password_description')}
+                >
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="old-password">{t('current_password')}</Label>
                             <Input
@@ -403,8 +405,8 @@ function PasswordSection() {
                             </Button>
                         </div>
                     </form>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }
@@ -420,15 +422,15 @@ function NotificationsSection() {
                 <p className="text-muted-foreground">{t('notifications_description')}</p>
             </div>
 
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>{t('notifications_preferences')}</CardTitle>
-                    <CardDescription>{t('notifications_preferences_description')}</CardDescription>
-                </CardHeader>
-                <CardContent>
+            <Accordion type="single" collapsible>
+                <CollapsibleCard
+                    value="notifications"
+                    title={t('notifications_preferences')}
+                    description={t('notifications_preferences_description')}
+                >
                     <p className="text-muted-foreground">Section under development...</p>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }
@@ -444,15 +446,15 @@ function PrivacySection() {
                 <p className="text-muted-foreground">{t('privacy_description')}</p>
             </div>
 
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>{t('privacy_settings')}</CardTitle>
-                    <CardDescription>{t('privacy_settings_description')}</CardDescription>
-                </CardHeader>
-                <CardContent>
+            <Accordion type="single" collapsible>
+                <CollapsibleCard
+                    value="privacy"
+                    title={t('privacy_settings')}
+                    description={t('privacy_settings_description')}
+                >
                     <p className="text-muted-foreground">Section under development...</p>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }
@@ -460,6 +462,8 @@ function PrivacySection() {
 
 import { useLocaleStore } from "@/store/localeStore";
 import { useRouter } from "next/navigation";
+import { Accordion } from "@/components/ui/accordion";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 
 function PreferencesSection() {
     const queryClient = useQueryClient();
@@ -510,17 +514,17 @@ function PreferencesSection() {
                     <h1 className="text-2xl font-bold">{t('preferences')}</h1>
                     <p className="text-muted-foreground">{t('preferences_description')}</p>
                 </div>
-                <Card className="border border-border">
-                    <CardHeader>
+                <div className="space-y-6">
+                    <div className="space-y-2">
                         <Skeleton className="h-8 w-1/4" />
                         <Skeleton className="h-4 w-1/2" />
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+                    </div>
+                    <div className="space-y-4">
                         <Skeleton className="h-10 w-full" />
                         <Skeleton className="h-10 w-full" />
                         <Skeleton className="h-10 w-full" />
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
         )
     }
@@ -543,13 +547,12 @@ function PreferencesSection() {
                 <p className="text-muted-foreground">{t('preferences_description')}</p>
             </div>
 
-            {/* Theme selection card */}
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>{t('theme')}</CardTitle>
-                    <CardDescription>{t('theme_description')}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+            <Accordion type="multiple" className="space-y-6">
+                <CollapsibleCard
+                    value="theme"
+                    title={t('theme')}
+                    description={t('theme_description')}
+                >
                     <RadioGroup value={localTheme || 'system'} onValueChange={setLocalTheme} className="space-y-3">
                         <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                             <RadioGroupItem value="light" id="light" />
@@ -583,47 +586,41 @@ function PreferencesSection() {
                             </Label>
                         </div>
                     </RadioGroup>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
 
-            {/* Language selection card */}
-            <Card className="border border-border">
-              <CardHeader>
-                <CardTitle>{t('language')}</CardTitle>
-                <CardDescription>{t('language_description')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <RadioGroup value={locale} onValueChange={handleLanguageChange} className="space-y-3">
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                    <RadioGroupItem value="en" id="english" />
-                    <Label htmlFor="english" className="cursor-pointer flex-1">
-                      <div>
-                        <div className="font-medium">{t('english')}</div>
-                        <div className="text-sm text-muted-foreground">{t('english_description')}</div>
-                      </div>
-                    </Label>
-                  </div>
+                <CollapsibleCard
+                    value="language"
+                    title={t('language')}
+                    description={t('language_description')}
+                >
+                    <RadioGroup value={locale} onValueChange={handleLanguageChange} className="space-y-3">
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="en" id="english" />
+                            <Label htmlFor="english" className="cursor-pointer flex-1">
+                                <div>
+                                    <div className="font-medium">{t('english')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('english_description')}</div>
+                                </div>
+                            </Label>
+                        </div>
 
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                    <RadioGroupItem value="it" id="italian" />
-                    <Label htmlFor="italian" className="cursor-pointer flex-1">
-                      <div>
-                        <div className="font-medium">{t('italian')}</div>
-                        <div className="text-sm text-muted-foreground">{t('italian_description')}</div>
-                      </div>
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="it" id="italian" />
+                            <Label htmlFor="italian" className="cursor-pointer flex-1">
+                                <div>
+                                    <div className="font-medium">{t('italian')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('italian_description')}</div>
+                                </div>
+                            </Label>
+                        </div>
+                    </RadioGroup>
+                </CollapsibleCard>
 
-            {/* Grid Layout settings card */}
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>{t('grid_layout')}</CardTitle>
-                    <CardDescription>{t('grid_description')}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                <CollapsibleCard
+                    value="grid"
+                    title={t('grid_layout')}
+                    description={t('grid_description')}
+                >
                     <RadioGroup
                         value={localShowResizeHandle}
                         onValueChange={setLocalShowResizeHandle}
@@ -650,70 +647,69 @@ function PreferencesSection() {
                             </Label>
                         </div>
                     </RadioGroup>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
 
-            {/* Measurement unit selection card */}
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>{t('measurement_units')}</CardTitle>
-                    <CardDescription>{t('measurement_units_description')}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+                <CollapsibleCard
+                    value="units"
+                    title={t('measurement_units')}
+                    description={t('measurement_units_description')}
+                >
+                    <div className="space-y-6">
+                        {/* Accelerometer unit selection */}
+                        <div className="space-y-3">
+                            <Label className="text-base font-medium"> <CircleGauge /> {t('accelerometers')}</Label>
+                            <RadioGroup value={accelerometerUnit} onValueChange={setAccelerometerUnit} className="space-y-3">
+                                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                    <RadioGroupItem value="ms2" id="ms2" />
+                                    <Label htmlFor="ms2" className="cursor-pointer flex-1">
+                                        <div>
+                                            <div className="font-medium">{t('ms2')}</div>
+                                            <div className="text-sm text-muted-foreground">{t('ms2_description')}</div>
+                                        </div>
+                                    </Label>
+                                </div>
+                                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                    <RadioGroupItem value="g" id="g" />
+                                    <Label htmlFor="g" className="cursor-pointer flex-1">
+                                        <div>
+                                            <div className="font-medium">{t('g')}</div>
+                                            <div className="text-sm text-muted-foreground">{t('g_description')}</div>
+                                        </div>
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
 
-                    {/* Accelerometer unit selection */}
-                    <div className="space-y-3">
-                        <Label className="text-base font-medium"> <CircleGauge /> {t('accelerometers')}</Label>
-                        <RadioGroup value={accelerometerUnit} onValueChange={setAccelerometerUnit} className="space-y-3">
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                                <RadioGroupItem value="ms2" id="ms2" />
-                                <Label htmlFor="ms2" className="cursor-pointer flex-1">
-                                    <div>
-                                        <div className="font-medium">{t('ms2')}</div>
-                                        <div className="text-sm text-muted-foreground">{t('ms2_description')}</div>
-                                    </div>
-                                </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                                <RadioGroupItem value="g" id="g" />
-                                <Label htmlFor="g" className="cursor-pointer flex-1">
-                                    <div>
-                                        <div className="font-medium">{t('g')}</div>
-                                        <div className="text-sm text-muted-foreground">{t('g_description')}</div>
-                                    </div>
-                                </Label>
-                            </div>
-                        </RadioGroup>
+                        <Separator />
+
+                        {/* Inclinometer unit selection */}
+                        <div className="space-y-3">
+                            <Label className="text-base font-medium"> <TriangleRight /> {t('inclinometers')}</Label>
+                            <RadioGroup value={inclinometerUnit} onValueChange={setInclinometerUnit} className="space-y-3">
+                                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                    <RadioGroupItem value="deg" id="deg" />
+                                    <Label htmlFor="deg" className="cursor-pointer flex-1">
+                                        <div>
+                                            <div className="font-medium">{t('deg')}</div>
+                                            <div className="text-sm text-muted-foreground">{t('deg_description')}</div>
+                                        </div>
+                                    </Label>
+                                </div>
+                                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                    <RadioGroupItem value="rad" id="rad" />
+                                    <Label htmlFor="rad" className="cursor-pointer flex-1">
+                                        <div>
+                                            <div className="font-medium">{t('rad')}</div>
+                                            <div className="text-sm text-muted-foreground">{t('rad_description')}</div>
+                                        </div>
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
                     </div>
+                </CollapsibleCard>
+            </Accordion>
 
-                    <Separator />
-
-                    {/* Inclinometer unit selection */}
-                    <div className="space-y-3">
-                        <Label className="text-base font-medium"> <TriangleRight /> {t('inclinometers')}</Label>
-                        <RadioGroup value={inclinometerUnit} onValueChange={setInclinometerUnit} className="space-y-3">
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                                <RadioGroupItem value="deg" id="deg" />
-                                <Label htmlFor="deg" className="cursor-pointer flex-1">
-                                    <div>
-                                        <div className="font-medium">{t('deg')}</div>
-                                        <div className="text-sm text-muted-foreground">{t('deg_description')}</div>
-                                    </div>
-                                </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                                <RadioGroupItem value="rad" id="rad" />
-                                <Label htmlFor="rad" className="cursor-pointer flex-1">
-                                    <div>
-                                        <div className="font-medium">{t('rad')}</div>
-                                        <div className="text-sm text-muted-foreground">{t('rad_description')}</div>
-                                    </div>
-                                </Label>
-                            </div>
-                        </RadioGroup>
-                    </div>
-                </CardContent>
-            </Card>
 
             {/* Unified Save Button */}
             <div className="flex justify-end pt-4">
