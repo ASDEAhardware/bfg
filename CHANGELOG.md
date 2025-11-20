@@ -4,6 +4,15 @@ Tutte le modifiche notevoli a questo progetto saranno documentate in questo file
 
 Il formato si basa su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2025-11-20
+
+### Added
+- **Mappa Siti**: Aggiunta una mappa interattiva nella dashboard che mostra la geolocalizzazione di tutti i siti.
+- **Popup Mappa**: I marker sulla mappa ora mostrano un popup con i dettagli del sito e un pulsante "Mostra" per impostarlo come sito attivo.
+
+### Fixed
+- **Visualizzazione Mappa**: Risolto un problema di layout che impediva alla mappa di essere visualizzata correttamente, facendola collassare su se stessa a causa di un'altezza non definita.
+
 ## [1.5.1] - 2025-11-18
 
 ### Changed

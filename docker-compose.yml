@@ -78,25 +78,28 @@ services:
       - db
 
   bookstack:
-    image: lscr.io/linuxserver/bookstack:latest
+    image: linuxserver/bookstack@sha256:7f46081f96e7d6cc24e860965edcab0ef54d69667ffa253444ee68f979a5c792
     container_name: bfg_bookstack
     env_file:
-      - bookstack.env
-    volumes:
-      - bookstack_config:/config
+      - .env
     ports:
       - "6875:80"
+    volumes:
+      # Uploads persistenti
+      - bookstack_uploads:/config/www/uploads
+      # Storage persistente (cache, loghi, etc.)
+      - bookstack_data:/config/www/storage
     restart: unless-stopped
     depends_on:
       - bookstack_db
 
   bookstack_db:
-    image: lscr.io/linuxserver/mariadb:latest
+    image: mariadb:10.11
     container_name: bfg_bookstack_db
     env_file:
-      - bookstack.env
+      - .env
     volumes:
-      - bookstack_db_data:/config
+      - bookstack_db_data:/var/lib/mysql
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -106,5 +109,6 @@ services:
 volumes:
   bfg_postgres_data:
   bfg_redis_data:
-  bookstack_config:
+  bookstack_uploads:
+  bookstack_data:
   bookstack_db_data:

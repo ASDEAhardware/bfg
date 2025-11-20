@@ -1,0 +1,32 @@
+.site-map {
+    border-radius: 0.5rem;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Black and white filter for the map tiles */
+  .leaflet-tile-pane {
+    filter: grayscale(100%);
+  }
+
+  /* Custom styles for marker cluster */
+.marker-cluster-custom {
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 50%; /* No white border */
+    color: #fff;
+    font-weight: bold;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center; /* Should provide vertical centering */
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+    transition: background-color 0.2s;
+}
+
+.marker-cluster-custom span {
+    font-size: 14px;
+    line-height: 40px; /* Align line-height with iconSize for perfect vertical centering */
+}
+
+.marker-cluster-custom:hover {
+    background-color: rgba(0, 0, 0, 0.9);
+}

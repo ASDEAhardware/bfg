@@ -44,9 +44,42 @@ services:
     depends_on:
       - backend
 
+
+  bookstack:
+    image: linuxserver/bookstack@sha256:7f46081f96e7d6cc24e860965edcab0ef54d69667ffa253444ee68f979a5c792
+    container_name: bfg_bookstack
+    env_file:
+      - .env
+    ports:
+      - "6875:80"
+    volumes:
+      # Uploads persistenti
+      - bookstack_uploads:/config/www/uploads
+      # Storage persistente (cache, loghi, etc.)
+      - bookstack_data:/config/www/storage
+    restart: unless-stopped
+    depends_on:
+      - bookstack_db
+
+  bookstack_db:
+    image: mariadb:10.11
+    container_name: bfg_bookstack_db
+    env_file:
+      - .env
+    volumes:
+      - bookstack_db_data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 60s
+      retries: 20
+
 volumes:
   postgres_data:
   media_data:
+  bookstack_uploads:
+  bookstack_data:
+  bookstack_db_data:
 
 # Per avviare in produzione, usa:
 # podman-compose -f docker-compose.prod.yml up --build 

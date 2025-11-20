@@ -32,7 +32,7 @@ class SiteViewSet(viewsets.ModelViewSet):
     def user_sites(self, request):
         """Get sites accessible by the current user for dropdown"""
         sites = self.get_queryset()
-        serializer = SiteListSerializer(sites, many=True)
+        serializer = SiteSerializer(sites, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
