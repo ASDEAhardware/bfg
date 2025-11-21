@@ -14,7 +14,11 @@ import {
   Gauge,
   Router,
   HardDrive,
-  Loader2
+  Loader2,
+  Thermometer,
+  Droplets,
+  Zap,
+  Wind
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
@@ -45,6 +49,7 @@ interface DeviceCardProps {
   onConnect: (datalogger: DeviceCardProps['datalogger']) => void;
   onLabelUpdate?: (datalogger: DeviceCardProps['datalogger'], newLabel: string) => void;
   compact?: boolean;
+  showTwoSectionLayout?: boolean; // Layout con 2 sezioni per UX familiare
 }
 
 const statusConfig = {
@@ -60,7 +65,13 @@ const statusConfig = {
   }
 };
 
-export function DeviceCard({ datalogger, onConnect, onLabelUpdate, compact = false }: DeviceCardProps) {
+export function DeviceCard({
+  datalogger,
+  onConnect,
+  onLabelUpdate,
+  compact = false,
+  showTwoSectionLayout = true
+}: DeviceCardProps) {
   const [isNavigating, setIsNavigating] = useState(false);
 
   // Determine status based on is_online field
@@ -103,6 +114,23 @@ export function DeviceCard({ datalogger, onConnect, onLabelUpdate, compact = fal
   const deviceName = datalogger.device_id
     ? `${datalogger.datalogger_type}/${datalogger.device_id}`
     : datalogger.datalogger_type || 'Unknown';
+
+  // Calculate sensor types for 2-section layout (placeholder - will be dynamic in FASE 1.2)
+  const getSensorTypes = () => {
+    // TODO FASE 1.2: Fetch real sensor types from API
+    // For now, return placeholder based on sensor counts
+    const totalSensors = datalogger.sensors_count;
+    const activeSensors = datalogger.active_sensors_count;
+
+    return [
+      { icon: Thermometer, count: Math.floor(totalSensors * 0.4), label: "Temperatura" },
+      { icon: Droplets, count: Math.floor(totalSensors * 0.3), label: "Umidità" },
+      { icon: Zap, count: Math.floor(totalSensors * 0.2), label: "Corrente" },
+      { icon: Wind, count: totalSensors - Math.floor(totalSensors * 0.9), label: "Altro" }
+    ].filter(type => type.count > 0);
+  };
+
+  const sensorTypes = getSensorTypes();
 
   if (compact) {
     return (
@@ -195,6 +223,116 @@ export function DeviceCard({ datalogger, onConnect, onLabelUpdate, compact = fal
     );
   }
 
+  // Render with 2-section layout or classic layout
+  if (showTwoSectionLayout) {
+    return (
+      <Card className="card-standard">
+        <CardContent className="card-content-detailed flex flex-col h-full">
+          {/* Header: Label + Badge */}
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="min-w-0 flex-1">
+              <InlineLabelEditor
+                label={datalogger.label}
+                onUpdate={handleLabelUpdate}
+                size="sm"
+                className="text-sm font-semibold truncate"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {datalogger.serial_number}
+              </p>
+            </div>
+            <Badge
+              variant={config.variant}
+              className={`flex-shrink-0 ${config.className}`}
+            >
+              {config.label}
+            </Badge>
+          </div>
+
+          {/* SEZIONE 1: Metriche Principali */}
+          <div className="bg-background/50 rounded p-2.5 border border-primary/20 mb-3">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Sensori</div>
+                <div className="text-sm font-semibold">
+                  {datalogger.active_sensors_count}/{datalogger.sensors_count}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Uptime</div>
+                <div className="text-sm font-semibold">
+                  {datalogger.uptime_percentage.toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Heartbeat</div>
+                <div className="text-sm font-semibold">
+                  {datalogger.total_heartbeats - datalogger.missed_heartbeats}/{datalogger.total_heartbeats}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SEZIONE 2: Tipologia Sensori */}
+          {sensorTypes.length > 0 && (
+            <div className="bg-background/50 rounded p-2.5 border border-primary/20 mb-4">
+              <div className="text-xs text-muted-foreground mb-2">Tipologia Sensori</div>
+              <div className={`grid gap-2 ${sensorTypes.length <= 4 ? 'grid-cols-4' : 'grid-cols-5'}`}>
+                {sensorTypes.map((type, idx) => {
+                  const SensorIcon = type.icon;
+                  return (
+                    <div key={idx} className="flex flex-col items-center">
+                      <SensorIcon className="h-4 w-4 text-muted-foreground mb-1" />
+                      <span className="text-xs font-semibold">{type.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Info Aggiuntive (opzionali) */}
+          <div className="space-y-1.5 mb-4 text-xs text-muted-foreground">
+            {datalogger.ip_address && (
+              <div className="flex items-center gap-2">
+                <Network className="h-3 w-3" />
+                <span>IP: {datalogger.ip_address}</span>
+              </div>
+            )}
+            {datalogger.firmware_version && (
+              <div className="flex items-center gap-2">
+                <Settings className="h-3 w-3" />
+                <span>FW: {datalogger.firmware_version}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Clock className="h-3 w-3" />
+              <span>Ultimo contatto: {lastCommText}</span>
+            </div>
+          </div>
+
+          {/* Button */}
+          <Button
+            onClick={handleConnect}
+            disabled={isNavigating}
+            className="w-full mt-auto cursor-pointer"
+            size="sm"
+          >
+            {isNavigating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Caricamento...
+              </>
+            ) : (
+              "Visualizza"
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Classic layout (fallback when showTwoSectionLayout = false)
   return (
     <Card className="card-standard">
       <CardContent className="card-content-detailed">

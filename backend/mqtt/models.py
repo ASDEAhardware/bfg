@@ -449,6 +449,18 @@ class Datalogger(models.Model):
         default='online',
         help_text='Current connection status'
     )
+    acquisition_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('running', 'Running'),
+            ('stopped', 'Stopped'),
+            ('paused', 'Paused'),
+            ('error', 'Error'),
+            ('unknown', 'Unknown')
+        ],
+        default='running',
+        help_text='Acquisition/measurement status'
+    )
     expected_heartbeat_interval = models.IntegerField(
         default=60,
         help_text='Expected heartbeat interval in seconds'

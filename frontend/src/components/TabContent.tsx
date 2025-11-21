@@ -36,14 +36,14 @@ export function TabContent({ children }: TabContentProps) {
 
   // Se il percorso corrente deve essere ignorato dalla logica delle schede,
   // mostra semplicemente il contenuto della pagina (children).
-  if (IGNORED_PATHS.includes(pathname)) {
-    return <div className="flex-1 overflow-auto">{children}</div>;
+  if (IGNORED_PATHS.includes(pathname) || pathname.startsWith('/devices')) {
+    return <div className="flex-1 flex flex-col h-full overflow-hidden">{children}</div>;
   }
 
   // Se modalità griglia attiva (con o senza schede)
   if (isGridModeEnabled && !isTabModeEnabled) {
     return (
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
         <GridLayout />
       </div>
     )
@@ -51,7 +51,7 @@ export function TabContent({ children }: TabContentProps) {
 
   // Se non siamo in modalità schede, mostra sempre il contenuto
   if (!isTabModeEnabled) {
-    return <div className="flex-1 overflow-auto">{children}</div>
+    return <div className="flex-1 flex flex-col h-full overflow-hidden">{children}</div>
   }
 
   // Se siamo in modalità schede ma non ci sono schede
