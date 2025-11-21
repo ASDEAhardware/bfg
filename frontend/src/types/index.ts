@@ -39,3 +39,4 @@ export type SiteListItem = {
     site_type: SiteType;
 }
 
+export type ThemeOption = "light" | "dark" | "system";

@@ -20,6 +20,8 @@ import { useUserPreferences, useUpdateUserPreferences } from "@/hooks/useUserPre
 import { useSettingsStore } from "@/store/settingsStore"
 import { useTheme } from "next-themes";
 import { useTranslations } from 'next-intl';
+import { useSaveTheme } from "@/hooks/useSaveTheme"
+import { ThemeOption } from "@/types/index"
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState("profile")
@@ -467,8 +469,10 @@ import { CollapsibleCard } from "@/components/ui/collapsible-card";
 
 function PreferencesSection() {
     const queryClient = useQueryClient();
+    const {setTheme} = useTheme();
     const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
     const mutation = useUpdateUserPreferences();
+    const themeMutation = useSaveTheme();
     const t = useTranslations('settings');
     const router = useRouter();
 
@@ -480,7 +484,7 @@ function PreferencesSection() {
 
     const { locale, setLocale } = useLocaleStore();
 
-    // Sync local form state with remote data from the query
+    // recupera i dati da useUserPreferences() che è l'hook contenente la chiamata API in GET per mantenere la stato locale aggiornato con il DB
     useEffect(() => {
         if (preferences) {
             setLocalTheme(preferences.theme);
@@ -493,12 +497,59 @@ function PreferencesSection() {
     const handleSavePreferencesSettings = () => {
         if (!localTheme) return;
         mutation.mutate({
-            theme: localTheme,
             accelerometer_unit: accelerometerUnit,
             inclinometer_unit: inclinometerUnit,
             show_resize_handle: localShowResizeHandle,
         });
     };
+
+    /**
+     * useRef permette di creare un oggetto la cui proprietà .current sopravvive ai diversi re-render senza innescarne di nuovi
+     * 
+     * Utilizzato per memorizzare l'ID del timer (ritornato da window.setTimeout)
+     * 
+     * È quindi un riferimento persistente al timer, in modo che possa essere cancellato
+     * 
+     * Il tipo number | null è perché setTimeout in un ambiente browser restituisce un ID numerico.
+     */
+    const themeSaveTimer = useRef<number | null>(null); 
+
+    /**
+     * 
+     * @param value: string -> 'light', 'dark', 'system'
+     * 
+     * Funzione che viene invocata ogni volta che l'utente seleziona un nuovo tema tramite radio btn
+     */
+    const handleThemeChange = (value: ThemeOption) => {
+        
+        // Aggiorna lo stato locale del radio btn
+        setLocalTheme(value);
+
+        
+        
+        // Cambia l'aspetto visivo dell'applicazione, applicando effettivamente il tema selezionato
+        setTheme(value);
+
+        // controlla se esiste un timer di salvataggio attivo da una precedente selezione
+        if (themeSaveTimer.current) {
+            window.clearTimeout(themeSaveTimer.current); // cancella il vecchio timer se l'utente seleziona un nuovo tema prima che scadano i 3 secondi
+        }
+
+        // Imposta nuovo timer: salva dopo 3s dall'ultimo cambio
+        themeSaveTimer.current = window.setTimeout(() => {
+            themeMutation.mutate(value);
+            themeSaveTimer.current = null;
+        }, 3000);
+    };
+
+    // Pulisce il timer al unmount
+    useEffect(() => {
+        return () => {
+            if (themeSaveTimer.current) {
+                window.clearTimeout(themeSaveTimer.current);
+            }
+        };
+    }, []);
 
     const handleLanguageChange = (newLanguage: string) => {
       if (locale === newLanguage) return;
@@ -553,7 +604,7 @@ function PreferencesSection() {
                     title={t('theme')}
                     description={t('theme_description')}
                 >
-                    <RadioGroup value={localTheme || 'system'} onValueChange={setLocalTheme} className="space-y-3">
+                    <RadioGroup value={localTheme || 'system'} onValueChange={handleThemeChange} className="space-y-3">
                         <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                             <RadioGroupItem value="light" id="light" />
                             <Label htmlFor="light" className="flex items-center gap-3 cursor-pointer flex-1">
@@ -712,14 +763,14 @@ function PreferencesSection() {
 
 
             {/* Unified Save Button */}
-            <div className="flex justify-end pt-4">
+            {/* <div className="flex justify-end pt-4">
                 <Button onClick={handleSavePreferencesSettings} disabled={mutation.isPending}>
                     {mutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : null}
                     {t('save_preferences')}
                 </Button>
-            </div>
+            </div> */}
         </div>
     )
 }
