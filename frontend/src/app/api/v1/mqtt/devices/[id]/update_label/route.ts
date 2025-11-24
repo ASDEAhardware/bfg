@@ -23,18 +23,18 @@ export async function PATCH(
 
     const response = await apiServer({
       method: 'PATCH',
-      url: `/api/v1/mqtt/dataloggers/${id}/update_label/`,
+      url: `/api/v1/mqtt/devices/${id}/update_label/`,
       headers,
       data: body,
     });
 
     return NextResponse.json(response.data, { status: response.status });
   } catch (error: any) {
-    console.error('MQTT Datalogger Label Update API Error:', error);
+    console.error('MQTT Device Label Update API Error:', error);
 
     if (error.response) {
       return NextResponse.json(
-        error.response.data || { error: 'MQTT Datalogger Label Update API Error' },
+        error.response.data || { error: 'MQTT Device Label Update API Error' },
         { status: error.response.status }
       );
     }

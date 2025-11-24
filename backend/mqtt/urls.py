@@ -23,10 +23,10 @@ urlpatterns = [
     path('connections/', views.connections_list, name='connections_list'),
     path('connections/status/', views.all_connections_status, name='all_connections_status'),
 
-    # Datalogger endpoints
-    path('dataloggers/', datalogger_views.dataloggers_list, name='dataloggers_list'),
-    path('dataloggers/<int:datalogger_id>/', datalogger_views.datalogger_detail, name='datalogger_detail'),
-    path('dataloggers/<int:datalogger_id>/update_label/', datalogger_views.update_datalogger_label, name='update_datalogger_label'),
+    # Devices endpoints
+    path('devices/', datalogger_views.dataloggers_list, name='devices_list'),
+    path('devices/<int:datalogger_id>/', datalogger_views.datalogger_detail, name='device_detail'),
+    path('devices/<int:datalogger_id>/update_label/', datalogger_views.update_datalogger_label, name='update_device_label'),
 
     # Sensor endpoints
     path('sensors/by_datalogger/', datalogger_views.sensors_by_datalogger, name='sensors_by_datalogger'),

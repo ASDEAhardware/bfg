@@ -78,7 +78,7 @@ export const useMqttStatusSocket = () => {
     };
 
     ws.current.onerror = (error) => {
-      console.error('WebSocket Error:', error);
+      console.error('WebSocket Error - Connection failed or lost');
       setStatus('DISCONNECTED');
       ws.current?.close(); // Chiude per innescare onclose e il tentativo di riconnessione
     };
