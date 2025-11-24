@@ -10,7 +10,8 @@ from .serializers import (
     UserPreferencesSerializer,
     ResizeHandlePreferenceSerializer,
     AccelerometerUnitPreferenceSerializer,
-    InclinometerUnitPreferenceSerializer
+    InclinometerUnitPreferenceSerializer,
+    LanguagePreferenceSerializer
 )
 import logging
 
@@ -82,3 +83,16 @@ class InclinometerUnitPreferenceView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         logger.warning(f"User {request.user.username} failed to update inclinometer unit preference. Errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class LanguagePreferenceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user_preference, _ = UserPreferences.objects.get_or_create(user=request.user)
+        serializer = LanguagePreferenceSerializer(user_preference, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            logger.info(f"User {request.user.username}, updated language preference to '{user_preference.language}'")
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        logger.warning(f"User {request.user.username} failed to update language preference. Errors {serializer.errors}")
+        return Response(serializer.errrors, status=status.HTTP_400_BAD_REQUEST)

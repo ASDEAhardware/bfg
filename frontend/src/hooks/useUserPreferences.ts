@@ -4,7 +4,6 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import { useSettingsStore } from '@/store/settingsStore';
 import * as userPreferencesService from '@/services/userPreferences.service';
-import { ResizeHandlePreferencePayload, AccelerometerUnitPreferencePayload, InclinometerUnitPreferencePayload } from '@/types/userPreferences';
 
 export function useUserPreferences() {
     return useQuery({
@@ -76,3 +75,20 @@ export function usePatchInclinometerUnit() {
         },
     });
 }
+
+
+/**
+ * Hook per salvare la preferenza del tema dell'utente nel backend.
+ * Utilizza useMutation per gestire la chiamata API in modo asincrono.
+ */
+export const usePatchLanguage = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: userPreferencesService.updateUserLanguage,
+    onSuccess: () => {
+      // Invalida la query delle preferenze utente per mantenere la coerenza
+      queryClient.invalidateQueries({ queryKey: ["userPreferences"] });
+    },
+  });
+};

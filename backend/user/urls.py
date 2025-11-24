@@ -4,7 +4,8 @@ from .views import (
     UserPreferencesView,
     ResizeHandlePreferenceView,
     AccelerometerUnitPreferenceView,
-    InclinometerUnitPreferenceView
+    InclinometerUnitPreferenceView,
+    LanguagePreferenceView
 )
 
 urlpatterns = [
@@ -15,6 +16,7 @@ urlpatterns = [
     path("preferences/resize-handle/", ResizeHandlePreferenceView.as_view(), name="update-resize-handle"),
     path("preferences/accelerometer-unit/", AccelerometerUnitPreferenceView.as_view(), name="update-accelerometer-unit"),
     path("preferences/inclinometer-unit/", InclinometerUnitPreferenceView.as_view(), name="update-inclinometer-unit"),
+    path("preferences/language/", LanguagePreferenceView.as_view(), name="update-language"),
 ]
 #ENDPOINTS AUTH:
 # /user/login/ - Login

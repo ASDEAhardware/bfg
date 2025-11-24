@@ -16,12 +16,19 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQueryClient, useMutation } from "@tanstack/react-query"
 import { api } from "@/lib/axios"
 import axios from "axios"
-import { useUserPreferences, usePatchResizeHandle, usePatchAccelerometerUnit, usePatchInclinometerUnit } from "@/hooks/useUserPreferences";
+import { useUserPreferences, usePatchResizeHandle, usePatchAccelerometerUnit, usePatchInclinometerUnit, usePatchLanguage } from "@/hooks/useUserPreferences";
 import { useSettingsStore } from "@/store/settingsStore"
 import { useTheme } from "next-themes";
 import { useTranslations } from 'next-intl';
 import { useSaveTheme } from "@/hooks/useSaveTheme"
-import { AccelerometerUnit, InclinometerUnit, ShowResizeHandle, ThemeOption } from "@/types/index"
+import { AccelerometerUnit, InclinometerUnit, ShowResizeHandle, ThemeOption, LanguageOption } from "@/types/index"
+
+
+import { useLocaleStore } from "@/store/localeStore";
+import { useRouter } from "next/navigation";
+import { Accordion } from "@/components/ui/accordion";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { Lancelot } from "next/font/google"
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState("profile")
@@ -462,10 +469,6 @@ function PrivacySection() {
 }
 
 
-import { useLocaleStore } from "@/store/localeStore";
-import { useRouter } from "next/navigation";
-import { Accordion } from "@/components/ui/accordion";
-import { CollapsibleCard } from "@/components/ui/collapsible-card";
 
 function PreferencesSection() {
     const queryClient = useQueryClient();
@@ -475,6 +478,7 @@ function PreferencesSection() {
     const resizeHandleMutation = usePatchResizeHandle();
     const accelerometerUnitMutation = usePatchAccelerometerUnit();
     const inclinometerUnitMutation = usePatchInclinometerUnit();
+    const languageMutation = usePatchLanguage();
     const t = useTranslations('settings');
     const router = useRouter();
 
@@ -483,6 +487,7 @@ function PreferencesSection() {
     const [accelerometerUnit, setAccelerometerUnit] = useState(preferences?.accelerometer_unit || 'ms2');
     const [inclinometerUnit, setInclinometerUnit] = useState(preferences?.inclinometer_unit || 'deg');
     const [localShowResizeHandle, setLocalShowResizeHandle] = useState(preferences?.show_resize_handle || 'show');
+    const [language, setLanguage] = useState(preferences?.language || 'en');
 
     const { locale, setLocale } = useLocaleStore();
 
@@ -493,6 +498,7 @@ function PreferencesSection() {
             setAccelerometerUnit(preferences.accelerometer_unit);
             setInclinometerUnit(preferences.inclinometer_unit);
             setLocalShowResizeHandle(preferences.show_resize_handle);
+            setLanguage(preferences.language);
         }
     }, [preferences]);
     
@@ -510,6 +516,7 @@ function PreferencesSection() {
     const resizeHandleSaveTimer = useRef<number | null>(null);
     const accelerometerUnitSaveTimer = useRef<number | null>(null);
     const inclinometerUnitSaveTimer = useRef<number | null>(null);
+    const languageSaveTimer = useRef<number | null>(null);
 
 
     /**
@@ -575,6 +582,20 @@ function PreferencesSection() {
         }, 3000);
     };
 
+    const handleLanguageChange = (value: LanguageOption) => {
+        setLanguage(value);
+        if (locale === value) return;
+        setLocale(value);
+
+        if (languageSaveTimer.current) {
+            window.clearTimeout(languageSaveTimer.current);
+        }
+        languageSaveTimer.current = window.setTimeout(() => {
+            languageMutation.mutate(value);
+            languageSaveTimer.current = null;
+        }, 3000);
+    };
+
     // Pulisce il timer al unmount
     useEffect(() => {
         return () => {
@@ -590,15 +611,18 @@ function PreferencesSection() {
             if (inclinometerUnitSaveTimer.current) {
                 window.clearTimeout(inclinometerUnitSaveTimer.current);
             }
+            if (languageSaveTimer.current) {
+                window.clearTimeout(languageSaveTimer.current);
+            }
         };
     }, []);
 
-    const handleLanguageChange = (newLanguage: string) => {
-      if (locale === newLanguage) return;
+    // const handleLanguageChange = (newLanguage: string) => {
+    //   if (locale === newLanguage) return;
 
-      setLocale(newLanguage as any);
-      router.refresh();
-    }
+    //   setLocale(newLanguage as any);
+    //   router.refresh();
+    // }
 
     if (isLoadingPreferences) {
         return (

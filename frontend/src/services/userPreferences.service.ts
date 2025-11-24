@@ -1,5 +1,5 @@
 import { api } from '@/lib/axios'
-import { ShowResizeHandle, AccelerometerUnit, InclinometerUnit } from '@/types/index'
+import { ShowResizeHandle, AccelerometerUnit, InclinometerUnit, LanguageOption } from '@/types/index'
 import { AccelerometerUnitPreferencePayload, InclinometerUnitPreferencePayload, userPreferencesPayload } from '@/types/userPreferences'
 
 //TODO: ELIMINARE
@@ -28,3 +28,11 @@ export const getUserPreferences = async () => {
     return response.data;
 }
 
+export const updateUserLanguage = async (newLanguage: LanguageOption) => {
+    try {
+        await api.patch("preferences/change-language/", { language: newLanguage });
+    } catch (err) {
+        console.error("Errore nel salvataggio del tema nel backend:", err);
+        throw err;
+    }
+}

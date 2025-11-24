@@ -15,4 +15,4 @@ class CustomUserAdmin(UserAdmin):
 @admin.register(UserPreferences)
 class UserPreferencesAdmin(admin.ModelAdmin):
     model = UserPreferences
-    list_display = ('user', 'theme', 'show_resize_handle', 'accelerometer_unit', 'inclinometer_unit')
+    list_display = ('user', 'theme', 'show_resize_handle', 'accelerometer_unit', 'inclinometer_unit', 'language')

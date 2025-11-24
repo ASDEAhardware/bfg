@@ -6,7 +6,7 @@ from .models import UserPreferences
 class UserPreferencesSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPreferences
-        fields = ['theme', 'show_resize_handle', 'accelerometer_unit', 'inclinometer_unit']
+        fields = ['theme', 'show_resize_handle', 'accelerometer_unit', 'inclinometer_unit', 'language']
 
 class ResizeHandlePreferenceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -22,6 +22,11 @@ class InclinometerUnitPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPreferences
         fields = ['inclinometer_unit']
+
+class LanguagePreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserPreferences
+        fields = ['language']
 
 class CustomUserDetailsSerializer(UserDetailsSerializer):
     userpreferences = UserPreferencesSerializer(read_only=True)
