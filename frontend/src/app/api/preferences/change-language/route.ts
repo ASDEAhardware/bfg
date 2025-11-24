@@ -1,10 +1,9 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { apiServer } from '@/lib/axios-server';
 import { cookies } from 'next/headers';
 import axios from 'axios';
 
-export async function GET(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
     const accessToken = (await cookies()).get('access_token')?.value;
 
     if (!accessToken) {
@@ -12,7 +11,9 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const djangoResponse = await apiServer.get('api/v1/user/preferences/', {
+        const payload = await request.json();
+
+        const djangoResponse = await apiServer.patch('api/v1/user/preferences/language/', payload, {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
             },
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        console.error("Error fetching preferences:", error);
+        console.error("Error updating preferences:", error);
         return NextResponse.json(
             { error: 'Internal server error.' },
             { status: 500 }

@@ -1,6 +1,6 @@
 import { api } from '@/lib/axios'
+import { ThemeOption } from '@/types';
 
-type ThemeOption = "light" | "dark" | "system";
 
 export const updateUserTheme = async (newTheme: ThemeOption) => {
     try {

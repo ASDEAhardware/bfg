@@ -16,10 +16,19 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQueryClient, useMutation } from "@tanstack/react-query"
 import { api } from "@/lib/axios"
 import axios from "axios"
-import { useUserPreferences, useUpdateUserPreferences } from "@/hooks/useUserPreferences";
+import { useUserPreferences, usePatchResizeHandle, usePatchAccelerometerUnit, usePatchInclinometerUnit, usePatchLanguage } from "@/hooks/useUserPreferences";
 import { useSettingsStore } from "@/store/settingsStore"
 import { useTheme } from "next-themes";
 import { useTranslations } from 'next-intl';
+import { useSaveTheme } from "@/hooks/useSaveTheme"
+import { AccelerometerUnit, InclinometerUnit, ShowResizeHandle, ThemeOption, LanguageOption } from "@/types/index"
+
+
+import { useLocaleStore } from "@/store/localeStore";
+import { useRouter } from "next/navigation";
+import { Accordion } from "@/components/ui/accordion";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { Lancelot } from "next/font/google"
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState("profile")
@@ -460,52 +469,160 @@ function PrivacySection() {
 }
 
 
-import { useLocaleStore } from "@/store/localeStore";
-import { useRouter } from "next/navigation";
-import { Accordion } from "@/components/ui/accordion";
-import { CollapsibleCard } from "@/components/ui/collapsible-card";
 
 function PreferencesSection() {
     const queryClient = useQueryClient();
+    const {setTheme} = useTheme();
     const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
-    const mutation = useUpdateUserPreferences();
+    const themeMutation = useSaveTheme();
+    const resizeHandleMutation = usePatchResizeHandle();
+    const accelerometerUnitMutation = usePatchAccelerometerUnit();
+    const inclinometerUnitMutation = usePatchInclinometerUnit();
+    const languageMutation = usePatchLanguage();
     const t = useTranslations('settings');
     const router = useRouter();
 
     // Initialize local states for the form
-    const [localTheme, setLocalTheme] = useState(preferences?.theme || 'system');
+    const [localTheme, setLocalTheme] = useState<ThemeOption>(preferences?.theme || 'system');
     const [accelerometerUnit, setAccelerometerUnit] = useState(preferences?.accelerometer_unit || 'ms2');
     const [inclinometerUnit, setInclinometerUnit] = useState(preferences?.inclinometer_unit || 'deg');
     const [localShowResizeHandle, setLocalShowResizeHandle] = useState(preferences?.show_resize_handle || 'show');
+    const [language, setLanguage] = useState(preferences?.language || 'en');
 
     const { locale, setLocale } = useLocaleStore();
 
-    // Sync local form state with remote data from the query
+    // recupera i dati da useUserPreferences() che è l'hook contenente la chiamata API in GET per mantenere la stato locale aggiornato con il DB
     useEffect(() => {
         if (preferences) {
             setLocalTheme(preferences.theme);
             setAccelerometerUnit(preferences.accelerometer_unit);
             setInclinometerUnit(preferences.inclinometer_unit);
             setLocalShowResizeHandle(preferences.show_resize_handle);
+            setLanguage(preferences.language);
         }
     }, [preferences]);
+    
 
-    const handleSavePreferencesSettings = () => {
-        if (!localTheme) return;
-        mutation.mutate({
-            theme: localTheme,
-            accelerometer_unit: accelerometerUnit,
-            inclinometer_unit: inclinometerUnit,
-            show_resize_handle: localShowResizeHandle,
-        });
+    /**
+     * useRef permette di creare un oggetto la cui proprietà .current sopravvive ai diversi re-render senza innescarne di nuovi
+     * 
+     * Utilizzato per memorizzare l'ID del timer (ritornato da window.setTimeout)
+     * 
+     * È quindi un riferimento persistente al timer, in modo che possa essere cancellato
+     * 
+     * Il tipo number | null è perché setTimeout in un ambiente browser restituisce un ID numerico.
+     */
+    const themeSaveTimer = useRef<number | null>(null); 
+    const resizeHandleSaveTimer = useRef<number | null>(null);
+    const accelerometerUnitSaveTimer = useRef<number | null>(null);
+    const inclinometerUnitSaveTimer = useRef<number | null>(null);
+    const languageSaveTimer = useRef<number | null>(null);
+
+
+    /**
+     * @param value: 'light' | 'dark' | 'system'
+     * Funzione che viene invocata ogni volta che l'utente seleziona un nuovo tema tramite radio btn
+     */
+    const handleThemeChange = (value: ThemeOption) => {
+        setLocalTheme(value);
+        setTheme(value);
+
+        if (themeSaveTimer.current) {
+            window.clearTimeout(themeSaveTimer.current);
+        }
+
+        themeSaveTimer.current = window.setTimeout(() => {
+            themeMutation.mutate(value);
+            themeSaveTimer.current = null;
+        }, 3000);
     };
 
-    const handleLanguageChange = (newLanguage: string) => {
-      if (locale === newLanguage) return;
+    /**
+     * @param value: 'show' | 'hide'
+     * Funzione che viene invocata ogni volta che l'utente seleziona una preferenza per la maniglia di ridimensionamento
+     */
+    const handleResizeHandleChange = (value: ShowResizeHandle) => {
+        setLocalShowResizeHandle(value);
+        if (resizeHandleSaveTimer.current) {
+            window.clearTimeout(resizeHandleSaveTimer.current);
+        }
+        resizeHandleSaveTimer.current = window.setTimeout(() => {
+            resizeHandleMutation.mutate(value);
+            resizeHandleSaveTimer.current = null;
+        }, 3000);
+    };
 
-      setLocale(newLanguage as any);
-      router.refresh();
-    }
+    /**
+     * @param value: 'ms2' | 'g'
+     * Funzione che viene invocata ogni volta che l'utente seleziona un'unità di misura per l'accelerometro
+     */
+    const handleAccelerometerUnitChange = (value: AccelerometerUnit) => {
+        setAccelerometerUnit(value);
+        if (accelerometerUnitSaveTimer.current) {
+            window.clearTimeout(accelerometerUnitSaveTimer.current);
+        }
+        accelerometerUnitSaveTimer.current = window.setTimeout(() => {
+            accelerometerUnitMutation.mutate(value);
+            accelerometerUnitSaveTimer.current = null;
+        }, 3000);
+    };
+    
+    /**
+     * @param value: 'deg' | 'rad'
+     * Funzione che viene invocata ogni volta che l'utente seleziona un'unità di misura per l'inclinometro
+     */
+    const handleInclinometerUnitChange = (value: InclinometerUnit) => {
+        setInclinometerUnit(value);
+        if (inclinometerUnitSaveTimer.current) {
+            window.clearTimeout(inclinometerUnitSaveTimer.current);
+        }
+        inclinometerUnitSaveTimer.current = window.setTimeout(() => {
+            inclinometerUnitMutation.mutate(value);
+            inclinometerUnitSaveTimer.current = null;
+        }, 3000);
+    };
+
+    const handleLanguageChange = (value: LanguageOption) => {
+        setLanguage(value);
+        if (locale === value) return;
+        setLocale(value);
+
+        if (languageSaveTimer.current) {
+            window.clearTimeout(languageSaveTimer.current);
+        }
+        languageSaveTimer.current = window.setTimeout(() => {
+            languageMutation.mutate(value);
+            languageSaveTimer.current = null;
+        }, 3000);
+    };
+
+    // Pulisce il timer al unmount
+    useEffect(() => {
+        return () => {
+            if (themeSaveTimer.current) {
+                window.clearTimeout(themeSaveTimer.current);
+            }
+            if (resizeHandleSaveTimer.current) {
+                window.clearTimeout(resizeHandleSaveTimer.current);
+            }
+            if (accelerometerUnitSaveTimer.current) {
+                window.clearTimeout(accelerometerUnitSaveTimer.current);
+            }
+            if (inclinometerUnitSaveTimer.current) {
+                window.clearTimeout(inclinometerUnitSaveTimer.current);
+            }
+            if (languageSaveTimer.current) {
+                window.clearTimeout(languageSaveTimer.current);
+            }
+        };
+    }, []);
+
+    // const handleLanguageChange = (newLanguage: string) => {
+    //   if (locale === newLanguage) return;
+
+    //   setLocale(newLanguage as any);
+    //   router.refresh();
+    // }
 
     if (isLoadingPreferences) {
         return (
@@ -553,7 +670,7 @@ function PreferencesSection() {
                     title={t('theme')}
                     description={t('theme_description')}
                 >
-                    <RadioGroup value={localTheme || 'system'} onValueChange={setLocalTheme} className="space-y-3">
+                    <RadioGroup value={localTheme || 'system'} onValueChange={handleThemeChange} className="space-y-3">
                         <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                             <RadioGroupItem value="light" id="light" />
                             <Label htmlFor="light" className="flex items-center gap-3 cursor-pointer flex-1">
@@ -623,7 +740,7 @@ function PreferencesSection() {
                 >
                     <RadioGroup
                         value={localShowResizeHandle}
-                        onValueChange={setLocalShowResizeHandle}
+                        onValueChange={handleResizeHandleChange}
                         className="space-y-3"
                     >
                         <Label className="text-base font-medium"> <GripVertical />{t('resize_handle')}</Label>
@@ -658,7 +775,7 @@ function PreferencesSection() {
                         {/* Accelerometer unit selection */}
                         <div className="space-y-3">
                             <Label className="text-base font-medium"> <CircleGauge /> {t('accelerometers')}</Label>
-                            <RadioGroup value={accelerometerUnit} onValueChange={setAccelerometerUnit} className="space-y-3">
+                            <RadioGroup value={accelerometerUnit} onValueChange={handleAccelerometerUnitChange} className="space-y-3">
                                 <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                                     <RadioGroupItem value="ms2" id="ms2" />
                                     <Label htmlFor="ms2" className="cursor-pointer flex-1">
@@ -685,7 +802,7 @@ function PreferencesSection() {
                         {/* Inclinometer unit selection */}
                         <div className="space-y-3">
                             <Label className="text-base font-medium"> <TriangleRight /> {t('inclinometers')}</Label>
-                            <RadioGroup value={inclinometerUnit} onValueChange={setInclinometerUnit} className="space-y-3">
+                            <RadioGroup value={inclinometerUnit} onValueChange={handleInclinometerUnitChange} className="space-y-3">
                                 <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                                     <RadioGroupItem value="deg" id="deg" />
                                     <Label htmlFor="deg" className="cursor-pointer flex-1">
@@ -709,17 +826,6 @@ function PreferencesSection() {
                     </div>
                 </CollapsibleCard>
             </Accordion>
-
-
-            {/* Unified Save Button */}
-            <div className="flex justify-end pt-4">
-                <Button onClick={handleSavePreferencesSettings} disabled={mutation.isPending}>
-                    {mutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    {t('save_preferences')}
-                </Button>
-            </div>
         </div>
     )
 }

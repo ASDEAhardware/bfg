@@ -5,7 +5,7 @@ services:
       target: runtime
     container_name: bfg_backend
     # In development, use runserver for hot reload:
-    # command: python manage.py runserver 0.0.0.0:8000
+    command: python manage.py runserver 0.0.0.0:8000
     # In production (with Supervisor), comment the line above and use default CMD
     working_dir: /app
     volumes:
@@ -16,8 +16,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       - API_KEY=${SECRET_API_KEY}
       # MQTT Service Configuration
@@ -38,6 +40,13 @@ services:
       - "5432:5432"
     volumes:
       - bfg_postgres_data:/var/lib/postgresql/data
+      # Health check per PostgreSQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s # Health check per PostgreSQL
 
   redis:
     image: redis:7-alpine
