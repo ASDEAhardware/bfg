@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,40 +16,52 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQueryClient, useMutation } from "@tanstack/react-query"
 import { api } from "@/lib/axios"
 import axios from "axios"
-import { useUserPreferences, useUpdateUserPreferences } from "@/hooks/useUserPreferences";
+import { useUserPreferences, usePatchResizeHandle, usePatchAccelerometerUnit, usePatchInclinometerUnit, usePatchLanguage } from "@/hooks/useUserPreferences";
 import { useSettingsStore } from "@/store/settingsStore"
 import { useTheme } from "next-themes";
+import { useTranslations } from 'next-intl';
+import { useSaveTheme } from "@/hooks/useSaveTheme"
+import { AccelerometerUnit, InclinometerUnit, ShowResizeHandle, ThemeOption, LanguageOption } from "@/types/index"
 
-const settingsNavigation = [
-    {
-        id: "profile",
-        name: "Profile",
-        icon: User,
-    },
-    {
-        id: "password",
-        name: "Password",
-        icon: Lock,
-    },
-    {
-        id: "appearance",
-        name: "Appearance",
-        icon: Palette,
-    },
-    //{
-    //     id: "notifications",
-    //     name: "Notifiche",
-    //     icon: Bell,
-    // },
-    // {
-    //     id: "privacy",
-    //     name: "Privacy",
-    //     icon: Shield,
-    // },
-]
+
+import { useLocaleStore } from "@/store/localeStore";
+import { useRouter } from "next/navigation";
+import { Accordion } from "@/components/ui/accordion";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { Lancelot } from "next/font/google"
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState("profile")
+    const t = useTranslations('settings');
+
+    const settingsNavigation = [
+        {
+            id: "profile",
+            name: t('profile'),
+            icon: User,
+        },
+        {
+            id: "password",
+            name: t('password'),
+            icon: Lock,
+        },
+        {
+            id: "preferences",
+            name: t('preferences'),
+            icon: Palette,
+        },
+        // {
+        //     id: "notifications",
+        //     name: t('notifications'),
+        //     icon: Bell,
+        // },
+        // {
+        //     id: "privacy",
+        //     name: t('privacy'),
+        //     icon: Shield,
+        // },
+    ]
+
 
     return (
         <div className="flex justify-center min-h-screen bg-background">
@@ -60,7 +72,7 @@ export default function SettingsPage() {
                     <div className="p-4 md:p-4">
                         <div className="flex items-center gap-2 mb-6">
                             <Settings className="h-5 w-5" />
-                            <h2 className="text-lg font-semibold">Settings</h2>
+                            <h2 className="text-lg font-semibold">{t('title')}</h2>
                         </div>
                         <nav className="space-y-2">
                             {settingsNavigation.map((item) => {
@@ -113,7 +125,7 @@ export default function SettingsPage() {
                         {activeSection === "password" && <PasswordSection />}
                         {activeSection === "notifications" && <NotificationsSection />}
                         {activeSection === "privacy" && <PrivacySection />}
-                        {activeSection === "appearance" && <AppearanceSection />}
+                        {activeSection === "preferences" && <PreferencesSection />}
                     </div>
                 </div>
             </div>
@@ -123,6 +135,7 @@ export default function SettingsPage() {
 
 function ProfileSection() {
 
+    const t = useTranslations('settings');
     const { data, isLoading, isError } = useUserInfo();
 
     // Istanziamo il queryClient
@@ -220,58 +233,60 @@ function ProfileSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Profile</h1>
-                <p className="text-muted-foreground">Manage your profile information and account preferences.</p>
+                <h1 className="text-2xl font-bold">{t('profile')}</h1>
+                <p className="text-muted-foreground">{t('profile_description')}</p>
             </div>
 
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>Personal Information</CardTitle>
-                    <CardDescription>Update your profile picture and personal details here.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="flex items-center gap-6">
-                        {isLoading ? (
-                            <Skeleton className="h-20 w-20 rounded-full" />
-                        ) : (
-                            <Avatar className="h-20 w-20">
-                                <AvatarImage
-                                    // 9. UTILIZZO DELLO STATO DELL'ANTEPRIMA
-                                    src={previewImage || "/user-profile-illustration.png"}
-                                    alt="Foto profilo"
-                                />
-                                <AvatarFallback className="text-lg">{data?.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                        )}
+            <Accordion type="single" collapsible defaultValue="personal-info">
+                <CollapsibleCard
+                    value="personal-info"
+                    title={t('personal_information')}
+                    description={t('personal_information_description')}
+                >
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-6">
+                            {isLoading ? (
+                                <Skeleton className="h-20 w-20 rounded-full" />
+                            ) : (
+                                <Avatar className="h-20 w-20">
+                                    <AvatarImage
+                                        // 9. UTILIZZO DELLO STATO DELL'ANTEPRIMA
+                                        src={previewImage || "/user-profile-illustration.png"}
+                                        alt="Foto profilo"
+                                    />
+                                    <AvatarFallback className="text-lg">{data?.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                            )}
 
-                        <div className="space-y-2">
-                            <Button
-                                className="cursor-pointer"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleButtonClick} // 8.
-                                disabled={mutation.isPending}
-                            >
-                                {mutation.isPending ? (
-                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : null}
-                                Change Picture
-                            </Button>
-                            {/* !!!! SBLOCCA QUESTO INPUT PER FARLO FUNZIONARE !!!! */}
-                            {/* <input
-                                type="file"
-                                className="hidden"
-                                ref={fileInputRef}
-                                onChange={handleFileChange} // 6.
-                                accept="image/jpeg,image/png,image/gif"
-                            /> */}
-                            <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p>
+                            <div className="space-y-2">
+                                {/*Button per permettere all'utente di cambiare la sua immagine profilo*/}
+                                {/* <Button
+                                    className="cursor-pointer"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleButtonClick} // 8.
+                                    disabled={mutation.isPending}
+                                >
+                                    {mutation.isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    ) : null}
+                                    Change Picture
+                                </Button> */}
+                                {/* !!!! SBLOCCA QUESTO INPUT PER FARLO FUNZIONARE !!!! */}
+                                {/* <input
+                                    type="file"
+                                    className="hidden"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange} // 6.
+                                    accept="image/jpeg,image/png,image/gif"
+                                /> */}
+                                {/* <p className="text-xs text-muted-foreground">JPG, GIF o PNG. Max 2MB.</p> */}
+                            </div>
                         </div>
-                    </div>
 
-                    {/* <Separator /> */}
+                        {/* <Separator /> */}
 
-                    {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="username">Nome utente</Label>
               <Input id="username" placeholder="mario.rossi" />
@@ -284,7 +299,7 @@ function ProfileSection() {
                 placeholder="mario.rossi@example.com"
               />
             </div> */}
-                    {/* <div className="space-y-2">
+                        {/* <div className="space-y-2">
               <Label htmlFor="firstName">Nome</Label>
               <Input id="firstName" placeholder="Mario" defaultValue="Mario" />
             </div>
@@ -292,18 +307,21 @@ function ProfileSection() {
               <Label htmlFor="lastName">Cognome</Label>
               <Input id="lastName" placeholder="Rossi" defaultValue="Rossi" />
             </div> */}
-                    {/* </div> */}
+                        {/* </div> */}
 
-                    <div className="flex justify-end">
-                        <Button className="cursor-pointer">Save Changes</Button>
+                        <div className="flex justify-end">
+                            <Button className="cursor-pointer">{t('save_changes_button')}</Button>
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }
 
 function PasswordSection() {
+
+    const t = useTranslations('settings');
 
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword1, setNewPassword1] = useState('');
@@ -335,165 +353,295 @@ function PasswordSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Password</h1>
-                <p className="text-muted-foreground">Update your password to keep your account secure.</p>
+                <h1 className="text-2xl font-bold">{t('password')}</h1>
+                <p className="text-muted-foreground">{t('password_description')}</p>
             </div>
 
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>Change Password</CardTitle>
-                    <CardDescription>Make sure your new password is strong and secure.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <form onSubmit={handleSubmit} className="space-y-2">
+            <Accordion type="single" collapsible defaultValue="change-password">
+                <CollapsibleCard
+                    value="change-password"
+                    title={t('change_password')}
+                    description={t('change_password_description')}
+                >
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="old-password">Current Password</Label>
+                            <Label htmlFor="old-password">{t('current_password')}</Label>
                             <Input
                                 id="old-password"
                                 type="password"
                                 required
                                 value={oldPassword}
                                 onChange={(e) => setOldPassword(e.target.value)}
-                                placeholder="Inserisci la password attuale" />
+                                placeholder={t('current_password_placeholder')} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password1">New password</Label>
+                            <Label htmlFor="new-password1">{t('new_password')}</Label>
                             <Input
                                 id="new-password1"
                                 type="password"
                                 required
                                 value={newPassword1}
                                 onChange={(e) => setNewPassword1(e.target.value)}
-                                placeholder="Inserisci la nuova password" />
+                                placeholder={t('new_password_placeholder')} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-password2">Confirm new password</Label>
+                            <Label htmlFor="new-password2">{t('confirm_new_password')}</Label>
                             <Input
                                 id="new-password2"
                                 type="password"
                                 required
                                 value={newPassword2}
                                 onChange={(e) => setNewPassword2(e.target.value)}
-                                placeholder="Conferma la nuova password" />
+                                placeholder={t('confirm_new_password_placeholder')} />
                         </div>
 
                         <Separator />
 
                         <div className="bg-muted/50 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium mb-2">Password Requirements:</h4>
+                            <h4 className="text-sm font-medium mb-2">{t('password_requirements')}:</h4>
                             <ul className="text-xs text-muted-foreground space-y-1">
-                                <li>• At least 8 characters</li>
-                                <li>• At least one capital letter</li>
-                                <li>• At least one lowercase letter</li>
-                                <li>• At least one number</li>
-                                <li>• At least one special character</li>
+                                <li>• {t('password_number_characters')}</li>
+                                <li>• {t('password_capital_letter')}</li>
+                                <li>• {t('password_lowercase_letter')}</li>
+                                <li>• {t('password_number')}</li>
+                                <li>• {t('password_special_character')}</li>
                             </ul>
                         </div>
 
                         <div className="flex justify-end">
                             <Button className="cursor-pointer" type="submit" disabled={mutation.isPending}>
-                                {mutation.isPending ? 'Updating...' : 'Update Password'}
+                                {mutation.isPending ? t('update_password_button_status') : t('update_password_button')}
                             </Button>
                         </div>
                     </form>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }
 
 function NotificationsSection() {
+
+    const t = useTranslations('settings');
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Notifications</h1>
-                <p className="text-muted-foreground">Configure how and when to receive notifications.</p>
+                <h1 className="text-2xl font-bold">{t('notifications')}</h1>
+                <p className="text-muted-foreground">{t('notifications_description')}</p>
             </div>
 
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>Notification Preferences</CardTitle>
-                    <CardDescription>Choose which notifications you want to receive.</CardDescription>
-                </CardHeader>
-                <CardContent>
+            <Accordion type="single" collapsible>
+                <CollapsibleCard
+                    value="notifications"
+                    title={t('notifications_preferences')}
+                    description={t('notifications_preferences_description')}
+                >
                     <p className="text-muted-foreground">Section under development...</p>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }
 
 function PrivacySection() {
+
+    const t = useTranslations('settings');
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Privacy</h1>
-                <p className="text-muted-foreground">Manage your privacy and security settings.</p>
+                <h1 className="text-2xl font-bold">{t('privacy')}</h1>
+                <p className="text-muted-foreground">{t('privacy_description')}</p>
             </div>
 
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>Privacy settings</CardTitle>
-                    <CardDescription>Control who can see your information.</CardDescription>
-                </CardHeader>
-                <CardContent>
+            <Accordion type="single" collapsible>
+                <CollapsibleCard
+                    value="privacy"
+                    title={t('privacy_settings')}
+                    description={t('privacy_settings_description')}
+                >
                     <p className="text-muted-foreground">Section under development...</p>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }
 
 
-function AppearanceSection() {
+
+function PreferencesSection() {
     const queryClient = useQueryClient();
+    const {setTheme} = useTheme();
     const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
-    const mutation = useUpdateUserPreferences();
+    const themeMutation = useSaveTheme();
+    const resizeHandleMutation = usePatchResizeHandle();
+    const accelerometerUnitMutation = usePatchAccelerometerUnit();
+    const inclinometerUnitMutation = usePatchInclinometerUnit();
+    const languageMutation = usePatchLanguage();
+    const t = useTranslations('settings');
+    const router = useRouter();
 
     // Initialize local states for the form
-    const [localTheme, setLocalTheme] = useState(preferences?.theme || 'system');
+    const [localTheme, setLocalTheme] = useState<ThemeOption>(preferences?.theme || 'system');
     const [accelerometerUnit, setAccelerometerUnit] = useState(preferences?.accelerometer_unit || 'ms2');
     const [inclinometerUnit, setInclinometerUnit] = useState(preferences?.inclinometer_unit || 'deg');
     const [localShowResizeHandle, setLocalShowResizeHandle] = useState(preferences?.show_resize_handle || 'show');
+    const [language, setLanguage] = useState(preferences?.language || 'en');
 
-    // Sync local form state with remote data from the query
+    const { locale, setLocale } = useLocaleStore();
+
+    // recupera i dati da useUserPreferences() che è l'hook contenente la chiamata API in GET per mantenere la stato locale aggiornato con il DB
     useEffect(() => {
         if (preferences) {
             setLocalTheme(preferences.theme);
             setAccelerometerUnit(preferences.accelerometer_unit);
             setInclinometerUnit(preferences.inclinometer_unit);
             setLocalShowResizeHandle(preferences.show_resize_handle);
+            setLanguage(preferences.language);
         }
     }, [preferences]);
+    
 
-    const handleSaveAppearanceSettings = () => {
-        if (!localTheme) return;
-        mutation.mutate({
-            theme: localTheme,
-            accelerometer_unit: accelerometerUnit,
-            inclinometer_unit: inclinometerUnit,
-            show_resize_handle: localShowResizeHandle,
-        });
+    /**
+     * useRef permette di creare un oggetto la cui proprietà .current sopravvive ai diversi re-render senza innescarne di nuovi
+     * 
+     * Utilizzato per memorizzare l'ID del timer (ritornato da window.setTimeout)
+     * 
+     * È quindi un riferimento persistente al timer, in modo che possa essere cancellato
+     * 
+     * Il tipo number | null è perché setTimeout in un ambiente browser restituisce un ID numerico.
+     */
+    const themeSaveTimer = useRef<number | null>(null); 
+    const resizeHandleSaveTimer = useRef<number | null>(null);
+    const accelerometerUnitSaveTimer = useRef<number | null>(null);
+    const inclinometerUnitSaveTimer = useRef<number | null>(null);
+    const languageSaveTimer = useRef<number | null>(null);
+
+
+    /**
+     * @param value: 'light' | 'dark' | 'system'
+     * Funzione che viene invocata ogni volta che l'utente seleziona un nuovo tema tramite radio btn
+     */
+    const handleThemeChange = (value: ThemeOption) => {
+        setLocalTheme(value);
+        setTheme(value);
+
+        if (themeSaveTimer.current) {
+            window.clearTimeout(themeSaveTimer.current);
+        }
+
+        themeSaveTimer.current = window.setTimeout(() => {
+            themeMutation.mutate(value);
+            themeSaveTimer.current = null;
+        }, 3000);
     };
+
+    /**
+     * @param value: 'show' | 'hide'
+     * Funzione che viene invocata ogni volta che l'utente seleziona una preferenza per la maniglia di ridimensionamento
+     */
+    const handleResizeHandleChange = (value: ShowResizeHandle) => {
+        setLocalShowResizeHandle(value);
+        if (resizeHandleSaveTimer.current) {
+            window.clearTimeout(resizeHandleSaveTimer.current);
+        }
+        resizeHandleSaveTimer.current = window.setTimeout(() => {
+            resizeHandleMutation.mutate(value);
+            resizeHandleSaveTimer.current = null;
+        }, 3000);
+    };
+
+    /**
+     * @param value: 'ms2' | 'g'
+     * Funzione che viene invocata ogni volta che l'utente seleziona un'unità di misura per l'accelerometro
+     */
+    const handleAccelerometerUnitChange = (value: AccelerometerUnit) => {
+        setAccelerometerUnit(value);
+        if (accelerometerUnitSaveTimer.current) {
+            window.clearTimeout(accelerometerUnitSaveTimer.current);
+        }
+        accelerometerUnitSaveTimer.current = window.setTimeout(() => {
+            accelerometerUnitMutation.mutate(value);
+            accelerometerUnitSaveTimer.current = null;
+        }, 3000);
+    };
+    
+    /**
+     * @param value: 'deg' | 'rad'
+     * Funzione che viene invocata ogni volta che l'utente seleziona un'unità di misura per l'inclinometro
+     */
+    const handleInclinometerUnitChange = (value: InclinometerUnit) => {
+        setInclinometerUnit(value);
+        if (inclinometerUnitSaveTimer.current) {
+            window.clearTimeout(inclinometerUnitSaveTimer.current);
+        }
+        inclinometerUnitSaveTimer.current = window.setTimeout(() => {
+            inclinometerUnitMutation.mutate(value);
+            inclinometerUnitSaveTimer.current = null;
+        }, 3000);
+    };
+
+    const handleLanguageChange = (value: LanguageOption) => {
+        setLanguage(value);
+        if (locale === value) return;
+        setLocale(value);
+
+        if (languageSaveTimer.current) {
+            window.clearTimeout(languageSaveTimer.current);
+        }
+        languageSaveTimer.current = window.setTimeout(() => {
+            languageMutation.mutate(value);
+            languageSaveTimer.current = null;
+        }, 3000);
+    };
+
+    // Pulisce il timer al unmount
+    useEffect(() => {
+        return () => {
+            if (themeSaveTimer.current) {
+                window.clearTimeout(themeSaveTimer.current);
+            }
+            if (resizeHandleSaveTimer.current) {
+                window.clearTimeout(resizeHandleSaveTimer.current);
+            }
+            if (accelerometerUnitSaveTimer.current) {
+                window.clearTimeout(accelerometerUnitSaveTimer.current);
+            }
+            if (inclinometerUnitSaveTimer.current) {
+                window.clearTimeout(inclinometerUnitSaveTimer.current);
+            }
+            if (languageSaveTimer.current) {
+                window.clearTimeout(languageSaveTimer.current);
+            }
+        };
+    }, []);
+
+    // const handleLanguageChange = (newLanguage: string) => {
+    //   if (locale === newLanguage) return;
+
+    //   setLocale(newLanguage as any);
+    //   router.refresh();
+    // }
 
     if (isLoadingPreferences) {
         return (
             <div className="space-y-6">
                 <div>
-                    <h1 className="text-2xl font-bold">Appearance</h1>
-                    <p className="text-muted-foreground">Customize the appearance of the interface.</p>
+                    <h1 className="text-2xl font-bold">{t('preferences')}</h1>
+                    <p className="text-muted-foreground">{t('preferences_description')}</p>
                 </div>
-                <Card className="border border-border">
-                    <CardHeader>
+                <div className="space-y-6">
+                    <div className="space-y-2">
                         <Skeleton className="h-8 w-1/4" />
                         <Skeleton className="h-4 w-1/2" />
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+                    </div>
+                    <div className="space-y-4">
                         <Skeleton className="h-10 w-full" />
                         <Skeleton className="h-10 w-full" />
                         <Skeleton className="h-10 w-full" />
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
         )
     }
@@ -502,7 +650,7 @@ function AppearanceSection() {
         return (
             <div className="flex flex-col items-center h-40 justify-center">
                 <span className="text-red-500 mb-2">
-                    Error loading appearance settings.
+                    Error loading preferences settings.
                 </span>
                 <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['userPreferences'] })}>Try Again</Button>
             </div>
@@ -512,25 +660,24 @@ function AppearanceSection() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Appearance</h1>
-                <p className="text-muted-foreground">Customize the appearance of the interface.</p>
+                <h1 className="text-2xl font-bold">{t('preferences')}</h1>
+                <p className="text-muted-foreground">{t('preferences_description')}</p>
             </div>
 
-            {/* Theme selection card */}
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>Theme</CardTitle>
-                    <CardDescription>Select the theme for your interface.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <RadioGroup value={localTheme || 'system'} onValueChange={setLocalTheme} className="space-y-3">
+            <Accordion type="multiple" className="space-y-6">
+                <CollapsibleCard
+                    value="theme"
+                    title={t('theme')}
+                    description={t('theme_description')}
+                >
+                    <RadioGroup value={localTheme || 'system'} onValueChange={handleThemeChange} className="space-y-3">
                         <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                             <RadioGroupItem value="light" id="light" />
                             <Label htmlFor="light" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Sun className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">Light</div>
-                                    <div className="text-sm text-muted-foreground">Light theme for the interface</div>
+                                    <div className="font-medium">{t('light')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('light_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -539,8 +686,8 @@ function AppearanceSection() {
                             <Label htmlFor="dark" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Moon className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">Dark</div>
-                                    <div className="text-sm text-muted-foreground">Dark theme for the interface</div>
+                                    <div className="font-medium">{t('dark')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('dark_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -550,34 +697,59 @@ function AppearanceSection() {
                             <Label htmlFor="system" className="flex items-center gap-3 cursor-pointer flex-1">
                                 <Monitor className="h-5 w-5 text-muted-foreground" />
                                 <div>
-                                    <div className="font-medium">System</div>
-                                    <div className="text-sm text-muted-foreground">Use system settings</div>
+                                    <div className="font-medium">{t('system')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('system_description')}</div>
                                 </div>
                             </Label>
                         </div>
                     </RadioGroup>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
 
-            {/* Grid Layout settings card */}
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>Grid Layout</CardTitle>
-                    <CardDescription>Customize the grid mode behavior.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                <CollapsibleCard
+                    value="language"
+                    title={t('language')}
+                    description={t('language_description')}
+                >
+                    <RadioGroup value={locale} onValueChange={handleLanguageChange} className="space-y-3">
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="en" id="english" />
+                            <Label htmlFor="english" className="cursor-pointer flex-1">
+                                <div>
+                                    <div className="font-medium">{t('english')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('english_description')}</div>
+                                </div>
+                            </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="it" id="italian" />
+                            <Label htmlFor="italian" className="cursor-pointer flex-1">
+                                <div>
+                                    <div className="font-medium">{t('italian')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('italian_description')}</div>
+                                </div>
+                            </Label>
+                        </div>
+                    </RadioGroup>
+                </CollapsibleCard>
+
+                <CollapsibleCard
+                    value="grid"
+                    title={t('grid_layout')}
+                    description={t('grid_description')}
+                >
                     <RadioGroup
                         value={localShowResizeHandle}
-                        onValueChange={setLocalShowResizeHandle}
+                        onValueChange={handleResizeHandleChange}
                         className="space-y-3"
                     >
-                        <Label className="text-base font-medium"> <GripVertical /> Resize Handle</Label>
+                        <Label className="text-base font-medium"> <GripVertical />{t('resize_handle')}</Label>
                         <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                             <RadioGroupItem value="show" id="show-handle" />
                             <Label htmlFor="show-handle" className="cursor-pointer flex-1">
                                 <div>
-                                    <div className="font-medium">Show</div>
-                                    <div className="text-sm text-muted-foreground">Display a visual handle for resizing sections.</div>
+                                    <div className="font-medium">{t('resize_handle_show')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('resize_handle_show_description')}</div>
                                 </div>
                             </Label>
                         </div>
@@ -586,86 +758,74 @@ function AppearanceSection() {
                             <RadioGroupItem value="hide" id="hide-handle" />
                             <Label htmlFor="hide-handle" className="cursor-pointer flex-1">
                                 <div>
-                                    <div className="font-medium">Hide</div>
-                                    <div className="text-sm text-muted-foreground">Hide the visual handle for a cleaner interface.</div>
+                                    <div className="font-medium">{t('resize_handle_hide')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('resize_handle_hide_description')}</div>
                                 </div>
                             </Label>
                         </div>
                     </RadioGroup>
-                </CardContent>
-            </Card>
+                </CollapsibleCard>
 
-            {/* Measurement unit selection card */}
-            <Card className="border border-border">
-                <CardHeader>
-                    <CardTitle>Unit of Measurement</CardTitle>
-                    <CardDescription>Choose which unit of measurement to display in the application.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+                <CollapsibleCard
+                    value="units"
+                    title={t('measurement_units')}
+                    description={t('measurement_units_description')}
+                >
+                    <div className="space-y-6">
+                        {/* Accelerometer unit selection */}
+                        <div className="space-y-3">
+                            <Label className="text-base font-medium"> <CircleGauge /> {t('accelerometers')}</Label>
+                            <RadioGroup value={accelerometerUnit} onValueChange={handleAccelerometerUnitChange} className="space-y-3">
+                                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                    <RadioGroupItem value="ms2" id="ms2" />
+                                    <Label htmlFor="ms2" className="cursor-pointer flex-1">
+                                        <div>
+                                            <div className="font-medium">{t('ms2')}</div>
+                                            <div className="text-sm text-muted-foreground">{t('ms2_description')}</div>
+                                        </div>
+                                    </Label>
+                                </div>
+                                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                    <RadioGroupItem value="g" id="g" />
+                                    <Label htmlFor="g" className="cursor-pointer flex-1">
+                                        <div>
+                                            <div className="font-medium">{t('g')}</div>
+                                            <div className="text-sm text-muted-foreground">{t('g_description')}</div>
+                                        </div>
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
 
-                    {/* Accelerometer unit selection */}
-                    <div className="space-y-3">
-                        <Label className="text-base font-medium"> <CircleGauge /> Accelerometers</Label>
-                        <RadioGroup value={accelerometerUnit} onValueChange={setAccelerometerUnit} className="space-y-3">
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                                <RadioGroupItem value="ms2" id="ms2" />
-                                <Label htmlFor="ms2" className="cursor-pointer flex-1">
-                                    <div>
-                                        <div className="font-medium">m/s²</div>
-                                        <div className="text-sm text-muted-foreground">Meters per second squared</div>
-                                    </div>
-                                </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                                <RadioGroupItem value="g" id="g" />
-                                <Label htmlFor="g" className="cursor-pointer flex-1">
-                                    <div>
-                                        <div className="font-medium">g</div>
-                                        <div className="text-sm text-muted-foreground">Acceleration due to gravity (9.81 m/s²)</div>
-                                    </div>
-                                </Label>
-                            </div>
-                        </RadioGroup>
+                        <Separator />
+
+                        {/* Inclinometer unit selection */}
+                        <div className="space-y-3">
+                            <Label className="text-base font-medium"> <TriangleRight /> {t('inclinometers')}</Label>
+                            <RadioGroup value={inclinometerUnit} onValueChange={handleInclinometerUnitChange} className="space-y-3">
+                                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                    <RadioGroupItem value="deg" id="deg" />
+                                    <Label htmlFor="deg" className="cursor-pointer flex-1">
+                                        <div>
+                                            <div className="font-medium">{t('deg')}</div>
+                                            <div className="text-sm text-muted-foreground">{t('deg_description')}</div>
+                                        </div>
+                                    </Label>
+                                </div>
+                                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+                                    <RadioGroupItem value="rad" id="rad" />
+                                    <Label htmlFor="rad" className="cursor-pointer flex-1">
+                                        <div>
+                                            <div className="font-medium">{t('rad')}</div>
+                                            <div className="text-sm text-muted-foreground">{t('rad_description')}</div>
+                                        </div>
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
                     </div>
-
-                    <Separator />
-
-                    {/* Inclinometer unit selection */}
-                    <div className="space-y-3">
-                        <Label className="text-base font-medium"> <TriangleRight /> Inclinometers</Label>
-                        <RadioGroup value={inclinometerUnit} onValueChange={setInclinometerUnit} className="space-y-3">
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                                <RadioGroupItem value="deg" id="deg" />
-                                <Label htmlFor="deg" className="cursor-pointer flex-1">
-                                    <div>
-                                        <div className="font-medium">deg (°)</div>
-                                        <div className="text-sm text-muted-foreground">Degrees (0° - 360°)</div>
-                                    </div>
-                                </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                                <RadioGroupItem value="rad" id="rad" />
-                                <Label htmlFor="rad" className="cursor-pointer flex-1">
-                                    <div>
-                                        <div className="font-medium">rad</div>
-                                        <div className="text-sm text-muted-foreground">Radiant (0 - 2π)</div>
-                                    </div>
-                                </Label>
-                            </div>
-                        </RadioGroup>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Unified Save Button */}
-            <div className="flex justify-end pt-4">
-                <Button onClick={handleSaveAppearanceSettings} disabled={mutation.isPending}>
-                    {mutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    Save All Preferences
-                </Button>
-            </div>
+                </CollapsibleCard>
+            </Accordion>
         </div>
     )
 }

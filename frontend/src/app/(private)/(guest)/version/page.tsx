@@ -9,13 +9,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Rocket, Bug, Sparkles, Shield, CheckCircle2, ArrowLeft, Star, Hash, ChevronDown } from "lucide-react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 
 interface ChangelogEntry {
   version: string
   date: string
   title: string
   description: string
-  highlights?: string[]
   tags?: string[]
   videoUrl?: string
   docsUrl?: string
@@ -28,211 +28,203 @@ interface ChangelogEntry {
   }[]
 }
 
-const changelogData: ChangelogEntry[] = [
+
+export default function ChangelogPage() {
+
+  const t = useTranslations('changelog');
+
+  const changelogData: ChangelogEntry[] = [
   {
     version: "1.2.1",
-    date: "08 Ottobre 2025",
-    title: "Miglioramenti e Fix",
-    description: "Questa versione introduce la modularità delle app nel frontend e risolve importanti race condition relative ai token e al tema.",
-    highlights: [
-      "Architettura a moduli per le app frontend",
-      "Endpoint di refresh token nel BFF",
-      "Risoluzione race condition token e tema",
-      "Fix di bug minori e miglioramenti UI"
-    ],
+    date: "2025/10/08",
+    title: t('version_1_2_1.title'),
+    description: t('version_1_2_1.description'),
     tags: ["Refactor", "Bugfix", "Security", "UX"],
     changes: [
       {
         type: "feature",
         items: [
-          "Modularità: nel frontend le app sono state suddivise in moduli tramite un'apposita architettura per facilitarne l'aggiunta e lo sgancio del modulo.",
-          "Refresh token BFF Endpoint: è stato aggiunto l'endpoint del refresh dell'access_token nel server BFF in quanto questa chiamata API deve essere effettuata dal Client (che comunica obbligatoriamente con il server BFF) e non più dal middleware.ts, rispettando le regole dell'architettura BFF Pattern.",
-          "Tooltips: sono stati aggiunti dei Tooltips, per spiegare brevemente la funzione di un dato button all'hover del mouse."
+          t('version_1_2_1.changes.feature_1'),
+          t('version_1_2_1.changes.feature_2'),
+          t('version_1_2_1.changes.feature_3'),
         ]
       },
       {
         type: "bugfix",
         items: [
-          "Token race condition: è stata fixata la race condition per cui l'access_token non veniva refreshato correttamente per cui ogni 5 minuti, al suo refresh, si veniva redirectati alla `/dashboard`.",
-          "Save Theme race condition: fixata tramite un `debouncer` la race condition del tema per cui il tema mostrato nella UI non era sempre sincronizzato con il rispettivo valore all'interno del database.",
-          "Issue #6 Fixed: è stato fixato l'issue #6 aperto in quanto nel terminale poteva essere visualizzato un error 400 durante il refresh dell'access_token. Questo errore era causato dalla token race condition.",
-          "Scroll on Grid contents: è stato fixato lo scroll per il contenuto delle pagine che eccedevano lo spazio disponibile durante la Grid Mode.",
-          "Header Version Page: fixato lo z-index dell'header della pagina per visualizzare i rilasci delle varie versioni, in quanto scrollando si sovrapponeva all'header della sidebar.",
-          "nav-user.tsx: Fixata la tipizzazione di user nel file, utilizzando il tipo `User` definito in `/types/user.ts`."
+          t('version_1_2_1.changes.bugfix_1'),
+          t('version_1_2_1.changes.bugfix_2'),
+          t('version_1_2_1.changes.bugfix_3'),
+          t('version_1_2_1.changes.bugfix_4'),
+          t('version_1_2_1.changes.bugfix_5'),
+          t('version_1_2_1.changes.bugfix_6'),
         ]
       }
     ]
   },
   {
     version: "1.2.0",
-    date: "03 Ottobre 2025",
-    title: "Grid System",
-    description: "Implementazione completa del sistema di griglia per visualizzazione multi-schermo e gestione layout avanzata.",
-    highlights: [
-      "Sistema di griglia multi-sezione completamente funzionale",
-      "Gestione layout dinamica con divisione orizzontale/verticale",
-      "Integrazione avanzata con sistema tabs esistente",
-      "Persistenza stato e navigazione intelligente"
-    ],
+    date: "2025/10/03",
+    title: t('version_1_2_0.title'),
+    description: t('version_1_2_0.description'),
     tags: ["Grid", "Layout", "UX", "Multi-Screen"],
-    videoUrl: "#demo-grid",
-    docsUrl: "#docs-grid",
     changes: [
       {
         type: "feature",
         items: [
-          "Implementazione GridStore con Zustand per gestione stato griglia completa",
-          "GridSection component per rendering e gestione sezioni individuali",
-          "Sistema di divisione dinamica orizzontale/verticale delle sezioni",
-          "Supporto completo per assegnazione tabs alle sezioni grid",
-          "Virtual Pages system per contenuti dinamici nelle sezioni",
-          "Drag & Drop per trascinamento schede nelle sezioni",
-          "GridModeToggle component per controllo modalità griglia",
-          "PageSelector per assegnazione pagine specifiche alle sezioni",
-          "TabContentRenderer specializzato per contenuti tab in grid",
-          "Smart Navigation integration con grid mode attivo"
+          t('version_1_2_0.changes.feature_1'),
+          t('version_1_2_0.changes.feature_2'),
+          t('version_1_2_0.changes.feature_3'),
+          t('version_1_2_0.changes.feature_4'),
+          t('version_1_2_0.changes.feature_5'),
+          t('version_1_2_0.changes.feature_6'),
+          t('version_1_2_0.changes.feature_7'),
+          t('version_1_2_0.changes.feature_8'),
+          t('version_1_2_0.changes.feature_9'),
+          t('version_1_2_0.changes.feature_10'),
         ],
-        details: "Il grid system rappresenta un salto qualitativo nell'esperienza utente, permettendo visualizzazione contemporanea di contenuti multipli con gestione layout professionale."
+        details: t('version_1_2_0.changes.details_1')
       },
       {
         type: "improvement",
         items: [
-          "Layout responsive che si adatta automaticamente alle dimensioni schermo",
-          "Algoritmi ottimizzati per posizionamento e ridimensionamento sezioni",
-          "Persistenza automatica stato griglia tra sessioni utente",
-          "Performance ottimizzate per rendering di layout complessi"
+          t('version_1_2_0.changes.improvement_1'),
+          t('version_1_2_0.changes.improvement_2'),
+          t('version_1_2_0.changes.improvement_3'),
+          t('version_1_2_0.changes.improvement_4'),
         ],
       },
       {
         type: "security",
         items: [
-          "Validazione robusta degli stati grid per prevenire corruzioni layout",
-          "Gestione sicura della memoria per layout complessi"
+          t('version_1_2_0.changes.security_1'),
+          t('version_1_2_0.changes.security_2'),
         ],
       },
     ],
   },
   {
     version: "1.1.0",
-    date: "02 Ottobre 2025",
-    title: "Tab Navigation",
-    description: "Aggiunta la navigazione degli elementi della sidebar tramite tabs.",
-    highlights: [
-      "Sistema di navigazione a schede completamente nuovo",
-      "Gestione stato avanzata con Zustand",
-      "UI responsiva con supporto drag & drop"
-    ],
+    date: "2025/10/02",
+    title: t('version_1_1_0.title'),
+    description: t('version_1_1_0.description'),
     tags: ["Navigation", "UX", "Performance"],
-    videoUrl: "#demo-tabs",
-    docsUrl: "#docs-tabs",
     changes: [
       {
         type: "feature",
         items: [
-          "Aggiunti i componenti per permettere la navigazione con le Tabs.",
-          "Aggiunto il css per nascondere la scrollbar senza disabilitare lo scroll.",
-          "Aggiunto l'alert dialog che viene mostrato quando si disabilita la modalità tabs senza averle chiuse.",
-          "Aggiunto lo store Zustand per le tabs.",
+          t('version_1_1_0.changes.feature_1'),
+          t('version_1_1_0.changes.feature_2'),
+          t('version_1_1_0.changes.feature_3'),
+          t('version_1_1_0.changes.feature_4'),
         ],
-        details: "Il sistema di tab navigation migliora significativamente l'esperienza utente permettendo multitasking efficiente."
+        details: t('version_1_1_0.changes.details_1')
       },
       {
         type: "improvement",
         items: [
-          "Ottimizzazioni performance per rendering delle schede",
-          "Migliorata accessibilità con supporto keyboard navigation"
+          t('version_1_1_0.changes.improvement_1'),
+          t('version_1_1_0.changes.improvement_2'),
         ],
       },
       {
         type: "bugfix",
         items: [
-          "Risolti problemi di memory leak nella gestione delle schede",
-          "Fixato problema di sincronizzazione stato tra componenti"
+          t('version_1_1_0.changes.bugfix_1'),
+          t('version_1_1_0.changes.bugfix_2'),
         ],
       },
     ],
   },
   {
     version: "1.0.0",
-    date: "02 Ottobre 2025",
-    title: "Release iniziale dell'applicazione web",
-    description: "Prima versione pubblica: architettura containerizzata, autenticazione sicura, API REST, frontend Next.js con gestione stato avanzata e UI moderna.",
-    highlights: [
-      "Architettura completamente containerizzata",
-      "Autenticazione JWT sicura e scalabile",
-      "Frontend moderno con Next.js e TypeScript",
-      "UI system basato su Shadcn/UI"
-    ],
+    date: "2025/10/02",
+    title: t('version_1_0_0.title'),
+    description: t('version_1_0_0.description'),
     tags: ["Launch", "Architecture", "Security", "UI"],
-    docsUrl: "#docs-v1",
-    downloadUrl: "#download-v1",
     changes: [
       {
         type: "feature",
         items: [
-          "Setup completamente containerizzato con Docker e Docker Compose per backend e frontend.",
-          "Server Next.js come Backend for Frontend (BFF) con rendering SSR, protezione API route e validazione JWT.",
-          "Comunicazione sicura tra container frontend e backend tramite rete Docker.",
-          "Backend sviluppato con Django e Django REST Framework.",
-          "Autenticazione JWT tramite dj-rest-auth e djangorestframework-simplejwt.",
-          "Strategia di validazione asimmetrica dei JWT: firma con chiave privata, endpoint pubblico per chiave pubblica.",
-          "Memorizzazione sicura dei token JWT in cookie (refresh_token httpOnly, access_token standard).",
-          "Endpoint API per registrazione, login, logout, reset password e recupero dati utente.",
-          "Frontend Next.js (App Router), React e TypeScript.",
-          "Gestione stato globale con Zustand.",
-          "Data fetching e caching con TanStack Query (React Query).",
-          "API client Axios verso il BFF.",
-          "UI con Radix UI, Shadcn UI e Tailwind CSS.",
-          "Supporto tema light/dark con next-themes.",
-          "Routing protetto basato su ruoli tramite directory e middleware Next.js.",
-          "Middleware Next.js per protezione delle route private.",
-          "Validazione JWT lato server nel BFF tramite jose.",
+          t('version_1_0_0.changes.feature_1'),
+          t('version_1_0_0.changes.feature_2'),
+          t('version_1_0_0.changes.feature_3'),
+          t('version_1_0_0.changes.feature_4'),
+          t('version_1_0_0.changes.feature_5'),
+          t('version_1_0_0.changes.feature_6'),
+          t('version_1_0_0.changes.feature_7'),
+          t('version_1_0_0.changes.feature_8'),
+          t('version_1_0_0.changes.feature_9'),
+          t('version_1_0_0.changes.feature_10'),
+          t('version_1_0_0.changes.feature_11'),
+          t('version_1_0_0.changes.feature_12'),
+          t('version_1_0_0.changes.feature_13'),
+          t('version_1_0_0.changes.feature_14'),
+          t('version_1_0_0.changes.feature_15'),
+          t('version_1_0_0.changes.feature_16'),
+          t('version_1_0_0.changes.feature_17'),
         ],
       },
       {
         type: "improvement",
         items: [
-          "ESLint configurato per mantenere elevati standard di codice frontend.",
-          "File di esempio per variabili d'ambiente (example.env, example.env.local) per backend e frontend.",
+          t('version_1_0_0.changes.improvement_1'),
+          t('version_1_0_0.changes.improvement_2'),
         ],
       },
       {
         type: "bugfix",
         items: [
-          "Nessuna correzione bug rilevante in questa release iniziale.",
+          t('version_1_0_0.changes.bugfix_1'),
         ],
       },
     ],
   },
 ]
 
-const changeTypeConfig = {
+  const [selectedVersion, setSelectedVersion] = useState<string | null>(changelogData[0]?.version || null)
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const router = useRouter()
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+  const changeTypeConfig = {
   feature: {
-    label: "Nuove funzionalità",
+    label: t('change_types.feature'),
     icon: Rocket,
     color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   },
   bugfix: {
-    label: "Correzioni",
+    label: t('change_types.bugfix'),
     icon: Bug,
     color: "bg-red-500/10 text-red-500 border-red-500/20",
   },
   improvement: {
-    label: "Miglioramenti",
+    label: t('change_types.improvement'),
     icon: Sparkles,
     color: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   },
   security: {
-    label: "Sicurezza",
+    label: t('change_types.security'),
     icon: Shield,
     color: "bg-orange-500/10 text-orange-500 border-orange-500/20",
   },
 }
 
-export default function ChangelogPage() {
-  const [selectedVersion, setSelectedVersion] = useState<string | null>(changelogData[0]?.version || null)
-  const [isSheetOpen, setIsSheetOpen] = useState(false)
-  const router = useRouter()
+
+
+
 
   const scrollToVersion = (version: string) => {
     const element = document.getElementById(`version-${version}`)
@@ -273,7 +265,7 @@ export default function ChangelogPage() {
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="sm" onClick={() => router.back()}>
                 <ArrowLeft className="h-4 w-4 mr-1" />
-                Indietro
+                {t('back_button')}
               </Button>
               <h1 className="text-xl font-bold">Changelog</h1>
 
@@ -299,7 +291,7 @@ export default function ChangelogPage() {
                     <SheetHeader>
                       <SheetTitle className="flex items-center gap-2">
                         <Hash className="h-4 w-4" />
-                        Seleziona Versione
+                        {t('select_version')}
                       </SheetTitle>
                     </SheetHeader>
                     <ScrollArea className="h-full mt-6">
@@ -349,7 +341,7 @@ export default function ChangelogPage() {
             <div>
               <h3 className="font-medium mb-3 text-sm flex items-center gap-2">
                 <Hash className="h-3 w-3" />
-                Versioni
+                {t('versions_title')}
               </h3>
               <ScrollArea className="h-full">
                 <div className="space-y-1">
@@ -398,7 +390,7 @@ export default function ChangelogPage() {
                         {index === 0 && (
                           <Badge className="bg-green-500 text-white px-2 py-1">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Latest
+                            {t('latest_badge')}
                           </Badge>
                         )}
                       </div>

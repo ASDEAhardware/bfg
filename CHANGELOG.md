@@ -4,6 +4,26 @@ Tutte le modifiche notevoli a questo progetto saranno documentate in questo file
 
 Il formato si basa su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2025-11-18
+
+### Changed
+
+- **Automazione Avvio Backend**: Migliorato lo script `entrypoint.sh` del backend per automatizzare e rendere più robusto l'avvio del container.
+    - Aggiunto un "wait loop" che attende la piena disponibilità del database prima di eseguire qualsiasi comando.
+    - Aggiunta l'esecuzione automatica dei comandi `check` (per controlli di sistema) e `migrate` (per le migrazioni del database) all'avvio.
+
+### Fixed
+
+- **Configurazione Docker Backend**: Risolto un problema che impediva l'avvio del servizio backend a causa della mancata disponibilità delle variabili d'ambiente durante la fase di build.
+    - Spostata la raccolta dei file statici (`collectstatic`) dal Dockerfile allo script `entrypoint.sh`, per garantirne l'esecuzione con le corrette variabili d'ambiente a runtime.
+    - Aggiornato il Dockerfile per utilizzare il nuovo `entrypoint.sh`.
+
+### Added
+
+#### Bootstack
+- **Bootstack**: raggiungibile in dev http://localhost:6875/ credenziali di default Email: admin@admin.com Password: password
+
+
 ## [1.5.0] - 2025-11-12
 
 ### Added

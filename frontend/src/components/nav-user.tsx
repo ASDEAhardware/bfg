@@ -31,6 +31,8 @@ import { Link } from "@/components/ui/link"
 import { User } from "@/types/user"
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useRouter } from "next/router"
+import { useTranslations } from "next-intl"
+import { ThemeSwitch } from "./theme-switch"
 
 export function NavUser({
   user,
@@ -46,6 +48,7 @@ export function NavUser({
   const { isMobile, state } = useSidebar()
   const logout = useLogout()
   const isCollapsed = state === "collapsed"
+  const t = useTranslations('components');
 
   const errorMessage = error && error !== "undefined" ? error : "";
 
@@ -136,18 +139,22 @@ export function NavUser({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <div className="px-2">
+              <ThemeSwitch />
+            </div>
+            <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <a href="/settings" onClick={(e) => { e.preventDefault(); if (onSettingsClick) onSettingsClick(); }}>
                 <DropdownMenuItem className="cursor-pointer">
                   <Settings2 />
-                  Settings
+                  {t('nav_user.settings')}
                 </DropdownMenuItem>
               </a>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="cursor-pointer" onClick={() => logout.mutate()}>
-              <LogOut />
-              Log out
+              <LogOut className="text-red-500" />
+              {t('nav_user.logout')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -162,7 +169,7 @@ export function NavUser({
               {profile_section}
           </TooltipTrigger>
           <TooltipContent side="right" align="center">
-              Profile
+              {t('nav_user.profile')}
           </TooltipContent>
       </Tooltip>
     )

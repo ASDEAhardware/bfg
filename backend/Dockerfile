@@ -43,13 +43,16 @@ COPY --from=builder /install /usr/local
 # Copia il progetto (codice, script, ecc.)
 COPY . .
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Copy and prepare the entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Crea directory per logs Supervisor
 RUN mkdir -p /var/log/supervisor /var/log/mqtt
 
 EXPOSE 8000
+
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Default command: usa Supervisor per gestire gunicorn + mqtt service
 CMD ["/usr/bin/supervisord", "-c", "/app/supervisord.conf", "-n"]

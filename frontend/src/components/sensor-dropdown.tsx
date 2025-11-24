@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Trash2, Plus } from "lucide-react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { type SensorType, SENSOR_ICONS } from "@/config/sensors"
+import { useTranslations } from 'next-intl';
 
 interface SensorDropdownProps {
   portId: string
@@ -23,6 +24,7 @@ export function SensorDropdown({
   position,
 }: SensorDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const t = useTranslations('sensors');
 
   const SelectedIcon = selectedSensor ? SENSOR_ICONS[selectedSensor] : null;
 
@@ -36,7 +38,7 @@ export function SensorDropdown({
                                dark:bg-slate-200 dark:text-black dark:hover:bg-slate-300 dark:focus:ring-slate-400 dark:focus:ring-offset-slate-900
                                w-10 h-10 sm:w-auto sm:h-auto">
               <SelectedIcon size={20} aria-hidden="true" />
-              <span className="hidden sm:inline">{selectedSensor}</span>
+              <span className="hidden sm:inline">{t(selectedSensor)}</span>
             </button>
           ) : (
             <button className="cursor-pointer w-10 h-10 rounded-full border-2 border-dashed border-gray-400 hover:border-gray-600 flex items-center justify-center transition-colors bg-neutral-900 sm:bg-transparent">
@@ -51,20 +53,20 @@ export function SensorDropdown({
               const Icon = sensor.icon;
               return (
                 <DropdownMenuItem
-                  key={sensor.name}
+                  key={sensor.nameKey}
                   onClick={() => {
-                    onSelectSensor(sensor.name)
+                    onSelectSensor(sensor.nameKey)
                     setIsOpen(false)
                   }}
                   className="cursor-pointer flex items-center gap-2"
                 >
                   <Icon size={20} aria-hidden="true" />
-                  <span>{sensor.name}</span>
+                  <span>{t(sensor.nameKey)}</span>
                 </DropdownMenuItem>
               )
             })
           ) : (
-            <DropdownMenuItem disabled>Nessun sensore disponibile</DropdownMenuItem>
+            <DropdownMenuItem disabled>{t('no_sensors_available')}</DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
