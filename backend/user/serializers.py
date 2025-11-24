@@ -8,6 +8,21 @@ class UserPreferencesSerializer(serializers.ModelSerializer):
         model = UserPreferences
         fields = ['theme', 'show_resize_handle', 'accelerometer_unit', 'inclinometer_unit']
 
+class ResizeHandlePreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserPreferences
+        fields = ['show_resize_handle']
+
+class AccelerometerUnitPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserPreferences
+        fields = ['accelerometer_unit']
+
+class InclinometerUnitPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserPreferences
+        fields = ['inclinometer_unit']
+
 class CustomUserDetailsSerializer(UserDetailsSerializer):
     userpreferences = UserPreferencesSerializer(read_only=True)
 

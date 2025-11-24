@@ -16,12 +16,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useQueryClient, useMutation } from "@tanstack/react-query"
 import { api } from "@/lib/axios"
 import axios from "axios"
-import { useUserPreferences, useUpdateUserPreferences } from "@/hooks/useUserPreferences";
+import { useUserPreferences, usePatchResizeHandle, usePatchAccelerometerUnit, usePatchInclinometerUnit } from "@/hooks/useUserPreferences";
 import { useSettingsStore } from "@/store/settingsStore"
 import { useTheme } from "next-themes";
 import { useTranslations } from 'next-intl';
 import { useSaveTheme } from "@/hooks/useSaveTheme"
-import { ThemeOption } from "@/types/index"
+import { AccelerometerUnit, InclinometerUnit, ShowResizeHandle, ThemeOption } from "@/types/index"
 
 export default function SettingsPage() {
     const [activeSection, setActiveSection] = useState("profile")
@@ -471,13 +471,15 @@ function PreferencesSection() {
     const queryClient = useQueryClient();
     const {setTheme} = useTheme();
     const { data: preferences, isLoading: isLoadingPreferences, isError } = useUserPreferences();
-    const mutation = useUpdateUserPreferences();
     const themeMutation = useSaveTheme();
+    const resizeHandleMutation = usePatchResizeHandle();
+    const accelerometerUnitMutation = usePatchAccelerometerUnit();
+    const inclinometerUnitMutation = usePatchInclinometerUnit();
     const t = useTranslations('settings');
     const router = useRouter();
 
     // Initialize local states for the form
-    const [localTheme, setLocalTheme] = useState(preferences?.theme || 'system');
+    const [localTheme, setLocalTheme] = useState<ThemeOption>(preferences?.theme || 'system');
     const [accelerometerUnit, setAccelerometerUnit] = useState(preferences?.accelerometer_unit || 'ms2');
     const [inclinometerUnit, setInclinometerUnit] = useState(preferences?.inclinometer_unit || 'deg');
     const [localShowResizeHandle, setLocalShowResizeHandle] = useState(preferences?.show_resize_handle || 'show');
@@ -493,15 +495,7 @@ function PreferencesSection() {
             setLocalShowResizeHandle(preferences.show_resize_handle);
         }
     }, [preferences]);
-
-    const handleSavePreferencesSettings = () => {
-        if (!localTheme) return;
-        mutation.mutate({
-            accelerometer_unit: accelerometerUnit,
-            inclinometer_unit: inclinometerUnit,
-            show_resize_handle: localShowResizeHandle,
-        });
-    };
+    
 
     /**
      * useRef permette di creare un oggetto la cui proprietà .current sopravvive ai diversi re-render senza innescarne di nuovi
@@ -513,32 +507,71 @@ function PreferencesSection() {
      * Il tipo number | null è perché setTimeout in un ambiente browser restituisce un ID numerico.
      */
     const themeSaveTimer = useRef<number | null>(null); 
+    const resizeHandleSaveTimer = useRef<number | null>(null);
+    const accelerometerUnitSaveTimer = useRef<number | null>(null);
+    const inclinometerUnitSaveTimer = useRef<number | null>(null);
+
 
     /**
-     * 
-     * @param value: string -> 'light', 'dark', 'system'
-     * 
+     * @param value: 'light' | 'dark' | 'system'
      * Funzione che viene invocata ogni volta che l'utente seleziona un nuovo tema tramite radio btn
      */
     const handleThemeChange = (value: ThemeOption) => {
-        
-        // Aggiorna lo stato locale del radio btn
         setLocalTheme(value);
-
-        
-        
-        // Cambia l'aspetto visivo dell'applicazione, applicando effettivamente il tema selezionato
         setTheme(value);
 
-        // controlla se esiste un timer di salvataggio attivo da una precedente selezione
         if (themeSaveTimer.current) {
-            window.clearTimeout(themeSaveTimer.current); // cancella il vecchio timer se l'utente seleziona un nuovo tema prima che scadano i 3 secondi
+            window.clearTimeout(themeSaveTimer.current);
         }
 
-        // Imposta nuovo timer: salva dopo 3s dall'ultimo cambio
         themeSaveTimer.current = window.setTimeout(() => {
             themeMutation.mutate(value);
             themeSaveTimer.current = null;
+        }, 3000);
+    };
+
+    /**
+     * @param value: 'show' | 'hide'
+     * Funzione che viene invocata ogni volta che l'utente seleziona una preferenza per la maniglia di ridimensionamento
+     */
+    const handleResizeHandleChange = (value: ShowResizeHandle) => {
+        setLocalShowResizeHandle(value);
+        if (resizeHandleSaveTimer.current) {
+            window.clearTimeout(resizeHandleSaveTimer.current);
+        }
+        resizeHandleSaveTimer.current = window.setTimeout(() => {
+            resizeHandleMutation.mutate(value);
+            resizeHandleSaveTimer.current = null;
+        }, 3000);
+    };
+
+    /**
+     * @param value: 'ms2' | 'g'
+     * Funzione che viene invocata ogni volta che l'utente seleziona un'unità di misura per l'accelerometro
+     */
+    const handleAccelerometerUnitChange = (value: AccelerometerUnit) => {
+        setAccelerometerUnit(value);
+        if (accelerometerUnitSaveTimer.current) {
+            window.clearTimeout(accelerometerUnitSaveTimer.current);
+        }
+        accelerometerUnitSaveTimer.current = window.setTimeout(() => {
+            accelerometerUnitMutation.mutate(value);
+            accelerometerUnitSaveTimer.current = null;
+        }, 3000);
+    };
+    
+    /**
+     * @param value: 'deg' | 'rad'
+     * Funzione che viene invocata ogni volta che l'utente seleziona un'unità di misura per l'inclinometro
+     */
+    const handleInclinometerUnitChange = (value: InclinometerUnit) => {
+        setInclinometerUnit(value);
+        if (inclinometerUnitSaveTimer.current) {
+            window.clearTimeout(inclinometerUnitSaveTimer.current);
+        }
+        inclinometerUnitSaveTimer.current = window.setTimeout(() => {
+            inclinometerUnitMutation.mutate(value);
+            inclinometerUnitSaveTimer.current = null;
         }, 3000);
     };
 
@@ -547,6 +580,15 @@ function PreferencesSection() {
         return () => {
             if (themeSaveTimer.current) {
                 window.clearTimeout(themeSaveTimer.current);
+            }
+            if (resizeHandleSaveTimer.current) {
+                window.clearTimeout(resizeHandleSaveTimer.current);
+            }
+            if (accelerometerUnitSaveTimer.current) {
+                window.clearTimeout(accelerometerUnitSaveTimer.current);
+            }
+            if (inclinometerUnitSaveTimer.current) {
+                window.clearTimeout(inclinometerUnitSaveTimer.current);
             }
         };
     }, []);
@@ -674,7 +716,7 @@ function PreferencesSection() {
                 >
                     <RadioGroup
                         value={localShowResizeHandle}
-                        onValueChange={setLocalShowResizeHandle}
+                        onValueChange={handleResizeHandleChange}
                         className="space-y-3"
                     >
                         <Label className="text-base font-medium"> <GripVertical />{t('resize_handle')}</Label>
@@ -709,7 +751,7 @@ function PreferencesSection() {
                         {/* Accelerometer unit selection */}
                         <div className="space-y-3">
                             <Label className="text-base font-medium"> <CircleGauge /> {t('accelerometers')}</Label>
-                            <RadioGroup value={accelerometerUnit} onValueChange={setAccelerometerUnit} className="space-y-3">
+                            <RadioGroup value={accelerometerUnit} onValueChange={handleAccelerometerUnitChange} className="space-y-3">
                                 <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                                     <RadioGroupItem value="ms2" id="ms2" />
                                     <Label htmlFor="ms2" className="cursor-pointer flex-1">
@@ -736,7 +778,7 @@ function PreferencesSection() {
                         {/* Inclinometer unit selection */}
                         <div className="space-y-3">
                             <Label className="text-base font-medium"> <TriangleRight /> {t('inclinometers')}</Label>
-                            <RadioGroup value={inclinometerUnit} onValueChange={setInclinometerUnit} className="space-y-3">
+                            <RadioGroup value={inclinometerUnit} onValueChange={handleInclinometerUnitChange} className="space-y-3">
                                 <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
                                     <RadioGroupItem value="deg" id="deg" />
                                     <Label htmlFor="deg" className="cursor-pointer flex-1">
@@ -760,17 +802,6 @@ function PreferencesSection() {
                     </div>
                 </CollapsibleCard>
             </Accordion>
-
-
-            {/* Unified Save Button */}
-            {/* <div className="flex justify-end pt-4">
-                <Button onClick={handleSavePreferencesSettings} disabled={mutation.isPending}>
-                    {mutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    {t('save_preferences')}
-                </Button>
-            </div> */}
         </div>
     )
 }

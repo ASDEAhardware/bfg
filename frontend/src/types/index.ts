@@ -40,3 +40,6 @@ export type SiteListItem = {
 }
 
 export type ThemeOption = "light" | "dark" | "system";
+export type ShowResizeHandle = "show" | "hide";
+export type InclinometerUnit = "deg" | "rad";
+export type AccelerometerUnit = "ms2" | "g";
