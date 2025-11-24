@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { useTabSiteContext } from '@/contexts/TabSiteContext';
 import { useSiteContextDiagnostics } from '@/hooks/useUnifiedSiteContext';
 import { Tab } from '@/store/tabStore';
-import { Videotape, LayoutDashboard, Shield, MonitorCog, SquareChartGantt } from 'lucide-react';
+import { Cpu, LayoutDashboard, Shield, MonitorCog, SquareChartGantt } from 'lucide-react';
 
 interface TabContextHeaderProps {
   tab?: Tab;
@@ -32,8 +32,8 @@ export function TabContextHeader({
         return Shield;
       case '/system':
         return MonitorCog;
-      case '/datalogger':
-        return Videotape;
+      case '/devices':
+        return Cpu;
       default:
         return SquareChartGantt;
     }

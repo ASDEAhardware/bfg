@@ -30,12 +30,12 @@ export default async function Layout({
                     <WebSocketInitializer />
                     <RefreshIndicator />
                     <AppSidebar />
-                    <SidebarInset>
+                    <SidebarInset className="h-screen flex flex-col overflow-hidden">
                         <TabNavigationHandler />
                         <HeaderComponent />
                         <ConditionalTabBar />
                         <TabContent>
-                            <main className="flex flex-1 flex-col">{children}</main>
+                            <main className="flex flex-1 flex-col h-full overflow-hidden">{children}</main>
                         </TabContent>
                     </SidebarInset>
                 </StatusBarProvider>

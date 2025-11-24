@@ -227,7 +227,7 @@ export function useDataloggers(siteId: number | null, onlineOnly: boolean = fals
         site_id: siteId.toString(),
         ...(onlineOnly && { online_only: 'true' })
       });
-      const response = await api.get(`v1/mqtt/dataloggers/?${params}`);
+      const response = await api.get(`v1/mqtt/devices/?${params}`);
       return response.data.dataloggers || [];
     },
     enabled: !!siteId, // Abilita la query solo se siteId è presente
@@ -241,7 +241,7 @@ export function useDataloggers(siteId: number | null, onlineOnly: boolean = fals
 
   const updateDataloggerLabel = useCallback(async (datalogger: Datalogger, newLabel: string) => {
     try {
-      const response = await api.patch(`v1/mqtt/dataloggers/${datalogger.id}/update_label/`, {
+      const response = await api.patch(`v1/mqtt/devices/${datalogger.id}/update_label/`, {
         label: newLabel
       });
       // Invalida la query per forzare un refetch e aggiornare la UI
@@ -262,66 +262,147 @@ export function useDataloggers(siteId: number | null, onlineOnly: boolean = fals
   };
 }
 
+// Single Datalogger Hook
+export function useDatalogger(dataloggerId: string | number | null) {
+  const { data: datalogger, isLoading: loading, error: queryError, refetch: refresh } = useQuery<Datalogger, Error>({
+    queryKey: ['datalogger', dataloggerId],
+    queryFn: async () => {
+      if (!dataloggerId) {
+        throw new Error('Datalogger ID is required');
+      }
+      const response = await api.get(`v1/mqtt/devices/${dataloggerId}/`);
+      // Ensure ID is string
+      const data = response.data;
+      return { ...data, id: data.id.toString() };
+    },
+    enabled: !!dataloggerId,
+    retry: 1,
+  });
+
+  const error = queryError ? queryError.message : null;
+
+  return {
+    datalogger: datalogger || null,
+    loading,
+    error,
+    refresh
+  };
+}
+
 /**
  * Hook for managing sensors of a specific datalogger
+ * REFACTORED to use React Query for consistent caching and invalidation
  */
 export function useSensors(datalogger: Datalogger | null) {
-  const [sensors, setSensors] = useState<Sensor[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const dataloggerId = datalogger?.id;
 
-  const fetchSensors = useCallback(async () => {
-    if (!datalogger) {
-      setSensors([]);
-      return;
-    }
+  const { data: sensors, isLoading: loading, error: queryError, refetch: refresh } = useQuery<Sensor[], Error>({
+    queryKey: ['sensors', dataloggerId],
+    queryFn: async () => {
+      if (!dataloggerId) {
+        return [];
+      }
+      const response = await api.get(`v1/mqtt/sensors/by_datalogger?datalogger_id=${dataloggerId}`);
+      return response.data.sensors || [];
+    },
+    enabled: !!dataloggerId,
+    retry: 1,
+  });
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await api.get(`v1/mqtt/sensors/by_datalogger?datalogger_id=${datalogger.id}`);
-      setSensors(response.data.sensors || []);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch sensors';
-      setError(errorMessage);
-      setSensors([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [datalogger]);
-
-  useEffect(() => {
-    fetchSensors();
-  }, [fetchSensors]);
-
-  const refresh = useCallback(() => {
-    return fetchSensors();
-  }, [fetchSensors]);
+  const error = queryError ? queryError.message : null;
 
   const updateSensorLabel = useCallback(async (sensor: Sensor, newLabel: string) => {
     try {
       const response = await api.patch(`v1/mqtt/sensors/${sensor.id}/update_label/`, {
         label: newLabel
       });
-
-      // Update local state
-      setSensors(prev => prev.map(s =>
-        s.id === sensor.id ? { ...s, label: newLabel } : s
-      ));
-
+      refresh(); // Refresh sensors list after update
       return response.data;
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || err.message || 'Failed to update sensor label';
       throw new Error(errorMessage);
     }
-  }, []);
+  }, [refresh]);
 
   return {
-    sensors,
+    sensors: sensors || [],
     loading,
     error,
     refresh,
     updateSensorLabel
   };
+}
+
+/**
+ * Hook for handling WebSocket MQTT events
+ */
+export function useMqttEvents(siteId: number | null) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // Create WebSocket connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.hostname;
+    // Use port 8001 for WebSocket (Daphne) or /ws/ if proxied
+    // Assuming direct access to 8001 in development
+    const wsUrl = `ws://${host}:8001/ws/status/`;
+    
+    console.log('Connecting to WebSocket:', wsUrl);
+    
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('WebSocket Connected');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        // Log only significant updates to reduce noise
+        if (message.type !== 'heartbeat') {
+           console.log('WS Message:', message);
+        }
+
+        // Handle different message types
+        if (message.site_id && siteId && message.site_id !== siteId) {
+          // Ignore messages for other sites
+          return;
+        }
+
+        if (message.type === 'datalogger_update') {
+          console.log('Invalidating dataloggers query due to WS update');
+          // 1. Invalidate global dataloggers list
+          queryClient.invalidateQueries({ queryKey: ['dataloggers', siteId] });
+          
+          // 2. Invalidate specific datalogger detail if ID is present
+          if (message.datalogger_id) {
+             const dlId = message.datalogger_id.toString();
+             queryClient.invalidateQueries({ queryKey: ['datalogger', dlId] });
+             
+             // 3. ALSO invalidate sensors for this datalogger
+             queryClient.invalidateQueries({ queryKey: ['sensors', dlId] });
+             queryClient.invalidateQueries({ queryKey: ['sensors', Number(dlId)] }); // Try both types just in case
+          } else {
+             // If no ID (bulk update), we might need to invalidate all sensors queries?
+             // Or just let the user navigate/refresh.
+             // Ideally we invalidate all 'sensors' queries but that might be overkill.
+             // For now let's assume specific ID updates for heartbeats.
+          }
+        } else if (message.type === 'connection_status' || message.type === 'status_update') {
+           queryClient.invalidateQueries({ queryKey: ['mqttConnectionStatus', siteId] });
+        }
+
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket Disconnected');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [siteId, queryClient]);
 }

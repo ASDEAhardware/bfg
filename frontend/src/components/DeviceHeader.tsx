@@ -2,7 +2,7 @@
 import React from "react";
 import { Building2 } from "lucide-react";
 
-interface DataloggerHeaderProps {
+interface DeviceHeaderProps {
   title: string;
   subtitle?: string;
   icon?: React.ReactNode;
@@ -10,13 +10,13 @@ interface DataloggerHeaderProps {
   children?: React.ReactNode;
 }
 
-export function DataloggerHeader({
+export function DeviceHeader({
   title,
   subtitle,
   icon,
   actions,
   children
-}: DataloggerHeaderProps) {
+}: DeviceHeaderProps) {
   return (
     <div className="bg-background border-b border-border">
       <div className="px-4 py-3">
