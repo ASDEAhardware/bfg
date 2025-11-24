@@ -1,6 +1,5 @@
 "use client"
 import React from "react"
-import { ModeToggle } from "@/components/theme-switch"
 import { TabModeToggle } from "@/components/TabModeToggle"
 import { GridModeToggle } from "@/components/GridModeToggle"
 import { SiteSelector } from "@/components/SiteSelector"
@@ -35,7 +34,7 @@ export function HeaderComponent() {
             <div className="ml-auto flex items-end gap-2 pr-4">
                 <GridModeToggle />
                 <TabModeToggle />
-                <ModeToggle />
+                {/* <ThemeSwitch /> */}
             </div>
         </header>
     )

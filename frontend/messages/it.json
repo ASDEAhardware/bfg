@@ -226,7 +226,12 @@
       "disable_grid_mode": "Disabilita Griglia",
       "enable_tab_mode": "Abilita Schede",
       "disable_tab_mode": "Disabilita Schede",
-      "change_theme": "Cambia Tema"
+      "change_theme": "Cambia Tema",
+      "themes": {
+        "light": "Chiaro",
+        "dark": "Scuro",
+        "system": "Sistema"
+      }
     }
   }
 }

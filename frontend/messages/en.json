@@ -226,7 +226,12 @@
       "disable_grid_mode": "Disable Grid Mode",
       "enable_tab_mode": "Enable Tab Mode",
       "disable_tab_mode": "Disable Tab Mode",
-      "change_theme": "Change Theme"
+      "change_theme": "Change Theme",
+      "themes": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      }
     }
   }
 }

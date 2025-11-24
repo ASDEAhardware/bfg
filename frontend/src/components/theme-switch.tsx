@@ -3,92 +3,87 @@
 import * as React from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
-
-import { Button } from "@/components/ui/button";
 import { useSaveTheme } from "@/hooks/useSaveTheme";
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useTranslations } from "next-intl";
+import { cn } from "@/lib/utils";
 
-export function ModeToggle() {
-    const { theme, setTheme } = useTheme();
-    const { mutate: saveTheme } = useSaveTheme();
+import { ThemeOption } from "@/types";
 
-    const t = useTranslations('components.header_buttons');
+const themes: { value: ThemeOption; icon: React.ComponentType<any> }[] = [
+  { value: "light", icon: Sun },
+  { value: "dark", icon: Moon },
+  { value: "system", icon: Monitor },
+];
 
-    // Usiamo una ref per tenere traccia del timer del debounce
-    const debounceTimer = React.useRef<NodeJS.Timeout | null>(null);
+export function ThemeSwitch() {
+  const { theme, setTheme } = useTheme();
+  const { mutate: saveTheme } = useSaveTheme();
+  const t = useTranslations('components.header_buttons');
+  const [mounted, setMounted] = React.useState(false);
+  const debounceTimer = React.useRef<NodeJS.Timeout | null>(null);
 
-    const handleThemeToggle = () => {
-        let newTheme: "light" | "dark" | "system";
+  React.useEffect(() => setMounted(true), []);
 
-        switch (theme) {
-            case "light":
-                newTheme = "dark";
-                break;
-            case "dark":
-                newTheme = "system";
-                break;
-            case "system":
-            default:
-                newTheme = "light";
-                break;
-        }
+  const handleThemeChange = (newTheme: ThemeOption) => {
+    if (theme === newTheme) return;
 
-        // Aggiorna immediatamente il tema lato client per una UX reattiva
-        setTheme(newTheme);
+    setTheme(newTheme);
 
-        // Pulisci il timer precedente se esiste
-        if (debounceTimer.current) {
-            clearTimeout(debounceTimer.current);
-        }
-
-        // Imposta un nuovo timer per salvare il tema dopo 500ms
-        debounceTimer.current = setTimeout(() => {
-            saveTheme(newTheme);
-        }, 2000);
-    };
-
-    // Assicurati di pulire il timer quando il componente viene smontato
-    React.useEffect(() => {
-        return () => {
-            if (debounceTimer.current) {
-                clearTimeout(debounceTimer.current);
-            }
-        };
-    }, []);
-
-    // Gestisce lo stato non montato per evitare mismatch SSR/CSR
-    // (next-themes gestisce questo internamente, ma un controllo non fa male)
-    // in modo tale che il tema venga determinato solo dopo che il componente è stato montato
-    const [mounted, setMounted] = React.useState(false);
-    React.useEffect(() => setMounted(true), []);
-
-    if (!mounted) {
-        return (
-            <Button variant="outline" size="icon" disabled>
-                <Monitor className="h-[1.2rem] w-[1.2rem]" />
-            </Button>
-        );
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
     }
 
-    const button =  (
-        <Button variant="outline" size="icon" onClick={handleThemeToggle} title="Change Theme">
-            {theme === "light" && <Sun className="h-[1.2rem] w-[1.2rem]" />}
-            {theme === "dark" && <Moon className="h-[1.2rem] w-[1.2rem]" />}
-            {theme === "system" && <Monitor className="h-[1.2rem] w-[1.2rem]" />}
-            <span className="sr-only">Toggle theme</span>
-        </Button>
-    );
+    debounceTimer.current = setTimeout(() => {
+      saveTheme(newTheme);
+    }, 2000);
+  };
 
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
+
+  if (!mounted) {
     return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                {button}
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="center">
-                {t('change_theme')}
-            </TooltipContent>
-        </Tooltip>
-    )
+      <div className="flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-1">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="flex h-8 w-8 items-center justify-center">
+            <div className="h-6 w-6 animate-pulse rounded-full bg-muted" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const activeThemeIndex = themes.findIndex((t) => t.value === theme);
+
+  return (
+    <div className="relative flex w-full items-center justify-between bg-transparent">
+      {/* Moving Highlight */}
+      <div
+        className="absolute h-8 w-1/3 rounded-md bg-muted transition-transform duration-300 ease-in-out"
+        style={{
+          transform: `translateX(${activeThemeIndex * 100}%)`,
+        }}
+      />
+      {themes.map(({ value, icon: Icon }) => (
+        <button
+          key={value}
+          onClick={() => handleThemeChange(value)}
+          className={cn(
+            "relative z-10 flex flex-1 items-center justify-center rounded-md p-1.5 text-sm font-medium transition-colors",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "disabled:pointer-events-none disabled:opacity-50",
+            theme === value ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Icon className="h-5 w-5" />
+        </button>
+      ))}
+    </div>
+  );
 }
 

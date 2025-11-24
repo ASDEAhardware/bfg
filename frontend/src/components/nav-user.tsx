@@ -32,6 +32,7 @@ import { User } from "@/types/user"
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useRouter } from "next/router"
 import { useTranslations } from "next-intl"
+import { ThemeSwitch } from "./theme-switch"
 
 export function NavUser({
   user,
@@ -137,6 +138,10 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <div className="px-2">
+              <ThemeSwitch />
+            </div>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <a href="/settings" onClick={(e) => { e.preventDefault(); if (onSettingsClick) onSettingsClick(); }}>
