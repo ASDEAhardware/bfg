@@ -33,6 +33,7 @@ import { useDatalogger, useSensors, useMqttEvents } from "@/hooks/useMqtt";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
+import { useTranslations } from "next-intl";
 
 // Helper per mappare il tipo di sensore all'icona
 const getSensorIcon = (type: string) => {
@@ -56,6 +57,7 @@ export default function DeviceDetailPage() {
   const router = useRouter();
   const params = useParams();
   const deviceId = params?.id as string;
+  const t = useTranslations('device_detail');
   const { selectedSiteId } = useUnifiedSiteContext();
 
   // 1. WebSocket Updates
@@ -104,7 +106,7 @@ export default function DeviceDetailPage() {
     return (
       <div className="flex flex-col h-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Caricamento dispositivo...</p>
+        <p className="text-muted-foreground">{t('loading_device')}</p>
       </div>
     );
   }
@@ -114,13 +116,13 @@ export default function DeviceDetailPage() {
     return (
       <div className="flex flex-col h-full items-center justify-center p-4">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-lg font-semibold mb-2">Errore Caricamento</h2>
+        <h2 className="text-lg font-semibold mb-2">{t('loading_error_title')}</h2>
         <p className="text-muted-foreground text-center mb-4">
-          {deviceError?.message || "Impossibile trovare il dispositivo richiesto."}
+          {deviceError?.message || t('loading_error_message')}
         </p>
         <Button onClick={handleBack} variant="outline">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Torna alla lista
+          {t('back_to_list')}
         </Button>
       </div>
     );
@@ -128,7 +130,7 @@ export default function DeviceDetailPage() {
 
   const lastCommText = datalogger.last_seen_at
     ? formatDistanceToNow(new Date(datalogger.last_seen_at), { addSuffix: true, locale: it })
-    : "Mai";
+    : t('never');
 
   return (
     <div className="flex flex-col h-full">
@@ -154,7 +156,7 @@ export default function DeviceDetailPage() {
                 />
               </div>
               <Badge variant="secondary" className="text-xs shrink-0 hidden sm:flex">
-                {sensors.length} sensori
+                {sensors.length} {t('sensors_count')}
               </Badge>
             </div>
 
@@ -174,7 +176,7 @@ export default function DeviceDetailPage() {
                 <DropdownMenuContent align="end" className="w-64">
                   <div className="p-2">
                     <Input
-                      placeholder="Cerca sensori..."
+                      placeholder={t('search_placeholder')}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="h-8"
@@ -189,7 +191,7 @@ export default function DeviceDetailPage() {
                 variant="outline"
                 size="sm"
                 className="h-6 w-6 p-0"
-                title="Impostazioni"
+                title={t('settings_tooltip')}
                 onClick={() => setIsSettingsOpen(!isSettingsOpen)}
               >
                 <MoreHorizontal className="h-4 w-4" />
@@ -207,7 +209,7 @@ export default function DeviceDetailPage() {
           </div>
         ) : filteredSensors.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
-            {searchTerm ? 'Nessun sensore trovato con questo filtro' : 'Nessun sensore associato a questo dispositivo'}
+            {searchTerm ? t('no_sensor_filter') : t('no_sensor_associated')}
           </div>
         ) : (
           <div className="grid-responsive-sensors">
@@ -236,7 +238,7 @@ export default function DeviceDetailPage() {
 
               const lastReadingTime = sensor.last_reading
                 ? formatDistanceToNow(new Date(sensor.last_reading), { addSuffix: true, locale: it })
-                : "Mai";
+                : t('never');
 
               return (
                 <Card key={sensor.id} className="card-standard hover:border-primary/50 transition-colors">
@@ -264,7 +266,7 @@ export default function DeviceDetailPage() {
                             : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100'
                         }`}
                       >
-                        {sensor.is_online ? 'Online' : 'Offline'}
+                        {sensor.is_online ? t('online') : t('offline')}
                       </Badge>
                     </div>
 
@@ -295,37 +297,37 @@ export default function DeviceDetailPage() {
       {/* Status Bar Style Sidebar */}
       <div className="h-6 bg-sidebar border-t border-sidebar-border flex items-center justify-between px-3 text-[10px] text-sidebar-foreground/50 font-mono tracking-wider select-none shrink-0 cursor-default">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors cursor-pointer" title="Device Type">
+          <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors cursor-pointer" title={t('device_type_tooltip')}>
             <Cpu className="h-3 w-3 opacity-80" />
             <span className="uppercase">{datalogger.datalogger_type}</span>
           </div>
-          <div className="hover:text-sidebar-foreground/80 transition-colors" title="Serial Number">
-            <span>S/N: {datalogger.serial_number}</span>
+          <div className="hover:text-sidebar-foreground/80 transition-colors" title={t('serial_number_tooltip')}>
+            <span>{t('serial_number_label')} {datalogger.serial_number}</span>
           </div>
           {datalogger.device_id && (
             <div className="hover:text-sidebar-foreground/80 transition-colors">
-              <span>ID: {datalogger.device_id}</span>
+              <span>{t('id_label')} {datalogger.device_id}</span>
             </div>
           )}
         </div>
         <div className="flex items-center gap-4">
           {datalogger.ip_address && (
             <div className="hover:text-sidebar-foreground/80 transition-colors hidden sm:flex">
-              <span>IP: {datalogger.ip_address}</span>
+              <span>{t('ip_label')} {datalogger.ip_address}</span>
             </div>
           )}
           {datalogger.firmware_version && (
             <div className="hover:text-sidebar-foreground/80 transition-colors hidden sm:flex">
-              <span>FW: {datalogger.firmware_version}</span>
+              <span>{t('fw_label')} {datalogger.firmware_version}</span>
             </div>
           )}
           <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors">
             <Activity className="h-3 w-3 opacity-80" />
-            <span>UPTIME: {datalogger.uptime_percentage.toFixed(1)}%</span>
+            <span>{t('uptime_label')} {datalogger.uptime_percentage.toFixed(1)}%</span>
           </div>
-          <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors" title={`Last Seen: ${lastCommText}`}>
+          <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors" title={`${t('last_seen_tooltip_prefix')} ${lastCommText}`}>
             <div className={`h-1.5 w-1.5 rounded-full ${datalogger.is_online ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-            <span>{datalogger.is_online ? 'ONLINE' : 'OFFLINE'}</span>
+            <span>{datalogger.is_online ? t('status_online') : t('status_offline')}</span>
           </div>
         </div>
       </div>
@@ -345,7 +347,7 @@ export default function DeviceDetailPage() {
         >
           <div className="px-4 py-2 border-b border-border bg-muted/20">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-foreground">Settings</h3>
+              <h3 className="text-lg font-semibold text-foreground">{t('settings_panel_title')}</h3>
               <Button onClick={() => setIsSettingsOpen(false)} variant="ghost" size="sm">
                 <X className="h-4 w-4" />
               </Button>
@@ -356,7 +358,7 @@ export default function DeviceDetailPage() {
               {/* Solo Online Toggle */}
               <div className="flex items-center justify-between">
                 <Label htmlFor="solo-online" className="text-sm font-medium text-foreground">
-                  Solo Online
+                  {t('online_only_label')}
                 </Label>
                 <Switch
                   id="solo-online"
