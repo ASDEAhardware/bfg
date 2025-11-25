@@ -219,7 +219,13 @@
     },
     "sidebar": {
       "admin_panel": "Pannello Admin",
-      "system_config": "Configurazione di Sistema"
+      "system_config": "Configurazione di Sistema" 
+    },
+    "show_confirmation_dialog": {
+      "title": "Uscire dalla visualizzazione corrente?",
+      "description": "Navigando verso questa pagina chiuderai la visualizzazione corrente della griglia o della scheda. Il layout verrà salvato e ripristinato al tuo ritorno.",
+      "confirm": "Conferma",
+      "cancel": "Annulla"
     },
     "header_buttons": {
       "enable_grid_mode": "Abilita Griglia",

@@ -221,6 +221,12 @@
       "admin_panel": "Admin Panel",
       "system_config": "System Config"
     },
+    "show_confirmation_dialog": {
+      "title": "Exit Current View?",
+      "description": "Navigating to this page will close your current grid or tab view. Your layout will be saved and restored when you return.",
+      "confirm": "Confirm",
+      "cancel": "Cancel"
+    },
     "header_buttons": {
       "enable_grid_mode": "Enable Grid Mode",
       "disable_grid_mode": "Disable Grid Mode",
