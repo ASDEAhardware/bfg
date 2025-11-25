@@ -29,7 +29,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useDatalogger, useSensors, useMqttEvents } from "@/hooks/useMqtt";
+import { useDatalogger, useSensors } from "@/hooks/useMqtt";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
@@ -58,10 +58,7 @@ export default function DeviceDetailPage() {
   const deviceId = params?.id as string;
   const { selectedSiteId } = useUnifiedSiteContext();
 
-  // 1. WebSocket Updates
-  useMqttEvents(selectedSiteId);
-
-  // 2. Fetch Datalogger Detail
+  // Fetch Datalogger Detail
   const { 
     datalogger, 
     loading: deviceLoading, 

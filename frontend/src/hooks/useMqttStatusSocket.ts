@@ -20,6 +20,7 @@ export const useMqttStatusSocket = () => {
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
+  const isIntentionalClose = useRef(false); // Flag per chiusure volontarie
   const MAX_RECONNECT_ATTEMPTS = 10;
   const RECONNECT_INTERVAL_MS = 5000; // 5 secondi
 
@@ -30,12 +31,14 @@ export const useMqttStatusSocket = () => {
 
     setStatus('CONNECTING');
     const url = getWebSocketUrl();
+    console.log('Connecting to WebSocket URL:', url);
     ws.current = new WebSocket(url);
 
     ws.current.onopen = () => {
       console.log('WebSocket Connected');
       setStatus('CONNECTED');
       reconnectAttempts.current = 0; // Reset tentativi al successo
+      isIntentionalClose.current = false; // Reset flag chiusura volontaria
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
         reconnectTimeout.current = null;
@@ -65,8 +68,25 @@ export const useMqttStatusSocket = () => {
     };
 
     ws.current.onclose = (event) => {
-      console.log('WebSocket Disconnected', event.code, event.reason);
+      // Non loggare errori per chiusure volontarie (F5, navigazione, chiusura tab)
+      if (!isIntentionalClose.current) {
+        // Codice 1006 = chiusura anomala (server down, rete persa, ecc.)
+        // Codice 1000 = chiusura normale
+        // Codice 1001 = endpoint andato via (es. navigazione)
+        const closeReason = event.code === 1006
+          ? 'Connection lost (server may be down or network issue)'
+          : event.reason || `Close code: ${event.code}`;
+
+        console.log('WebSocket Disconnected:', closeReason);
+      }
+
       setStatus('DISCONNECTED');
+
+      // Non tentare la riconnessione se la chiusura è volontaria
+      if (isIntentionalClose.current) {
+        return;
+      }
+
       if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts.current++;
         console.log(`Attempting to reconnect WebSocket (attempt ${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS})...`);
@@ -78,7 +98,10 @@ export const useMqttStatusSocket = () => {
     };
 
     ws.current.onerror = (error) => {
-      console.error('WebSocket Error - Connection failed or lost');
+      // Non loggare errori se stiamo chiudendo volontariamente
+      if (!isIntentionalClose.current) {
+        console.error('WebSocket Error - Connection failed or lost');
+      }
       setStatus('DISCONNECTED');
       ws.current?.close(); // Chiude per innescare onclose e il tentativo di riconnessione
     };
@@ -87,7 +110,39 @@ export const useMqttStatusSocket = () => {
   useEffect(() => {
     connectWebSocket();
 
+    // Handler per chiusura pagina (F5, navigazione, chiusura tab)
+    const handleBeforeUnload = () => {
+      isIntentionalClose.current = true;
+      if (ws.current) {
+        ws.current.close();
+      }
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+      }
+    };
+
+    // Handler per visibilità pagina (quando l'utente cambia tab)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Pagina nascosta - non fare nulla per ora
+      } else {
+        // Pagina tornata visibile - controlla connessione
+        if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+          isIntentionalClose.current = false;
+          reconnectAttempts.current = 0; // Reset tentativi
+          connectWebSocket();
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      isIntentionalClose.current = true;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+
       if (ws.current) {
         ws.current.close();
       }

@@ -5,8 +5,9 @@ services:
       target: runtime
     container_name: bfg_backend
     # In development, use runserver for hot reload:
-    command: python manage.py runserver 0.0.0.0:8000
+    # command: python manage.py runserver 0.0.0.0:8000
     # In production (with Supervisor), comment the line above and use default CMD
+    # IMPORTANT: runserver does NOT support WebSocket! Use Supervisor (default CMD) for WebSocket support
     working_dir: /app
     volumes:
       - ./backend:/app

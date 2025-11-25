@@ -3,7 +3,7 @@
  * Replaces the old useMqttStatus.ts with clean, type-safe implementation
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/axios';
 
@@ -335,74 +335,11 @@ export function useSensors(datalogger: Datalogger | null) {
 
 /**
  * Hook for handling WebSocket MQTT events
+ * @deprecated Use useMqttStatusSocket instead. This hook is deprecated and should not be used.
+ * The global WebSocketInitializer component already handles all WebSocket connections.
  */
 export function useMqttEvents(siteId: number | null) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    // Create WebSocket connection
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
-    // Use port 8001 for WebSocket (Daphne) or /ws/ if proxied
-    // Assuming direct access to 8001 in development
-    const wsUrl = `ws://${host}:8001/ws/status/`;
-    
-    console.log('Connecting to WebSocket:', wsUrl);
-    
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-      console.log('WebSocket Connected');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        // Log only significant updates to reduce noise
-        if (message.type !== 'heartbeat') {
-           console.log('WS Message:', message);
-        }
-
-        // Handle different message types
-        if (message.site_id && siteId && message.site_id !== siteId) {
-          // Ignore messages for other sites
-          return;
-        }
-
-        if (message.type === 'datalogger_update') {
-          console.log('Invalidating dataloggers query due to WS update');
-          // 1. Invalidate global dataloggers list
-          queryClient.invalidateQueries({ queryKey: ['dataloggers', siteId] });
-          
-          // 2. Invalidate specific datalogger detail if ID is present
-          if (message.datalogger_id) {
-             const dlId = message.datalogger_id.toString();
-             queryClient.invalidateQueries({ queryKey: ['datalogger', dlId] });
-             
-             // 3. ALSO invalidate sensors for this datalogger
-             queryClient.invalidateQueries({ queryKey: ['sensors', dlId] });
-             queryClient.invalidateQueries({ queryKey: ['sensors', Number(dlId)] }); // Try both types just in case
-          } else {
-             // If no ID (bulk update), we might need to invalidate all sensors queries?
-             // Or just let the user navigate/refresh.
-             // Ideally we invalidate all 'sensors' queries but that might be overkill.
-             // For now let's assume specific ID updates for heartbeats.
-          }
-        } else if (message.type === 'connection_status' || message.type === 'status_update') {
-           queryClient.invalidateQueries({ queryKey: ['mqttConnectionStatus', siteId] });
-        }
-
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket Disconnected');
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, [siteId, queryClient]);
+  // This hook is now a no-op. WebSocket is handled globally by useMqttStatusSocket.
+  // Left here for backward compatibility but does nothing.
+  console.warn('useMqttEvents is deprecated. WebSocket is handled globally by WebSocketInitializer.');
 }

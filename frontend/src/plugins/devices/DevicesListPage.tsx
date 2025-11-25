@@ -54,7 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/store/authStore";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
-import { useMqttConnectionStatus, useMqttControl, useDataloggers, useMqttEvents } from "@/hooks/useMqtt";
+import { useMqttConnectionStatus, useMqttControl, useDataloggers } from "@/hooks/useMqtt";
 import { useUserInfo } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { DeviceCard } from "@/components/DeviceCard";
@@ -82,9 +82,6 @@ export default function DevicesListPage() {
   const { connection: mqttConnection, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
   const { startConnection, stopConnection, forceDiscovery, loading: isMqttControlLoading } = useMqttControl();
   const { dataloggers: rawDataloggers, loading: dataloggerLoading, error: dataloggerError, refresh: refreshDataloggers } = useDataloggers(selectedSiteId);
-  
-  // Enable WebSocket updates
-  useMqttEvents(selectedSiteId);
 
   // Type-safe dataloggers array
   const dataloggers = (rawDataloggers || []) as any[];

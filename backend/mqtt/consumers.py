@@ -1,4 +1,5 @@
 import json
+import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 # Nome del gruppo a cui tutti i client si uniranno per ricevere broadcast
@@ -22,6 +23,12 @@ class MqttStatusConsumer(AsyncWebsocketConsumer):
 
         # Accetta la connessione WebSocket
         await self.accept()
+
+        # Invia un messaggio di conferma connessione
+        await self.send(text_data=json.dumps({
+            "type": "connection_established",
+            "message": "WebSocket connected successfully"
+        }))
 
     async def disconnect(self, close_code):
         """
