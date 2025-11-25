@@ -11,9 +11,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useConfirmationDialogStore } from "@/store/dialogStore"
+import { useTranslations } from "next-intl";
 
 export function GlobalConfirmationDialog() {
   const { isOpen, title, description, onConfirm, hide } = useConfirmationDialogStore();
+
+  const t = useTranslations('components');
 
   const handleConfirm = () => {
     onConfirm();
@@ -32,8 +35,8 @@ export function GlobalConfirmationDialog() {
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleCancel}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
+          <AlertDialogCancel onClick={handleCancel}>{t('show_confirmation_dialog.cancel')}</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirm}>{t('show_confirmation_dialog.confirm')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

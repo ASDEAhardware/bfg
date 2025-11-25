@@ -54,8 +54,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     if (isModeActive) {
       showConfirmationDialog({
-        title: "Exit Current View?",
-        description: "Navigating to this page will close your current grid or tab view. Your layout will be saved and restored when you return.",
+        title: t('show_confirmation_dialog.title'),
+        description: t('show_confirmation_dialog.description'),
         onConfirm: navigate,
       });
     } else {
