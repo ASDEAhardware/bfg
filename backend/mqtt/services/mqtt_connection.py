@@ -115,40 +115,6 @@ class MQTTConnectionManager:
             logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Connected successfully")
             self._update_connection_status('connected')
 
-            # Pubblica status "online" (contrario del LWT "offline")
-            from .mqtt_service import mqtt_service
-            from mqtt.models import MqttConnection
-            from django.conf import settings
-
-            try:
-                mqtt_conn = MqttConnection.objects.get(id=self.mqtt_connection_id)
-
-                if settings.MQTT_CONFIG.get('LWT_ENABLED', True):
-                    lwt_topic = f"{mqtt_conn.client_id_prefix}/backend/status"
-                    online_payload = json.dumps({
-                        "status": "online",
-                        "instance_id": mqtt_service.instance_id,
-                        "client_id": client._client_id.decode() if hasattr(client._client_id, 'decode') else str(client._client_id),
-                        "timestamp": datetime.utcnow().isoformat() + "Z"
-                    })
-
-                    client.publish(
-                        topic=lwt_topic,
-                        payload=online_payload,
-                        qos=1,
-                        retain=True
-                    )
-
-                    logger.info(
-                        f"[MQTT Connection {self.mqtt_connection_id}] "
-                        f"Published online status to {lwt_topic}"
-                    )
-            except Exception as e:
-                logger.warning(
-                    f"[MQTT Connection {self.mqtt_connection_id}] "
-                    f"Failed to publish online status: {e}"
-                )
-
             # Sottoscrivi ai topic configurati
             self._subscribe_to_topics()
 
@@ -340,29 +306,6 @@ class MQTTConnectionManager:
                         f"SSL/TLS enabled{' with custom CA' if mqtt_conn.ca_cert_path else ''}"
                     )
 
-                # Last Will and Testament (LWT) - notifica disconnessioni impreviste
-                if settings.MQTT_CONFIG.get('LWT_ENABLED', True):
-                    lwt_topic = f"{mqtt_conn.client_id_prefix}/backend/status"
-                    lwt_payload = json.dumps({
-                        "status": "offline",
-                        "instance_id": mqtt_service.instance_id,
-                        "client_id": client_id,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
-                        "reason": "unexpected_disconnect"
-                    })
-
-                    self.client.will_set(
-                        topic=lwt_topic,
-                        payload=lwt_payload,
-                        qos=1,
-                        retain=True
-                    )
-
-                    logger.info(
-                        f"[MQTT Connection {self.mqtt_connection_id}] "
-                        f"LWT configured: {lwt_topic}"
-                    )
-
                 # Keep alive
                 keep_alive = mqtt_conn.keep_alive_interval
 
@@ -444,7 +387,7 @@ class MQTTConnectionManager:
             'topics_list': self._subscribed_topics.copy(),
         }
 
-    def publish_message(self, topic: str, message: str, qos: int = 0) -> Dict[str, Any]:
+    def publish_message(self, topic: str, message: str, qos: int = 0, retain: bool = False) -> Dict[str, Any]:
         """
         Pubblica un messaggio su un topic MQTT.
 
@@ -452,6 +395,7 @@ class MQTTConnectionManager:
             topic: Topic MQTT
             message: Messaggio da pubblicare
             qos: Quality of Service (0, 1, 2)
+            retain: Se True, il messaggio viene mantenuto dal broker (retained message)
 
         Returns:
             Dict con success e messaggio
@@ -463,7 +407,7 @@ class MQTTConnectionManager:
             }
 
         try:
-            result = self.client.publish(topic, message, qos=qos)
+            result = self.client.publish(topic, message, qos=qos, retain=retain)
 
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 logger.info(

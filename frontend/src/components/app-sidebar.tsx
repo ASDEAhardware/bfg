@@ -94,7 +94,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <div className="flex items-center gap-2 overflow-hidden">
           <Image
-            src="/images/logo_test.webp"
+            src="/images/logo.jpg"
             alt="Logo"
             width={34}
             height={34}

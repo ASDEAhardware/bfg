@@ -35,11 +35,13 @@ export function LoginClient() {
                     </div>
                 </div>
             </div>
-            <div className="bg-muted relative hidden lg:block">
+            <div className="bg-muted relative hidden lg:block flex items-center justify-center">
                 <Image
-                    src="/placeholder.svg"
+                    src="/images/logo.jpg"
                     alt="Logo della mia azienda"
-                    fill
+                    width={400}
+                    height={400}
+                    className="rounded-lg"
                 />
             </div>
         </div>

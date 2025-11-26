@@ -461,7 +461,7 @@ class MQTTService:
         """
         return self.running
 
-    def publish_message(self, site_id: int, topic: str, message: str, qos: int = 0) -> Dict[str, Any]:
+    def publish_message(self, site_id: int, topic: str, message: str, qos: int = 0, retain: bool = False) -> Dict[str, Any]:
         """
         Pubblica un messaggio MQTT per un sito specifico.
 
@@ -470,6 +470,7 @@ class MQTTService:
             topic: Topic MQTT
             message: Messaggio da pubblicare
             qos: Quality of Service (0, 1, 2)
+            retain: Se True, il messaggio viene mantenuto dal broker (retained message)
 
         Returns:
             Dict con success e messaggio
@@ -486,7 +487,7 @@ class MQTTService:
                         'message': f'No active MQTT connection for site {site_id}'
                     }
 
-                return manager.publish_message(topic, message, qos)
+                return manager.publish_message(topic, message, qos, retain)
 
         except MqttConnection.DoesNotExist:
             return {

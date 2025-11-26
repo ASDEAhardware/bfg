@@ -31,7 +31,7 @@ class MqttConnection(models.Model):
                 message='Client ID prefix può contenere solo lettere, numeri, underscore, slash e trattini'
             )
         ],
-        help_text="Prefisso per client ID e topic MQTT (es: 'sito_001', 'company/site_a')"
+        help_text="Prefisso per identificare univocamente la connessione MQTT (es: 'sito_001', 'company_site_a'). Usato per costruire il client_id univoco e topic di sistema come LWT."
     )
 
     # Retry settings
@@ -95,7 +95,13 @@ class MqttTopic(models.Model):
     )
     topic_pattern = models.CharField(
         max_length=255,
-        help_text="Pattern topic senza prefisso (es: 'datalogger_o/heartbeat', 'alerts', 'config/response')"
+        validators=[
+            RegexValidator(
+                regex=r'^[a-zA-Z0-9_/\-+#]+$',
+                message='Topic pattern MQTT può contenere solo lettere, numeri, underscore, slash, trattini e wildcards MQTT (+, #)'
+            )
+        ],
+        help_text="Topic pattern completo MQTT (es: 'sito_001/datalogger_o/heartbeat', 'company/site/alerts', 'prefix/+/heartbeat', 'prefix/#'). Supporta wildcards: + (singolo livello), # (multi-livello)"
     )
     is_active = models.BooleanField(
         default=True,
@@ -150,9 +156,8 @@ class MqttTopic(models.Model):
         ]
 
     def get_full_topic(self):
-        """Ritorna topic completo con prefix configurabile"""
-        prefix = self.mqtt_connection.client_id_prefix
-        return f"{prefix}/{self.topic_pattern}"
+        """Ritorna il topic pattern completo (ora topic_pattern contiene già il topic completo)"""
+        return self.topic_pattern
 
     def __str__(self):
         status = "✅" if self.is_active else "❌"

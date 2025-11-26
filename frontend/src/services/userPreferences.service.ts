@@ -1,12 +1,5 @@
 import { api } from '@/lib/axios'
 import { ShowResizeHandle, AccelerometerUnit, InclinometerUnit, LanguageOption } from '@/types/index'
-import { AccelerometerUnitPreferencePayload, InclinometerUnitPreferencePayload, userPreferencesPayload } from '@/types/userPreferences'
-
-//TODO: ELIMINARE
-export const updateUserPreferences = async (newPreferences: userPreferencesPayload) => {
-    const response = await api.patch('preferences/', newPreferences);
-    return response.data;
-}
 
 export const patchUserResizeHandlePreference = async (resizeHandlePref: ShowResizeHandle) => {
     const response = await api.patch('preferences/resize-handle/', {show_resize_handle: resizeHandlePref});
