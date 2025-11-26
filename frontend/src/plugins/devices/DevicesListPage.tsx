@@ -58,25 +58,27 @@ import { useMqttConnectionStatus, useMqttControl, useDataloggers } from "@/hooks
 import { useUserInfo } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { DeviceCard } from "@/components/DeviceCard";
+import { useTranslations } from "next-intl";
 
 // Sensor types for grouped cards (temporary - will be calculated from real data)
 const adaqSensorTypes = [
-  { icon: Thermometer, count: 0, label: "Temperatura" },
-  { icon: Droplets, count: 0, label: "Umidità" },
-  { icon: Zap, count: 0, label: "Corrente" }
+  { icon: Thermometer, count: 0, labelKey: "temperature" },
+  { icon: Droplets, count: 0, labelKey: "humidity" },
+  { icon: Zap, count: 0, labelKey: "current" }
 ];
 
 const wsSensorTypes = [
-  { icon: Thermometer, count: 0, label: "Temperatura" },
-  { icon: Droplets, count: 0, label: "Umidità" },
-  { icon: Wind, count: 0, label: "Vento" },
-  { icon: Gauge, count: 0, label: "Pressione" }
+  { icon: Thermometer, count: 0, labelKey: "temperature" },
+  { icon: Droplets, count: 0, labelKey: "humidity" },
+  { icon: Wind, count: 0, labelKey: "wind" },
+  { icon: Gauge, count: 0, labelKey: "pressure" }
 ];
 
 export default function DevicesListPage() {
   const router = useRouter();
   const { selectedSiteId } = useUnifiedSiteContext();
   const { data: userData } = useUserInfo();
+  const t = useTranslations('devices_list');
 
   // MQTT hooks
   const { connection: mqttConnection, isHeartbeatTimeout, refresh: refreshMqttStatus } = useMqttConnectionStatus(selectedSiteId);
@@ -125,27 +127,27 @@ export default function DevicesListPage() {
     if (!selectedSiteId) return null;
 
     if (!mqttConnection) {
-      return { variant: "secondary" as const, text: "MQTT not configured", className: "bg-muted text-muted-foreground", icon: WifiOff };
+      return { variant: "secondary" as const, text: t('mqtt_not_configured'), className: "bg-muted text-muted-foreground", icon: WifiOff };
     }
 
     switch (mqttConnection.status) {
       case 'connected':
-        return { variant: "default" as const, text: "MQTT connected", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100", icon: Wifi };
+        return { variant: "default" as const, text: t('mqtt_connected'), className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100", icon: Wifi };
       case 'connecting':
-        return { variant: "secondary" as const, text: "Connecting...", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 animate-pulse", icon: RefreshCw };
+        return { variant: "secondary" as const, text: t('mqtt_connecting'), className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100 animate-pulse", icon: RefreshCw };
       case 'disconnected':
-        return { variant: "outline" as const, text: "MQTT disconnected", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100", icon: WifiOff };
+        return { variant: "outline" as const, text: t('mqtt_disconnected'), className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100", icon: WifiOff };
       case 'disabled':
-        return { variant: "outline" as const, text: "Disconnecting...", className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100 animate-pulse", icon: RefreshCw };
+        return { variant: "outline" as const, text: t('mqtt_disconnecting'), className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100 animate-pulse", icon: RefreshCw };
       case 'error':
         // Distinguish between real errors and heartbeat timeout
         if (isHeartbeatTimeout) {
-          return { variant: "secondary" as const, text: "MQTT device offline", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100", icon: WifiOff };
+          return { variant: "secondary" as const, text: t('mqtt_device_offline'), className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100", icon: WifiOff };
         } else {
-          return { variant: "outline" as const, text: "MQTT error", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100", icon: WifiOff };
+          return { variant: "outline" as const, text: t('mqtt_error'), className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100", icon: WifiOff };
         }
       default:
-        return { variant: "secondary" as const, text: "MQTT unknown", className: "bg-muted text-muted-foreground", icon: WifiOff };
+        return { variant: "secondary" as const, text: t('mqtt_unknown'), className: "bg-muted text-muted-foreground", icon: WifiOff };
     }
   };
 
@@ -235,7 +237,7 @@ export default function DevicesListPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Cpu className="h-5 w-5 text-muted-foreground shrink-0" />
-              <h1 className="text-lg font-semibold">Devices</h1>
+              <h1 className="text-lg font-semibold">{t('title')}</h1>
               
               {/* Dropdown admin per start/stop MQTT */}
               {hasAdminPermissions && (
@@ -245,7 +247,7 @@ export default function DevicesListPage() {
                       variant="outline"
                       size="sm"
                       className="h-6 w-6 p-0 border-primary/50 hover:border-primary"
-                      title="Controlli Admin MQTT"
+                      title={t('admin_controls_tooltip')}
                     >
                       <Shield className="h-3.5 w-3.5 text-primary" />
                     </Button>
@@ -264,7 +266,7 @@ export default function DevicesListPage() {
                       ) : (
                         <Play className="h-4 w-4" />
                       )}
-                      <span>Avvia MQTT</span>
+                      <span>{t('start_mqtt')}</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
@@ -279,7 +281,7 @@ export default function DevicesListPage() {
                       ) : (
                         <StopIcon className="h-4 w-4" />
                       )}
-                      <span>Ferma MQTT</span>
+                      <span>{t('stop_mqtt')}</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleForceDiscovery}
@@ -291,11 +293,11 @@ export default function DevicesListPage() {
                       ) : (
                         <RefreshCw className="h-4 w-4" />
                       )}
-                      <span>Force Discovery</span>
+                      <span>{t('force_discovery')}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                      Stato: {mqttConnection?.status || 'unknown'}
+                      {t('status_label')} {mqttConnection?.status || 'unknown'}
                     </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -327,7 +329,7 @@ export default function DevicesListPage() {
                 <DropdownMenuContent align="end" className="w-64">
                   <div className="p-2">
                     <Input
-                      placeholder="Cerca dispositivi..."
+                      placeholder={t('search_placeholder')}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="h-8"
@@ -347,7 +349,7 @@ export default function DevicesListPage() {
                     className="h-6 px-2"
                   >
                     <Square className="h-3 w-3 mr-1" />
-                    <span className="text-xs">Raggruppa Devices</span>
+                    <span className="text-xs">{t('group_devices')}</span>
                   </Button>
                 ) : (
                   <Button
@@ -357,7 +359,7 @@ export default function DevicesListPage() {
                     className="h-6 px-2"
                   >
                     <Layers className="h-3 w-3 mr-1" />
-                    <span className="text-xs">Espandi Devices</span>
+                    <span className="text-xs">{t('expand_devices')}</span>
                   </Button>
                 )
               )}
@@ -380,12 +382,12 @@ export default function DevicesListPage() {
         {!hasAnyDevice && !dataloggerLoading ? (
            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
              <Server className="h-12 w-12 mb-4 opacity-20" />
-             <h3 className="text-lg font-medium">Nessun dispositivo trovato</h3>
-             <p className="text-sm opacity-70 mb-4">Non ci sono dispositivi attivi per questo sito.</p>
+             <h3 className="text-lg font-medium">{t('no_device_found_title')}</h3>
+             <p className="text-sm opacity-70 mb-4">{t('no_device_found_description')}</p>
              {hasAdminPermissions && (
                <Button variant="outline" onClick={handleForceDiscovery} disabled={isMqttControlLoading}>
                  <RefreshCw className={`h-4 w-4 mr-2 ${isMqttControlLoading ? 'animate-spin' : ''}`} />
-                 Force Discovery
+                 {t('force_discovery')}
                </Button>
              )}
            </div>
@@ -435,11 +437,11 @@ export default function DevicesListPage() {
                           <h3 className="text-sm font-semibold">ADAQ</h3>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Monitoraggio analogico
+                          {t('analog_monitoring')}
                         </p>
                       </div>
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-primary/20 text-primary border-primary/30 flex-shrink-0">
-                        GRUPPO
+                        {t('group_badge')}
                       </Badge>
                     </div>
 
@@ -447,29 +449,29 @@ export default function DevicesListPage() {
                       <div className="bg-background/50 rounded p-2.5 border border-primary/20">
                         <div className="grid grid-cols-3 gap-2 text-center">
                           <div>
-                            <div className="text-xs text-muted-foreground mb-1">Dispositivi</div>
+                            <div className="text-xs text-muted-foreground mb-1">{t('devices_label')}</div>
                             <div className="text-sm font-semibold">{adaqStats.online}/{adaqStats.total}</div>
                           </div>
                           <div>
-                            <div className="text-xs text-muted-foreground mb-1">4 Canali</div>
+                            <div className="text-xs text-muted-foreground mb-1">{t('channels_4')}</div>
                             <div className="text-sm font-semibold">{adaqStats.channels4}</div>
                           </div>
                           <div>
-                            <div className="text-xs text-muted-foreground mb-1">8 Canali</div>
+                            <div className="text-xs text-muted-foreground mb-1">{t('channels_8')}</div>
                             <div className="text-sm font-semibold">{adaqStats.channels8}</div>
                           </div>
                         </div>
                       </div>
                       
                       <div className="bg-background/50 rounded p-2.5 border border-primary/20">
-                        <div className="text-xs text-muted-foreground mb-2">Tipologia Sensori</div>
+                        <div className="text-xs text-muted-foreground mb-2">{t('sensor_type_label')}</div>
                         <div className="grid grid-cols-3 gap-2">
                           {adaqSensorTypes.map((sensor, idx) => {
                             const SensorIcon = sensor.icon;
                             return (
                               <div key={idx} className="flex flex-col items-center">
                                 <SensorIcon className="h-4 w-4 text-muted-foreground mb-1" />
-                                <span className="text-xs font-semibold">{sensor.count}</span>
+                                <span className="text-xs font-semibold">{t(sensor.labelKey)}</span>
                               </div>
                             );
                           })}
@@ -487,7 +489,7 @@ export default function DevicesListPage() {
                       }}
                     >
                       <ChevronDown className="h-4 w-4 mr-2" />
-                      Espandi Gruppo
+                      {t('expand_group')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -537,32 +539,32 @@ export default function DevicesListPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <CloudRain className="h-5 w-5 text-primary" />
-                          <h3 className="text-sm font-semibold">Stazione meteo</h3>
+                          <h3 className="text-sm font-semibold">{t('weather_station_title')}</h3>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Monitoraggio meteorologico
+                          {t('weather_monitoring')}
                         </p>
                       </div>
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-primary/20 text-primary border-primary/30 flex-shrink-0">
-                        GRUPPO
+                        {t('group_badge')}
                       </Badge>
                     </div>
 
                     <div className="space-y-3 mb-4">
                       <div className="bg-background/50 rounded p-2.5 border border-primary/20">
-                        <div className="text-xs text-muted-foreground mb-1">Dispositivi</div>
+                        <div className="text-xs text-muted-foreground mb-1">{t('devices_label')}</div>
                         <div className="text-lg font-semibold">{wsStats.online}/{wsStats.total}</div>
                       </div>
                       
                       <div className="bg-background/50 rounded p-2.5 border border-primary/20">
-                        <div className="text-xs text-muted-foreground mb-2">Tipologia Sensori</div>
+                        <div className="text-xs text-muted-foreground mb-2">{t('sensor_type_label')}</div>
                         <div className="grid grid-cols-4 gap-2">
                           {wsSensorTypes.map((sensor, idx) => {
                             const SensorIcon = sensor.icon;
                             return (
                               <div key={idx} className="flex flex-col items-center">
                                 <SensorIcon className="h-4 w-4 text-muted-foreground mb-1" />
-                                <span className="text-xs font-semibold">{sensor.count}</span>
+                                <span className="text-xs font-semibold">{t(sensor.labelKey)}</span>
                               </div>
                             );
                           })}
@@ -580,7 +582,7 @@ export default function DevicesListPage() {
                       }}
                     >
                       <ChevronDown className="h-4 w-4 mr-2" />
-                      Espandi Gruppo
+                      {t('expand_group')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -606,31 +608,31 @@ export default function DevicesListPage() {
       {/* Status Bar */}
       <div className="h-6 bg-sidebar border-t border-sidebar-border flex items-center justify-between px-3 text-[10px] text-sidebar-foreground/50 font-mono tracking-wider select-none shrink-0 cursor-default">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors cursor-pointer" title={`Status: ${mqttConnection?.status}`}>
+          <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors cursor-pointer" title={`${t('status_tooltip')} ${mqttConnection?.status || 'unknown'}`}>
             <Wifi className={`h-3 w-3 ${mqttConnection?.status === 'connected' ? 'opacity-100' : 'opacity-50'}`} />
-            <span>MQTT: {mqttConnection?.status?.toUpperCase() || 'UNKNOWN'}</span>
+            <span>{t('mqtt_label')} {mqttConnection?.status?.toUpperCase() || 'UNKNOWN'}</span>
           </div>
           <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors">
             <Cpu className="h-3 w-3 opacity-80" />
-            <span>DEVICES: {filteredDataloggers.length}</span>
+            <span>{t('devices_count_label')} {filteredDataloggers.length}</span>
           </div>
           {(adaqStats.online + wsStats.online) > 0 && (
              <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors">
                <Activity className="h-3 w-3 opacity-80" />
-               <span>ACTIVE: {adaqStats.online + wsStats.online}</span>
+               <span>{t('active_count_label')} {adaqStats.online + wsStats.online}</span>
              </div>
           )}
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 hover:text-sidebar-foreground/80 transition-colors">
             <div className={`h-1.5 w-1.5 rounded-full ${mqttConnection?.status === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-            <span>LIVE</span>
+            <span>{t('live_status')}</span>
           </div>
-          <div className="hover:text-sidebar-foreground/80 transition-colors cursor-pointer" title="Site Configuration">
-            <span>{selectedSiteId ? `SITE: ${selectedSiteId}` : 'NO SITE'}</span>
+          <div className="hover:text-sidebar-foreground/80 transition-colors cursor-pointer" title={t('site_config_tooltip')}>
+            <span>{selectedSiteId ? `${t('site_label')} ${selectedSiteId}` : t('no_site_label')}</span>
           </div>
           <div className="hover:text-sidebar-foreground/80 transition-colors">
-            <span>© 2025 BFG v1.2.1</span>
+            <span>{t('copyright')}</span>
           </div>
         </div>
       </div>
@@ -650,7 +652,7 @@ export default function DevicesListPage() {
         >
           <div className="px-4 py-2 border-b border-border bg-muted/20">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-foreground">Settings</h3>
+              <h3 className="text-lg font-semibold text-foreground">{t('settings_panel_title')}</h3>
               <Button onClick={() => setIsSettingsOpen(false)} variant="ghost" size="sm">
                 <X className="h-4 w-4" />
               </Button>
@@ -675,7 +677,7 @@ export default function DevicesListPage() {
               {/* Solo Online Toggle */}
               <div className="flex items-center justify-between">
                 <Label htmlFor="solo-online" className="text-sm font-medium text-foreground">
-                  Solo Online
+                  {t('online_only_label')}
                 </Label>
                 <Switch
                   id="solo-online"
@@ -692,14 +694,14 @@ export default function DevicesListPage() {
       <AlertDialog open={showStartConfirm} onOpenChange={setShowStartConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Start MQTT Connection</AlertDialogTitle>
+            <AlertDialogTitle>{t('start_mqtt_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will start the MQTT connection for site monitoring. Continue?
+              {t('start_mqtt_description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleMqttStart}>Start</AlertDialogAction>
+            <AlertDialogCancel>{t('cancel_button')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMqttStart}>{t('start_button')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -708,14 +710,14 @@ export default function DevicesListPage() {
       <AlertDialog open={showStopConfirm} onOpenChange={setShowStopConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Stop MQTT Connection</AlertDialogTitle>
+            <AlertDialogTitle>{t('stop_mqtt_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will stop the MQTT connection and monitoring. Continue?
+              {t('stop_mqtt_description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleMqttStop}>Stop</AlertDialogAction>
+            <AlertDialogCancel>{t('cancel_button')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMqttStop}>{t('stop_button')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

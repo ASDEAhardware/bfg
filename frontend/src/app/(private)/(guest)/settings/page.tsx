@@ -658,7 +658,7 @@ function PreferencesSection() {
     }
 
     return (
-        <div className="space-y-6">
+        <div>
             <div>
                 <h1 className="text-2xl font-bold">{t('preferences')}</h1>
                 <p className="text-muted-foreground">{t('preferences_description')}</p>
