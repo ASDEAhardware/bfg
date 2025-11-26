@@ -338,6 +338,10 @@ class Gateway(models.Model):
         null=True, blank=True,
         help_text='When device went offline'
     )
+    last_seen_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Ultimo messaggio ricevuto dal gateway'
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -456,6 +460,7 @@ class Datalogger(models.Model):
             ('stopped', 'Stopped'),
             ('paused', 'Paused'),
             ('error', 'Error'),
+            ('offline', 'Offline'),
             ('unknown', 'Unknown')
         ],
         default='running',
@@ -694,6 +699,7 @@ class Sensor(models.Model):
         self.last_data_1 = data
 
         # Update statistiche
+        self.total_messages += 1  # Incrementa anche total_messages
         self.total_readings += 1
         self.last_reading = timestamp
         self.last_seen_at = timestamp

@@ -361,6 +361,21 @@ class MQTTService:
         self.running = True
         self._should_stop = False
 
+        # STARTUP CHECK: Verifica stato offline dispositivi PRIMA di iniziare
+        # Questo garantisce stato corretto dopo riavvii/crash
+        logger.info("Running startup offline check...")
+        try:
+            from mqtt.services.message_processor import message_processor
+            stats = message_processor.check_offline_devices()
+            logger.info(
+                f"Startup offline check completed: "
+                f"Gateways {stats['gateways_offline']}/{stats['gateways_checked']}, "
+                f"Dataloggers {stats['dataloggers_offline']}/{stats['dataloggers_checked']}, "
+                f"Sensors {stats['sensors_offline']}/{stats['sensors_checked']}"
+            )
+        except Exception as e:
+            logger.error(f"Error during startup offline check: {e}")
+
         # Avvia tutte le connessioni abilitate
         self.start_all()
 

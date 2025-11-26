@@ -337,8 +337,8 @@ export default function DevicesListPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Toggle Raggruppa/Espandi Devices - Mostra solo se ci sono gruppi */}
-              {(adaqDevices.length > 0 || weatherStationDevices.length > 0) && (
+              {/* Toggle Raggruppa/Espandi Devices - Mostra solo se ci sono gruppi (con più di 1 elemento) */}
+              {(adaqDevices.length > 1 || weatherStationDevices.length > 1) && (
                 hasExpandedGroups ? (
                   <Button
                     variant="default"
@@ -403,7 +403,18 @@ export default function DevicesListPage() {
             )}
 
             {/* ADAQ - Grouped or Expanded - SHOW ONLY IF HAS DEVICES */}
-            {adaqDevices.length > 0 && (
+            {/* Se c'è un solo device, mostralo diretto senza raggruppare */}
+            {adaqDevices.length === 1 && (
+              <DeviceCard
+                datalogger={adaqDevices[0]}
+                onConnect={handleDeviceClick}
+                onLabelUpdate={() => refreshDataloggers()}
+                compact={false}
+              />
+            )}
+
+            {/* Se ci sono più devices, raggruppa o espandi */}
+            {adaqDevices.length > 1 && (
               !expandedGroups.adaq ? (
                 // Grouped Card
                 <Card 
@@ -497,7 +508,18 @@ export default function DevicesListPage() {
             )}
 
             {/* WEATHER STATIONS - Grouped or Expanded - SHOW ONLY IF HAS DEVICES */}
-            {weatherStationDevices.length > 0 && (
+            {/* Se c'è un solo device, mostralo diretto senza raggruppare */}
+            {weatherStationDevices.length === 1 && (
+              <DeviceCard
+                datalogger={weatherStationDevices[0]}
+                onConnect={handleDeviceClick}
+                onLabelUpdate={() => refreshDataloggers()}
+                compact={false}
+              />
+            )}
+
+            {/* Se ci sono più devices, raggruppa o espandi */}
+            {weatherStationDevices.length > 1 && (
               !expandedGroups.weatherStations ? (
                 // Grouped Card
                 <Card 
