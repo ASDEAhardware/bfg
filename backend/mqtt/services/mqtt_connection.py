@@ -99,7 +99,7 @@ class MQTTConnectionManager:
                     'mqtt_retry_count', 'mqtt_next_retry', 'connection_errors'
                 ])
 
-                logger.debug(f"[MQTT Connection {self.mqtt_connection_id}] Status updated: {status}")
+                logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Status updated in DB: {status}")
 
         except Exception as e:
             logger.error(f"[MQTT Connection {self.mqtt_connection_id}] Error updating status: {e}")
@@ -341,30 +341,33 @@ class MQTTConnectionManager:
 
             try:
                 logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Disconnecting...")
-
+    
+                # Invia subito lo stato 'disconnecting' per aggiornare la UI
+                self._update_connection_status('disconnecting')
+    
                 # Stop loop (non-blocking)
                 try:
                     self.client.loop_stop()  # Stops the background thread
                 except Exception as e:
                     logger.warning(f"[MQTT Connection {self.mqtt_connection_id}] loop_stop error: {e}")
-
+    
                 # Disconnect (best effort, don't block on network issues)
                 try:
                     self.client.disconnect()
                 except Exception as e:
                     logger.warning(f"[MQTT Connection {self.mqtt_connection_id}] disconnect error (expected if connection lost): {e}")
-
+    
                 self.is_running = False
                 self.retry_count = 0
                 self._subscribed_topics = []
-
-                # Update status (handle DB errors gracefully)
-                try:
-                    self._update_connection_status('disconnected')
-                except Exception as e:
-                    logger.warning(f"[MQTT Connection {self.mqtt_connection_id}] Could not update DB status: {e}")
-
-                logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Disconnected")
+    
+                # A questo punto, il callback _on_disconnect potrebbe essere già stato chiamato.
+                # Chiamiamo comunque _update_connection_status per garantire che lo stato
+                # 'disconnected' venga impostato in modo definitivo.
+                # Il segnale gestirà eventuali chiamate multiple.
+                self._update_connection_status('disconnected')
+    
+                logger.info(f"[MQTT Connection {self.mqtt_connection_id}] Disconnected")            
             except Exception as e:
                 logger.error(f"[MQTT Connection {self.mqtt_connection_id}] Disconnect error: {e}")
 

@@ -56,11 +56,27 @@ export const useMqttStatusSocket = () => {
         // Invalida e/o aggiorna la cache di react-query per i datalogger e lo stato MQTT
         // Questo farà sì che i componenti che usano questi dati si aggiornino automaticamente
 
-        // Invalida la query per lo stato della connessione MQTT per il sito specifico
-        // Questo farà sì che react-query esegua un refetch dell'API
-        queryClient.invalidateQueries({ queryKey: ['mqttConnectionStatus', site_id] });
+        // DIRECTLY update the query cache with the new data from the WebSocket
+        queryClient.setQueryData(
+          ['mqttConnectionStatus', site_id],
+          (oldData: any) => {
+            if (!oldData) {
+              // If cache is empty, invalidate as a fallback to trigger a full fetch.
+              queryClient.invalidateQueries({ queryKey: ['mqttConnectionStatus', site_id] });
+              return undefined;
+            }
+            // Merge the new status from the WebSocket into the existing cached data
+            console.log(`WebSocket: Merging status for site ${site_id}. Old: ${oldData.status}, New: ${status}`);
+            return {
+              ...oldData,
+              status: status,
+              is_enabled: is_enabled,
+            };
+          }
+        );
 
-        // Invalida anche la query per i datalogger, dato che is_online potrebbe essere cambiato
+        // Invalidate the dataloggers query, as their online status might have changed.
+        // This is less critical and less prone to race conditions, so invalidation is fine here.
         queryClient.invalidateQueries({ queryKey: ['dataloggers', site_id] });
 
         toast.info(`Site ${site_id} MQTT status: ${status}`, { duration: 2000 });
@@ -88,15 +104,17 @@ export const useMqttStatusSocket = () => {
       }
 
       if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttempts.current++;
-        console.log(`Attempting to reconnect WebSocket (attempt ${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS})...`);
-        reconnectTimeout.current = setTimeout(connectWebSocket, RECONNECT_INTERVAL_MS);
-      } else {
-        console.error('Max WebSocket reconnect attempts reached.');
-        toast.error('WebSocket: Max reconnect attempts reached.', { duration: 5000 });
-      }
-    };
-
+                  reconnectAttempts.current++;
+                  toast.warning(
+                    `WebSocket: Attempting to reconnect (attempt ${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS})...`,
+                    { id: 'ws-reconnect', duration: RECONNECT_INTERVAL_MS - 500 } // Show for most of the interval
+                  );
+                  reconnectTimeout.current = setTimeout(connectWebSocket, RECONNECT_INTERVAL_MS);
+                } else {
+                  console.error('Max WebSocket reconnect attempts reached.');
+                  toast.error('WebSocket: Max reconnect attempts reached. Please refresh the page.', { id: 'ws-reconnect', duration: 10000 });
+                }
+            };
     ws.current.onerror = (error) => {
       // Non loggare errori se stiamo chiudendo volontariamente
       if (!isIntentionalClose.current) {
@@ -108,7 +126,11 @@ export const useMqttStatusSocket = () => {
   }, [queryClient, setStatus]);
 
   useEffect(() => {
-    connectWebSocket();
+    // Introduce a small initial delay before the first connection attempt
+    // to give the application and backend a moment to stabilize.
+    const initialConnectTimeout = setTimeout(() => {
+      connectWebSocket();
+    }, 1000); // 1 second delay for initial connection
 
     // Handler per chiusura pagina (F5, navigazione, chiusura tab)
     const handleBeforeUnload = () => {
@@ -119,6 +141,7 @@ export const useMqttStatusSocket = () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
+      clearTimeout(initialConnectTimeout); // Clear initial delay if unmounting before it fires
     };
 
     // Handler per visibilità pagina (quando l'utente cambia tab)
@@ -149,6 +172,7 @@ export const useMqttStatusSocket = () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
+      clearTimeout(initialConnectTimeout);
     };
   }, [connectWebSocket]);
 
