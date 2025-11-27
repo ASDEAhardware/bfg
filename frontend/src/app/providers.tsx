@@ -1,26 +1,31 @@
 'use client';
-//Qui puoi raggruppare tutti i provider client-side di alto livello mantenendo il file layout.tsx pulito e semplice.
 
 import { ReactNode, useEffect } from 'react';
-import { QueryClientProvider } from '@tanstack/react-query'; // Importa il provider di React Query
-import { queryClient } from '@/lib/queryClient'; // istanza di QueryClient
-import { ThemeProvider } from "@/components/theme-provider"
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
+import { ThemeProvider } from "@/components/theme-provider";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { initializePlugins } from '@/plugins';
 import { IntlClientProvider } from '@/lib/IntlClientProvider';
 
 interface ProvidersProps {
     children: ReactNode;
+    serverIsAuthenticated: boolean;
+    serverLocale: string;
+    serverMessages: any;
 }
 
-export function Providers({ children }: ProvidersProps) {
-    // Initialize plugins on app start
+export function Providers({ children, serverIsAuthenticated, serverLocale, serverMessages }: ProvidersProps) {
     useEffect(() => {
-        initializePlugins()
-    }, [])
+        initializePlugins();
+    }, []);
 
     return (
-        <IntlClientProvider>
+        <IntlClientProvider
+            serverIsAuthenticated={serverIsAuthenticated}
+            serverLocale={serverLocale}
+            serverMessages={serverMessages}
+        >
             <QueryClientProvider client={queryClient}>
                 <ThemeProvider
                     attribute="class"

@@ -118,5 +118,6 @@ export const config = {
         '/profile/:path*',
         '/staff-admin/:path*',
         '/system/:path*',
+        '/devices/:path*',
     ],
 };

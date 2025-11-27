@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import Cookies from 'js-cookie';
-import { defaultLocale, Locale } from '../../i18n.config';
+import { defaultLocale, Locale } from '../i18n.config';
 
 // Definiamo lo stato e le azioni del nostro store
 interface LocaleState {
