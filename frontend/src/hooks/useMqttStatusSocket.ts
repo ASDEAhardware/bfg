@@ -157,7 +157,11 @@ export const useMqttStatusSocket = () => {
   }, [queryClient, setStatus]);
 
   useEffect(() => {
-    connectWebSocket();
+    // Introduce a small initial delay before the first connection attempt
+    // to give the application and backend a moment to stabilize.
+    const initialConnectTimeout = setTimeout(() => {
+      connectWebSocket();
+    }, 1000); // 1 second delay for initial connection
 
     // Handler per chiusura pagina (F5, navigazione, chiusura tab)
     const handleBeforeUnload = () => {
@@ -168,6 +172,7 @@ export const useMqttStatusSocket = () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
+      clearTimeout(initialConnectTimeout); // Clear initial delay if unmounting before it fires
     };
 
     // Handler per visibilità pagina (quando l'utente cambia tab)
@@ -198,6 +203,7 @@ export const useMqttStatusSocket = () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
+      clearTimeout(initialConnectTimeout);
     };
   }, [connectWebSocket]);
 

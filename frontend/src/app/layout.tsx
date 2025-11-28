@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 };
 
 import { PageLoader } from "@/components/ui/page-loader";
+import { WebSocketInitializer } from "@/components/WebSocketInitializer";
 
 export default function RootLayout({
   children,
@@ -32,6 +33,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
+            <WebSocketInitializer />
             {children}
         </Providers>
         <PageLoader />

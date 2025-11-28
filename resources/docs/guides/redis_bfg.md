@@ -8,7 +8,7 @@
 
 <!-- 3) Figura con didascalia (HTML per maggiore controllo) -->
 <figure>
-  <img src="../../assets/images/redis_2.png" alt="Diagramma dell'architettura Redis" width="800" />
+  <img src="../../assets/images/redis_in_bfg.png" alt="Diagramma dell'architettura Redis" width="800" />
   <figcaption>Figura 1 — Architettura di Redis.</figcaption>
 </figure>
 
