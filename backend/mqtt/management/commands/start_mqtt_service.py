@@ -147,7 +147,7 @@ class Command(BaseCommand):
             if len(connections) <= 10:
                 self.stdout.write("\nActive Connections:")
                 for conn in connections:
-                    if conn.get('is_enabled'):
+                    if conn.get('is_active'):
                         site_name = conn.get('site_name', 'Unknown')
                         status = conn.get('status', 'unknown')
                         is_connected = conn.get('handler_connected', False)

@@ -15,30 +15,49 @@ class MqttStatusConsumer(AsyncWebsocketConsumer):
         """
         Chiamato quando un client tenta di connettersi via WebSocket.
         """
-        # Aggiunge il client al gruppo di broadcast
-        await self.channel_layer.group_add(
-            GROUP_NAME,
-            self.channel_name
-        )
+        import logging
+        logger = logging.getLogger('mqtt.websocket')
 
-        # Accetta la connessione WebSocket
-        await self.accept()
+        try:
+            logger.info(f"WebSocket connection attempt from {self.scope['client']}")
 
-        # Invia un messaggio di conferma connessione
-        await self.send(text_data=json.dumps({
-            "type": "connection_established",
-            "message": "WebSocket connected successfully"
-        }))
+            # Aggiunge il client al gruppo di broadcast
+            await self.channel_layer.group_add(
+                GROUP_NAME,
+                self.channel_name
+            )
+            logger.info(f"Added client to group {GROUP_NAME}")
+
+            # Accetta la connessione WebSocket
+            await self.accept()
+            logger.info("WebSocket connection accepted")
+
+            # Invia un messaggio di conferma connessione
+            await self.send(text_data=json.dumps({
+                "type": "connection_established",
+                "message": "WebSocket connected successfully"
+            }))
+            logger.info("Confirmation message sent to client")
+
+        except Exception as e:
+            logger.error(f"Error in WebSocket connect: {e}", exc_info=True)
+            raise
 
     async def disconnect(self, close_code):
         """
         Chiamato alla chiusura della connessione WebSocket.
         """
+        import logging
+        logger = logging.getLogger('mqtt.websocket')
+
+        logger.info(f"WebSocket disconnecting with code {close_code}")
+
         # Rimuove il client dal gruppo di broadcast
         await self.channel_layer.group_discard(
             GROUP_NAME,
             self.channel_name
         )
+        logger.info(f"Removed client from group {GROUP_NAME}")
 
     async def status_update(self, event):
         """

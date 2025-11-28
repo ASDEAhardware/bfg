@@ -31,7 +31,8 @@ import {
   Play,
   Square as StopIcon,
   Wifi,
-  WifiOff
+  WifiOff,
+  Calendar
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -52,12 +53,20 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuthStore } from "@/store/authStore";
 import { useUnifiedSiteContext } from "@/hooks/useUnifiedSiteContext";
 import { useMqttConnectionStatus, useMqttControl, useDataloggers } from "@/hooks/useMqtt";
 import { useUserInfo } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { DeviceCard } from "@/components/DeviceCard";
+import { AcquisitionSchedulerModal } from "@/components/AcquisitionSchedulerModal";
 
 // Sensor types for grouped cards (temporary - will be calculated from real data)
 const adaqSensorTypes = [
@@ -98,6 +107,11 @@ export default function DevicesListPage() {
     weatherStations: false
   });
 
+  // Acquisition control states
+  const [acquisitionStatus, setAcquisitionStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
+  const [showStopAcquisitionConfirm, setShowStopAcquisitionConfirm] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+
   // MQTT Control Functions (superuser only)
   const handleMqttStart = () => {
     if (!selectedSiteId || !userData?.is_superuser || isMqttControlLoading) return;
@@ -119,6 +133,44 @@ export default function DevicesListPage() {
   };
 
   const hasAdminPermissions = userData?.is_staff || userData?.is_superuser;
+
+  // Acquisition Control Functions (staff only)
+  const handleStartAcquisition = () => {
+    if (!selectedSiteId || !hasAdminPermissions) return;
+    // TODO: Implement MQTT publish to gateway/1/datalogger/all/cmd with {"method": "start_acquisition"}
+    toast.success("Starting acquisition...");
+    console.log("Start acquisition command sent");
+  };
+
+  const handleStopAcquisition = () => {
+    if (!selectedSiteId || !hasAdminPermissions) return;
+    setShowStopAcquisitionConfirm(true);
+  };
+
+  const confirmStopAcquisition = () => {
+    // TODO: Implement MQTT publish to gateway/1/datalogger/all/cmd with {"method": "stop_acquisition"}
+    toast.success("Stopping acquisition...");
+    console.log("Stop acquisition command sent");
+    setShowStopAcquisitionConfirm(false);
+  };
+
+  // Extract acquisition status from telemetry data
+  React.useEffect(() => {
+    // Find the "all" datalogger which contains telemetry with acquisition status
+    const allDatalogger = dataloggers.find((d: any) =>
+      d.datalogger_type?.toLowerCase().includes('all') ||
+      d.device_id === 'all' ||
+      d.serial_number?.includes('all')
+    );
+
+    if (allDatalogger && allDatalogger.raw_metadata) {
+      // Extract status from raw_metadata (telemetry payload)
+      const status = allDatalogger.raw_metadata?.dataloggers?.[0]?.status;
+      if (status === 'running' || status === 'stopped') {
+        setAcquisitionStatus(status);
+      }
+    }
+  }, [dataloggers]);
 
   // Helper function to get MQTT status badge variant and text
   const getMqttStatusBadge = () => {
@@ -314,6 +366,74 @@ export default function DevicesListPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Acquisition Status Badge & Controls */}
+              {hasAdminPermissions && mqttConnection?.status === 'connected' && (
+                <TooltipProvider>
+                  {/* Acquisition Status Badge */}
+                  <Badge
+                    variant={acquisitionStatus === 'running' ? 'default' : 'secondary'}
+                    className={`text-xs h-6 flex items-center gap-1 ${
+                      acquisitionStatus === 'running'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                        : acquisitionStatus === 'stopped'
+                        ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100'
+                    }`}
+                  >
+                    <Activity className="h-3 w-3" />
+                    {acquisitionStatus === 'running' ? 'Running' : acquisitionStatus === 'stopped' ? 'Stopped' : 'Unknown'}
+                  </Badge>
+
+                  {/* Start Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-6 w-6 hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900 dark:hover:text-green-100"
+                        disabled={acquisitionStatus === 'running'}
+                        onClick={handleStartAcquisition}
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Start Acquisition</TooltipContent>
+                  </Tooltip>
+
+                  {/* Stop Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-6 w-6 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900 dark:hover:text-red-100"
+                        disabled={acquisitionStatus !== 'running'}
+                        onClick={handleStopAcquisition}
+                      >
+                        <StopIcon className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Stop Acquisition</TooltipContent>
+                  </Tooltip>
+
+                  {/* Schedule Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 hover:bg-blue-100 hover:text-blue-700 dark:hover:bg-blue-900 dark:hover:text-blue-100"
+                        onClick={() => setShowScheduleModal(true)}
+                      >
+                        <Calendar className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Schedule</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Schedule Acquisition</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
               <DropdownMenu open={isSearchOpen} onOpenChange={setIsSearchOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -719,6 +839,34 @@ export default function DevicesListPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Stop Acquisition Confirmation Dialog */}
+      <AlertDialog open={showStopAcquisitionConfirm} onOpenChange={setShowStopAcquisitionConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stop Acquisition</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to stop the ongoing acquisition? This may result in data loss for incomplete measurements.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStopAcquisition} className="bg-red-600 hover:bg-red-700">
+              Stop Acquisition
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Acquisition Scheduler Modal */}
+      <AcquisitionSchedulerModal
+        open={showScheduleModal}
+        onOpenChange={setShowScheduleModal}
+        onSave={(schedule) => {
+          console.log("Schedule saved:", schedule);
+          // TODO: Implement backend API call to save schedule
+        }}
+      />
     </div>
   );
 }

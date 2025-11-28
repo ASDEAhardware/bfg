@@ -14,7 +14,7 @@ def mqtt_connection_post_save(sender, instance, created, update_fields, **kwargs
     
     # Vogliamo notificare il frontend solo quando lo stato effettivo della connessione
     # (connecting, connected, error, etc.) viene modificato dal servizio MQTT,
-    # non quando la vista API imposta semplicemente `is_enabled`.
+    # non quando la vista API imposta semplicemente `is_active`.
     if update_fields and 'status' in update_fields:
         should_broadcast = True
 
@@ -22,5 +22,5 @@ def mqtt_connection_post_save(sender, instance, created, update_fields, **kwargs
         broadcast_status_update(
             site_id=instance.site.id,
             status=instance.status,
-            is_enabled=instance.is_enabled
+            is_active=instance.is_active
         )

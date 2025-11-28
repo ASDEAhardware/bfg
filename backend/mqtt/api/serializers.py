@@ -11,7 +11,7 @@ class MqttConnectionStatusSerializer(serializers.Serializer):
     connection_id = serializers.IntegerField()
     site_id = serializers.IntegerField()
     site_name = serializers.CharField()
-    is_enabled = serializers.BooleanField()
+    is_active = serializers.BooleanField()
     status = serializers.CharField()
     broker_host = serializers.CharField()
     broker_port = serializers.IntegerField()
@@ -57,7 +57,7 @@ class MqttConnectionListSerializer(serializers.ModelSerializer):
         model = MqttConnection
         fields = [
             'id', 'site_id', 'site_name', 'broker_host', 'broker_port',
-            'client_id_prefix', 'is_enabled', 'status', 'last_connected_at',
+            'client_id_prefix', 'is_active', 'status', 'last_connected_at',
             'last_heartbeat_at', 'connection_errors', 'error_message'
         ]
         read_only_fields = [

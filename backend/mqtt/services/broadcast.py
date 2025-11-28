@@ -4,7 +4,7 @@ from asgiref.sync import async_to_sync
 # Nome del gruppo definito nel consumer
 GROUP_NAME = "mqtt_status_updates"
 
-def broadcast_status_update(site_id: int, status: str, is_enabled: bool):
+def broadcast_status_update(site_id: int, status: str, is_active: bool):
     """
     Invia un messaggio di aggiornamento di stato al gruppo WebSocket.
     """
@@ -16,7 +16,7 @@ def broadcast_status_update(site_id: int, status: str, is_enabled: bool):
         'message': {
             'site_id': site_id,
             'status': status,
-            'is_enabled': is_enabled
+            'is_active': is_active
         }
     }
 

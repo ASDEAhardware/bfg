@@ -12,7 +12,7 @@ export interface MqttConnectionStatus {
   connection_id: number;
   site_id: number;
   site_name: string;
-  is_enabled: boolean;
+  is_active: boolean;
   status: 'connected' | 'connecting' | 'disconnected' | 'error' | 'disabled';
   broker_host: string;
   broker_port: number;
@@ -133,7 +133,7 @@ export function useMqttControl() {
         return {
           ...old,
           status: action === 'start' ? 'connecting' : 'disabled',
-          is_enabled: action === 'start',
+          is_active: action === 'start',
         };
       });
       return { previousStatus, siteId };

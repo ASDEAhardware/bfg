@@ -110,12 +110,12 @@ class MQTTService:
             mqtt_conn = MqttConnection.objects.select_related('site').get(site_id=site_id)
 
             # Se disabilitata e richiesta manuale, abilita
-            if not mqtt_conn.is_enabled and manual:
-                mqtt_conn.is_enabled = True
-                mqtt_conn.save(update_fields=['is_enabled'])
+            if not mqtt_conn.is_active and manual:
+                mqtt_conn.is_active = True
+                mqtt_conn.save(update_fields=['is_active'])
                 logger.info(f"[Site {site_id}] Auto-enabled MQTT connection")
 
-            if not mqtt_conn.is_enabled:
+            if not mqtt_conn.is_active:
                 return {
                     'success': False,
                     'message': f'MQTT connection for site {site_id} is disabled'
@@ -217,7 +217,7 @@ class MQTTService:
                 'connection_id': mqtt_conn.id,
                 'site_id': site_id,
                 'site_name': mqtt_conn.site.name,
-                'is_enabled': mqtt_conn.is_enabled,
+                'is_active': mqtt_conn.is_active,
                 'status': mqtt_conn.status,
                 'broker_host': mqtt_conn.broker_host,
                 'broker_port': mqtt_conn.broker_port,
@@ -283,7 +283,7 @@ class MQTTService:
     def start_all(self):
         """Avvia tutte le connessioni MQTT abilitate"""
         try:
-            enabled_connections = MqttConnection.objects.filter(is_enabled=True).select_related('site')
+            enabled_connections = MqttConnection.objects.filter(is_active=True).select_related('site')
             logger.info(f"Starting MQTT for {enabled_connections.count()} enabled connections")
 
             for mqtt_conn in enabled_connections:
@@ -293,52 +293,72 @@ class MQTTService:
             logger.error(f"Error starting all connections: {e}")
 
     def monitor_connections(self):
-        """Thread che monitora e riavvia connessioni"""
-        logger.info("MQTT Monitor started")
+        """Thread che monitora e riavvia connessioni ogni 30s"""
+        logger.info(f"MQTT Monitor started (instance: {self.instance_id})")
 
         # Grace period to prevent false "lost connection" detection during initial connection
         GRACE_PERIOD_SECONDS = 15
 
         while not self._should_stop:
             try:
+                cycle_start = time.time()
 
+                # Log monitor cycle start
+                logger.debug(f"Monitor cycle started ({len(self.connections)} active connections)")
 
-                # Cerca nuovi siti abilitati o quelli da retry
+                # 1. Check for new connections to start
                 now = timezone.now()
                 sites_to_check = MqttConnection.objects.filter(
-                    is_enabled=True
+                    is_active=True
                 ).exclude(
                     id__in=list(self.connections.keys())
                 ).filter(
                     Q(mqtt_next_retry__isnull=True) | Q(mqtt_next_retry__lte=now)
                 ).select_related('site')
 
+                if sites_to_check.exists():
+                    logger.info(f"Monitor found {sites_to_check.count()} connections to start")
+
                 for mqtt_conn in sites_to_check:
                     logger.info(
-                        f"[Site {mqtt_conn.site.id}] Attempting connection "
+                        f"[Site {mqtt_conn.site.id}] Starting connection "
                         f"(retry {mqtt_conn.mqtt_retry_count} or new)"
                     )
                     self.start_connection(mqtt_conn.site.id, manual=False)
 
-                # Pulizia: rimuovi connessioni per siti disabilitati
+                # 2. Disconnect inactive connections
                 disabled_connections = MqttConnection.objects.filter(
                     id__in=list(self.connections.keys()),
-                    is_enabled=False
+                    is_active=False
                 )
 
+                if disabled_connections.exists():
+                    logger.info(f"Monitor found {disabled_connections.count()} connections to stop")
+
                 for mqtt_conn in disabled_connections:
-                    logger.info(f"[Site {mqtt_conn.site.id}] MQTT disabled, stopping connection")
+                    logger.info(f"[Site {mqtt_conn.site.id}] Stopping connection (is_active=False)")
                     self.stop_connection(mqtt_conn.site.id)
 
-                # Controlla dispositivi offline (usa il message_processor esistente)
+                # 3. Check offline devices
                 try:
                     from mqtt.services.message_processor import message_processor
-                    message_processor.check_offline_devices()
+                    stats = message_processor.check_offline_devices()
+                    total_offline = stats['gateways_offline'] + stats['dataloggers_offline'] + stats['sensors_offline']
+                    if total_offline > 0:
+                        logger.info(
+                            f"Offline check: {stats['gateways_offline']} gateways, "
+                            f"{stats['dataloggers_offline']} dataloggers, "
+                            f"{stats['sensors_offline']} sensors marked offline"
+                        )
                 except Exception as e:
                     logger.error(f"Error checking offline devices: {e}")
 
+                # Log cycle completion
+                cycle_duration = time.time() - cycle_start
+                logger.debug(f"Monitor cycle completed in {cycle_duration:.2f}s")
+
             except Exception as e:
-                logger.error(f"Monitor error: {e}")
+                logger.error(f"Monitor error: {e}", exc_info=True)
 
             # Check ogni 30 secondi
             time.sleep(30)

@@ -49,7 +49,7 @@ class MqttConnection(models.Model):
     )
 
     # Connection control
-    is_enabled = models.BooleanField(
+    is_active = models.BooleanField(
         default=True,
         help_text="Se disabilitata, questa connessione MQTT viene ignorata dal sistema"
     )
@@ -73,7 +73,7 @@ class MqttConnection(models.Model):
         verbose_name_plural = "MQTT Connections"
 
     def __str__(self):
-        status_icon = "✅" if self.is_enabled else "❌"
+        status_icon = "✅" if self.is_active else "❌"
         return f"{status_icon} MQTT {self.site.name} - {self.broker_host}"
 
 
@@ -203,9 +203,13 @@ class DiscoveredTopic(models.Model):
     )
 
     # Processing status
-    is_processed = models.BooleanField(
+    is_processable = models.BooleanField(
         default=False,
         help_text="True se questo topic ha logica di processing implementata"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Se False, il topic non viene processato (utile per manutenzione)"
     )
     processor_name = models.CharField(
         max_length=100, blank=True,
@@ -220,7 +224,7 @@ class DiscoveredTopic(models.Model):
         indexes = [
             models.Index(fields=['site', 'topic_pattern']),
             models.Index(fields=['last_seen_at']),
-            models.Index(fields=['is_processed']),
+            models.Index(fields=['is_processable', 'is_active']),
         ]
 
     def __str__(self):
@@ -833,5 +837,91 @@ class MqttDowntimeEvent(models.Model):
         if self.downtime_seconds:
             return self.downtime_seconds / 60
         return None
+
+
+class MqttConnectionLog(models.Model):
+    """
+    Log degli eventi/errori delle connessioni MQTT.
+    Usato per audit trail e debugging.
+    """
+    connection = models.ForeignKey(
+        MqttConnection,
+        on_delete=models.CASCADE,
+        related_name='logs'
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    LEVEL_CHOICES = [
+        ('DEBUG', 'Debug'),
+        ('INFO', 'Info'),
+        ('WARNING', 'Warning'),
+        ('ERROR', 'Error'),
+        ('CRITICAL', 'Critical'),
+    ]
+    level = models.CharField(max_length=10, choices=LEVEL_CHOICES)
+
+    message = models.TextField()
+    exception_type = models.CharField(max_length=255, blank=True)
+    exception_traceback = models.TextField(blank=True)
+
+    # Context fields
+    broker_host = models.CharField(max_length=255, blank=True)
+    retry_attempt = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['connection', '-timestamp']),
+            models.Index(fields=['level', '-timestamp']),
+        ]
+        verbose_name = "MQTT Connection Log"
+        verbose_name_plural = "MQTT Connection Logs"
+
+    def __str__(self):
+        return f"[{self.level}] {self.connection.site.name} - {self.message[:50]}"
+
+
+class MqttParsingLog(models.Model):
+    """
+    Log degli errori di parsing dei messaggi MQTT.
+    Traccia messaggi malformati o non riconosciuti.
+    """
+    site = models.ForeignKey(
+        'sites.Site',
+        on_delete=models.CASCADE,
+        related_name='mqtt_parsing_logs'
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    topic = models.CharField(max_length=500)
+    parser_name = models.CharField(max_length=100, blank=True)
+
+    ERROR_TYPE_CHOICES = [
+        ('VALIDATION_ERROR', 'JSON Validation Error'),
+        ('PARSE_ERROR', 'Topic Parse Error'),
+        ('DB_ERROR', 'Database Error'),
+        ('UNKNOWN_ERROR', 'Unknown Error'),
+    ]
+    error_type = models.CharField(max_length=50, choices=ERROR_TYPE_CHOICES)
+
+    error_message = models.TextField()
+    exception_type = models.CharField(max_length=255, blank=True)
+    exception_traceback = models.TextField(blank=True)
+
+    # Payload sample (truncated se troppo grande)
+    payload_sample = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['site', '-timestamp']),
+            models.Index(fields=['error_type', '-timestamp']),
+            models.Index(fields=['topic']),
+        ]
+        verbose_name = "MQTT Parsing Log"
+        verbose_name_plural = "MQTT Parsing Logs"
+
+    def __str__(self):
+        return f"[{self.error_type}] {self.site.name} - {self.topic}"
 
 

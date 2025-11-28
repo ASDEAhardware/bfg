@@ -49,21 +49,70 @@ export const useMqttStatusSocket = () => {
       const data = JSON.parse(event.data);
       console.log('WebSocket Message:', data);
 
-      // Assumiamo che il messaggio contenga site_id, status e is_enabled
-      const { site_id, status, is_enabled } = data;
+      const { type, site_id } = data;
 
-      if (site_id !== undefined && status !== undefined && is_enabled !== undefined) {
-        // Invalida e/o aggiorna la cache di react-query per i datalogger e lo stato MQTT
-        // Questo farà sì che i componenti che usano questi dati si aggiornino automaticamente
+      // Gestisci diversi tipi di eventi MQTT
+      if (type) {
+        switch (type) {
+          case 'connection_established':
+            // WebSocket connesso
+            console.log('WebSocket connection established');
+            break;
 
-        // Invalida la query per lo stato della connessione MQTT per il sito specifico
-        // Questo farà sì che react-query esegua un refetch dell'API
-        queryClient.invalidateQueries({ queryKey: ['mqttConnectionStatus', site_id] });
+          case 'mqtt_status':
+          case 'status_update':
+            // Update dello status della connessione MQTT (con is_active)
+            if (site_id !== undefined) {
+              const { status, is_active } = data;
+              if (status !== undefined && is_active !== undefined) {
+                queryClient.invalidateQueries({ queryKey: ['mqttConnectionStatus', site_id] });
+                queryClient.invalidateQueries({ queryKey: ['dataloggers', site_id] });
+                toast.info(`Site ${site_id} MQTT status: ${status}`, { duration: 2000 });
+              }
+            }
+            break;
 
-        // Invalida anche la query per i datalogger, dato che is_online potrebbe essere cambiato
-        queryClient.invalidateQueries({ queryKey: ['dataloggers', site_id] });
+          case 'datalogger_update':
+            // Update di un datalogger specifico
+            if (site_id !== undefined) {
+              console.log(`Datalogger update for site ${site_id}:`, data);
+              queryClient.invalidateQueries({ queryKey: ['dataloggers', site_id] });
+              // Se c'è un datalogger_id, invalida anche le query specifiche per quel datalogger
+              if (data.datalogger_id) {
+                queryClient.invalidateQueries({ queryKey: ['sensors', data.datalogger_id] });
+              }
+            }
+            break;
 
-        toast.info(`Site ${site_id} MQTT status: ${status}`, { duration: 2000 });
+          case 'gateway_update':
+          case 'gateway_offline':
+            // Update del gateway
+            if (site_id !== undefined) {
+              console.log(`Gateway update for site ${site_id}:`, data);
+              queryClient.invalidateQueries({ queryKey: ['dataloggers', site_id] });
+              queryClient.invalidateQueries({ queryKey: ['gateways', site_id] });
+            }
+            break;
+
+          case 'sensor_offline':
+            // Sensore offline
+            if (site_id !== undefined) {
+              console.log(`Sensor offline for site ${site_id}:`, data);
+              if (data.datalogger_id) {
+                queryClient.invalidateQueries({ queryKey: ['sensors', data.datalogger_id] });
+              }
+              queryClient.invalidateQueries({ queryKey: ['dataloggers', site_id] });
+            }
+            break;
+
+          default:
+            // Evento non riconosciuto, invalida comunque i datalogger per sicurezza se c'è site_id
+            console.log(`Unknown WebSocket event type: ${type}`, data);
+            if (site_id !== undefined) {
+              queryClient.invalidateQueries({ queryKey: ['dataloggers', site_id] });
+            }
+            break;
+        }
       }
     };
 
@@ -97,7 +146,7 @@ export const useMqttStatusSocket = () => {
       }
     };
 
-    ws.current.onerror = (error) => {
+    ws.current.onerror = () => {
       // Non loggare errori se stiamo chiudendo volontariamente
       if (!isIntentionalClose.current) {
         console.error('WebSocket Error - Connection failed or lost');

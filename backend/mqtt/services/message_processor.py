@@ -74,7 +74,7 @@ class MqttMessageProcessor:
             # **STEP 1: AUTO-DISCOVERY - Salva TUTTI i topic ricevuti**
             self._save_discovered_topic(site_id, topic, payload_data, payload)
 
-            # **STEP 2: PARSING e PROCESSING - solo per topic riconosciuti**
+            # **STEP 2: PARSING e PROCESSING - solo per topic riconosciuti E attivi**
             # Parse della struttura topic
             topic_info = self._parse_topic_structure(topic)
 
@@ -82,6 +82,31 @@ class MqttMessageProcessor:
             if topic_info['type'] == 'unknown':
                 logger.debug(f"Topic discovered but not recognized for processing: {topic}")
                 return True
+
+            # Check se il topic è attivo per il processing e aggiorna is_processable se necessario
+            try:
+                from mqtt.models import DiscoveredTopic
+                discovered = DiscoveredTopic.objects.filter(
+                    site_id=site_id,
+                    topic_path=topic
+                ).first()
+
+                if discovered:
+                    # Aggiorna is_processable=True se il topic è riconosciuto
+                    if not discovered.is_processable:
+                        discovered.is_processable = True
+                        discovered.processor_name = f"mqtt_{topic_info['type']}"
+                        discovered.save(update_fields=['is_processable', 'processor_name'])
+                        logger.info(f"Topic {topic} marked as processable (type: {topic_info['type']})")
+
+                    # Check se il topic è disabilitato per manutenzione
+                    if not discovered.is_active:
+                        logger.debug(f"Topic {topic} is inactive (is_active=False), skipping processing")
+                        return True
+
+            except Exception as e:
+                logger.warning(f"Error checking/updating topic status: {e}")
+                # Procedi comunque se c'è un errore nel check
 
             logger.info(f"Processing topic: {topic} (Type: {topic_info['type']})")
 
@@ -677,7 +702,7 @@ class MqttMessageProcessor:
                     'message_count': 1,
                     'sample_payload': payload_data,
                     'payload_size_avg': float(payload_size),
-                    'is_processed': False
+                    'is_processable': False
                 }
             )
 

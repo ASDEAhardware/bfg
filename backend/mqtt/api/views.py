@@ -33,7 +33,10 @@ logger = logging.getLogger(__name__)
 @permission_classes([IsAuthenticated])
 def start_connection(request, site_id):
     """
-    Avvia connessione MQTT per un sito specifico.
+    Start MQTT connection for a site.
+
+    Sets is_active=True in DB. Monitor thread will connect within 30 seconds.
+    WebSocket will notify frontend when actually connected.
 
     POST /v1/mqtt/sites/{site_id}/start/
     """
@@ -47,22 +50,46 @@ def start_connection(request, site_id):
 
         logger.info(f"API request to start MQTT connection for site {site_id} by user {request.user}")
 
-        conn, created = MqttConnection.objects.update_or_create(
-            site_id=int(site_id),
-            defaults={'is_enabled': True}
-        )
+        # Get or create connection
+        try:
+            conn = MqttConnection.objects.select_related('site').get(site_id=int(site_id))
+        except MqttConnection.DoesNotExist:
+            return Response(
+                {'success': False, 'message': f'MQTT connection for site {site_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        result = {
+        # Check if already active
+        if conn.is_active:
+            return Response({
+                'success': True,
+                'message': f'MQTT connection for site {site_id} is already active',
+                'connection': {
+                    'site_id': site_id,
+                    'site_name': conn.site.name,
+                    'status': conn.status,
+                    'is_active': conn.is_active,
+                    'broker_host': conn.broker_host,
+                    'broker_port': conn.broker_port,
+                }
+            })
+
+        # ⭐ Only change DB flag, don't call service
+        conn.is_active = True
+        conn.save(update_fields=['is_active'])
+
+        return Response({
             'success': True,
-            'message': f'Site {site_id} enabled. Connection will be started by the monitor shortly.'
-        }
-
-        serializer = MqttControlResponseSerializer(data=result)
-        if serializer.is_valid():
-            response_status = status.HTTP_200_OK if result['success'] else status.HTTP_400_BAD_REQUEST
-            return Response(serializer.data, status=response_status)
-        else:
-            return Response(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            'message': f'MQTT connection for site {site_id} will start within 30 seconds. Monitor via WebSocket for real-time status.',
+            'connection': {
+                'site_id': site_id,
+                'site_name': conn.site.name,
+                'status': conn.status,  # Current status (probabilmente 'disconnected')
+                'is_active': conn.is_active,  # Now True
+                'broker_host': conn.broker_host,
+                'broker_port': conn.broker_port,
+            }
+        }, status=status.HTTP_202_ACCEPTED)  # ⭐ 202 = Accepted (async processing)
 
     except ValueError:
         return Response(
@@ -81,7 +108,10 @@ def start_connection(request, site_id):
 @permission_classes([IsAuthenticated])
 def stop_connection(request, site_id):
     """
-    Ferma connessione MQTT per un sito specifico.
+    Stop MQTT connection for a site.
+
+    Sets is_active=False in DB. Monitor thread will disconnect within 30 seconds.
+    WebSocket will notify frontend when actually disconnected.
 
     POST /v1/mqtt/sites/{site_id}/stop/
     """
@@ -95,26 +125,42 @@ def stop_connection(request, site_id):
 
         logger.info(f"API request to stop MQTT connection for site {site_id} by user {request.user}")
 
-        connection = get_object_or_404(MqttConnection, site_id=int(site_id))
-        connection.is_enabled = False
-        connection.save()
+        try:
+            conn = MqttConnection.objects.select_related('site').get(site_id=int(site_id))
+        except MqttConnection.DoesNotExist:
+            return Response(
+                {'success': False, 'message': f'MQTT connection for site {site_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        result = {
+        # Check if already inactive
+        if not conn.is_active:
+            return Response({
+                'success': True,
+                'message': f'MQTT connection for site {site_id} is already inactive',
+                'connection': {
+                    'site_id': site_id,
+                    'site_name': conn.site.name,
+                    'status': conn.status,
+                    'is_active': conn.is_active,
+                }
+            })
+
+        # ⭐ Only change DB flag
+        conn.is_active = False
+        conn.save(update_fields=['is_active'])
+
+        return Response({
             'success': True,
-            'message': f'Site {site_id} disabled. Connection will be stopped by the monitor shortly.'
-        }
+            'message': f'MQTT connection for site {site_id} will stop within 30 seconds. Monitor via WebSocket for real-time status.',
+            'connection': {
+                'site_id': site_id,
+                'site_name': conn.site.name,
+                'status': conn.status,  # Current status (probabilmente 'connected')
+                'is_active': conn.is_active,  # Now False
+            }
+        }, status=status.HTTP_202_ACCEPTED)  # ⭐ 202 = Accepted (async processing)
 
-        serializer = MqttControlResponseSerializer(data=result)
-        if serializer.is_valid():
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    except MqttConnection.DoesNotExist:
-        return Response(
-            {'success': False, 'message': f'Site {site_id} not found.'},
-            status=status.HTTP_404_NOT_FOUND
-        )
     except ValueError:
         return Response(
             {'success': False, 'message': 'Invalid site_id'},
@@ -185,7 +231,7 @@ def manager_status(request):
 
         # Calcola statistiche
         total_connections = len(all_connections)
-        active_connections = len([c for c in all_connections if c.get('is_enabled', False)])
+        active_connections = len([c for c in all_connections if c.get('is_active', False)])
         connected_connections = len([c for c in all_connections if c.get('handler_connected', False)])
         error_connections = len([c for c in all_connections if c.get('status') == 'error'])
 
@@ -670,8 +716,8 @@ def mqtt_service_health(request):
         all_connections = MqttConnection.objects.all()
 
         total = all_connections.count()
-        enabled = all_connections.filter(is_enabled=True).count()
-        healthy = all_connections.filter(is_enabled=True, status='connected').count()
+        enabled = all_connections.filter(is_active=True).count()
+        healthy = all_connections.filter(is_active=True, status='connected').count()
 
         # Build connections list for verbose mode
         connections = []
@@ -681,7 +727,7 @@ def mqtt_service_health(request):
                     'site_id': conn.site_id,
                     'site_name': conn.site.name,
                     'status': conn.status,
-                    'is_enabled': conn.is_enabled,
+                    'is_active': conn.is_active,
                     'last_connected_at': conn.last_connected_at.isoformat() if conn.last_connected_at else None,
                     'error_message': conn.error_message if conn.error_message else None
                 })

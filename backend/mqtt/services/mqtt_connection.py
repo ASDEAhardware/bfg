@@ -62,6 +62,8 @@ class MQTTConnectionManager:
             error_message: Messaggio di errore opzionale
         """
         from mqtt.models import MqttConnection
+        from mqtt.services.broadcast import broadcast_status_update
+        from mqtt.logging_utils import log_connection_event
 
         try:
             with transaction.atomic():
@@ -76,9 +78,24 @@ class MQTTConnectionManager:
                     mqtt_conn.connection_errors = 0
                     self.retry_count = 0
 
+                    # ⭐ LOG SUCCESS
+                    log_connection_event(
+                        mqtt_conn,
+                        level='INFO',
+                        message=f'Successfully connected to {mqtt_conn.broker_host}:{mqtt_conn.broker_port}'
+                    )
+
                 elif status == 'error':
                     mqtt_conn.error_message = error_message
                     mqtt_conn.connection_errors += 1
+
+                    # ⭐ LOG ERROR
+                    log_connection_event(
+                        mqtt_conn,
+                        level='ERROR',
+                        message=error_message,
+                        retry_attempt=self.retry_count
+                    )
 
                     if self.retry_count < self.MAX_RETRIES:
                         delay = self._get_retry_delay()
@@ -94,12 +111,28 @@ class MQTTConnectionManager:
                         )
                         mqtt_conn.mqtt_next_retry = None
 
+                elif status == 'disconnected':
+                    # ⭐ LOG DISCONNECT
+                    log_connection_event(
+                        mqtt_conn,
+                        level='WARNING' if error_message else 'INFO',
+                        message=f'Disconnected: {error_message}' if error_message else 'Disconnected cleanly'
+                    )
+
                 mqtt_conn.save(update_fields=[
                     'status', 'last_connected_at', 'error_message',
                     'mqtt_retry_count', 'mqtt_next_retry', 'connection_errors'
                 ])
 
                 logger.debug(f"[MQTT Connection {self.mqtt_connection_id}] Status updated: {status}")
+
+                # Broadcast status update via WebSocket
+                if self.site_id:
+                    broadcast_status_update(
+                        site_id=self.site_id,
+                        status=status,
+                        is_active=mqtt_conn.is_active
+                    )
 
         except Exception as e:
             logger.error(f"[MQTT Connection {self.mqtt_connection_id}] Error updating status: {e}")
@@ -250,7 +283,7 @@ class MQTTConnectionManager:
             try:
                 mqtt_conn = MqttConnection.objects.select_related('site').get(id=self.mqtt_connection_id)
 
-                if not mqtt_conn.is_enabled:
+                if not mqtt_conn.is_active:
                     logger.info(f"[MQTT Connection {self.mqtt_connection_id}] MQTT disabled, skipping")
                     return False
 

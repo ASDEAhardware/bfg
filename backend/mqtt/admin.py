@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import MqttConnection, MqttTopic, DiscoveredTopic, Gateway, Datalogger, Sensor
+from .models import (
+    MqttConnection, MqttTopic, DiscoveredTopic, Gateway, Datalogger, Sensor,
+    MqttConnectionLog, MqttParsingLog
+)
 
 
 # ============================================================================
@@ -17,11 +20,11 @@ class MqttTopicInline(admin.TabularInline):
 
 @admin.register(MqttConnection)
 class MqttConnectionAdmin(admin.ModelAdmin):
-    list_display = ['site', 'is_enabled', 'broker_host', 'broker_port', 'status', 'topics_count', 'last_connected_at', 'last_heartbeat_at', 'connection_errors']
-    list_filter = ['is_enabled', 'status', 'ssl_enabled', 'created_at']
+    list_display = ['site', 'is_active', 'broker_host', 'broker_port', 'status', 'topics_count', 'last_connected_at', 'last_heartbeat_at', 'connection_errors']
+    list_filter = ['is_active', 'status', 'ssl_enabled', 'created_at']
     search_fields = ['site__name', 'broker_host', 'client_id_prefix']
     readonly_fields = ['last_connected_at', 'last_heartbeat_at', 'connection_errors', 'created_at', 'updated_at']
-    list_editable = ['is_enabled']
+    list_editable = ['is_active']
     inlines = [MqttTopicInline]
 
     fieldsets = (
@@ -29,7 +32,7 @@ class MqttConnectionAdmin(admin.ModelAdmin):
             'fields': ('site',)
         }),
         ('Connection', {
-            'fields': ('is_enabled', 'broker_host', 'broker_port', 'client_id_prefix')
+            'fields': ('is_active', 'broker_host', 'broker_port', 'client_id_prefix')
         }),
         ('Authentication', {
             'fields': ('username', 'password'),
@@ -65,11 +68,11 @@ class MqttConnectionAdmin(admin.ModelAdmin):
 
 @admin.register(DiscoveredTopic)
 class DiscoveredTopicAdmin(admin.ModelAdmin):
-    list_display = ['topic_path', 'site', 'message_count', 'is_processed', 'processor_name', 'first_seen_at', 'last_seen_at', 'message_frequency_display']
-    list_filter = ['site', 'is_processed', 'processor_name', 'first_seen_at']
+    list_display = ['topic_path', 'site', 'message_count', 'is_processable', 'is_active', 'processor_name', 'first_seen_at', 'last_seen_at', 'message_frequency_display']
+    list_filter = ['site', 'is_processable', 'is_active', 'processor_name', 'first_seen_at']
     search_fields = ['topic_path', 'topic_pattern', 'site__name']
     readonly_fields = ['first_seen_at', 'last_seen_at', 'message_count', 'payload_size_avg', 'message_frequency_seconds']
-    list_editable = ['is_processed']
+    list_editable = ['is_active']
     ordering = ['-last_seen_at']
 
     fieldsets = (
@@ -81,7 +84,7 @@ class DiscoveredTopicAdmin(admin.ModelAdmin):
             'classes': ['collapse']
         }),
         ('Processing', {
-            'fields': ('is_processed', 'processor_name')
+            'fields': ('is_processable', 'is_active', 'processor_name')
         }),
         ('Sample Data', {
             'fields': ('sample_payload',),
@@ -327,6 +330,35 @@ class SensorAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return True  # Permettiamo cleanup manuale
+
+
+# ============================================================================
+# LOGGING SECTION
+# ============================================================================
+
+@admin.register(MqttConnectionLog)
+class MqttConnectionLogAdmin(admin.ModelAdmin):
+    list_display = ['timestamp', 'connection', 'level', 'message_short', 'retry_attempt']
+    list_filter = ['level', 'timestamp', 'connection']
+    search_fields = ['message', 'exception_type']
+    readonly_fields = ['timestamp', 'connection', 'level', 'message', 'exception_type', 'exception_traceback', 'broker_host', 'retry_attempt']
+
+    def message_short(self, obj):
+        return obj.message[:50] + '...' if len(obj.message) > 50 else obj.message
+    message_short.short_description = 'Message'
+
+    def has_add_permission(self, request):
+        return False  # Read-only
+
+@admin.register(MqttParsingLog)
+class MqttParsingLogAdmin(admin.ModelAdmin):
+    list_display = ['timestamp', 'site', 'topic', 'error_type', 'parser_name']
+    list_filter = ['error_type', 'timestamp', 'site']
+    search_fields = ['topic', 'error_message', 'parser_name']
+    readonly_fields = ['timestamp', 'site', 'topic', 'parser_name', 'error_type', 'error_message', 'exception_type', 'exception_traceback', 'payload_sample']
+
+    def has_add_permission(self, request):
+        return False  # Read-only
 
 
 # ============================================================================
