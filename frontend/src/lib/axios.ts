@@ -59,14 +59,15 @@ api.interceptors.response.use(
             } catch (refreshError) {
                 processQueue(refreshError as AxiosError);
 
-                if ((refreshError as AxiosError).response?.status === 401) {
-                    api.post('/auth/logout/').finally(() => {
-                        useAuthStore.getState().clearUser();
-                        window.location.href = '/login?sessionExpired=true';
-                    });
-                }
+                // Se il refresh del token fallisce per qualsiasi motivo, esegui il logout.
+                // La sessione è considerata irrecuperabile a questo punto.
+                api.post('/auth/logout/').finally(() => {
+                    useAuthStore.getState().clearUser();
+                    window.location.href = '/login?sessionExpired=true';
+                });
 
-                return new Promise(() => {});
+                // Respingi la promessa per evitare che la richiesta originale rimanga in sospeso
+                return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
                 useAuthStore.getState().setRefreshing(false);

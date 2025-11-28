@@ -27,11 +27,5 @@ export const devicesPlugin: Plugin = {
   permissions: {
     role: 'guest' // Requires guest privileges
   },
-  enabled: true,
-  initialize: () => {
-    console.log('Devices plugin initialized')
-  },
-  cleanup: () => {
-    console.log('Devices plugin cleanup')
-  }
+  enabled: true
 }
