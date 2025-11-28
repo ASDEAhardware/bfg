@@ -6,6 +6,9 @@ import { useTheme } from 'next-themes';
 import { SENSOR_TYPES } from '@/config/sensors';
 import { useIsMdUp } from '@/hooks/sensor/useIsMdUp';
 
+// Definirò una costante fuori dal componente per evitare loop infiniti nel selettore Zustand
+const EMPTY_SENSORS = {};
+
 // 1. Definiamo le props del componente, aggiungendo diagramType
 interface ConfigurableSensorDiagramProps {
   SvgComponent: React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -41,7 +44,12 @@ const DIAGRAM_LAYOUTS = {
 export default function ConfigurableSensorDiagram({ SvgComponent, diagramType }: ConfigurableSensorDiagramProps) {
 
   const theme = useTheme();
-  const { selectedSensors, setSelectedSensor, removeSensor } = useSensorConfigStore();
+  // 1. Aggiorniamo la chiamata allo store
+  const { setSelectedSensor, removeSensor } = useSensorConfigStore();
+  
+  // Modifica per evitare il loop infinito
+  const selectedSensorsForDiagram = useSensorConfigStore((state) => state.diagrams[diagramType]);
+  const selectedSensors = selectedSensorsForDiagram || EMPTY_SENSORS;
 
   const textColorClass = theme.theme === "light" ? "text-black" : "text-green-500";
   const lineColorClass = theme.theme === "light" ? "bg-gray-700" : "bg-green-500";
@@ -51,12 +59,13 @@ export default function ConfigurableSensorDiagram({ SvgComponent, diagramType }:
   // 3. Selezioniamo dinamicamente il layout
   const portsToRender = DIAGRAM_LAYOUTS[diagramType] || DIAGRAM_LAYOUTS.DEFAULT;
   
+  // 2. Aggiorniamo gli handler per passare il diagramType
   const handleSelectSensor = (portId: string, sensor: string) => {
-    setSelectedSensor(portId, sensor);
+    setSelectedSensor(diagramType, portId, sensor);
   }
 
   const handleRemoveSensor = (portId: string) => {
-    removeSensor(portId);
+    removeSensor(diagramType, portId);
   }
 
   return (

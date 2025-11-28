@@ -1,27 +1,48 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+// Interfaccia per lo stato di un singolo diagramma
+type DiagramSensors = Record<string, string | null>;
+
+// 1. Aggiorniamo l'interfaccia dello stato
 interface SensorConfigState {
-  selectedSensors: Record<string, string | null>;
-  setSelectedSensor: (portId: string, sensor: string) => void;
-  removeSensor: (portId: string) => void;
+  diagrams: Record<string, DiagramSensors>; // Stato annidato per diagramma
+  setSelectedSensor: (diagramId: string, portId: string, sensor: string) => void;
+  removeSensor: (diagramId: string, portId: string) => void;
 }
 
 export const useSensorConfigStore = create<SensorConfigState>()(
   persist(
     (set) => ({
-      selectedSensors: {},
-      setSelectedSensor: (portId: string, sensor: string) =>
+      // 2. Aggiorniamo lo stato iniziale
+      diagrams: {},
+      
+      // 3. Aggiorniamo l'azione setSelectedSensor
+      setSelectedSensor: (diagramId, portId, sensor) =>
         set((state) => ({
-          selectedSensors: {
-            ...state.selectedSensors,
-            [portId]: sensor,
+          diagrams: {
+            ...state.diagrams,
+            [diagramId]: {
+              ...state.diagrams[diagramId],
+              [portId]: sensor,
+            },
           },
         })),
-      removeSensor: (portId: string) =>
+
+      // 4. Aggiorniamo l'azione removeSensor
+      removeSensor: (diagramId, portId) =>
         set((state) => {
-          const { [portId]: _, ...remainingSensors } = state.selectedSensors;
-          return { selectedSensors: remainingSensors };
+          // Copia i sensori per il diagramma specifico
+          const newPortsForDiagram = { ...(state.diagrams[diagramId] || {}) };
+          // Rimuovi la porta
+          delete newPortsForDiagram[portId];
+          // Ritorna il nuovo stato
+          return {
+            diagrams: {
+              ...state.diagrams,
+              [diagramId]: newPortsForDiagram,
+            },
+          };
         }),
     }),
     {

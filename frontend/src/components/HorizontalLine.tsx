@@ -9,9 +9,9 @@ interface HorizontalLineProps {
 export function HorizontalLine({ top, position, lineColorClass, className, diagramType }: HorizontalLineProps) {
   
   // Applica un offset diverso per il layout ADAQ4
-  const horizontalPosition = diagramType === 'ADAQ4' ? '96%' : '87%';
-  const startDotPosition = diagramType === 'ADAQ4' ? 'calc(96% - 4px)' : 'calc(87% - 4px)';
-  const endDotPosition = diagramType === 'ADAQ4' ? 'calc(90% + 82px)' : 'calc(80% + 82px)';
+  const horizontalPosition = diagramType === 'ADAQ4' ? '98%' : '87%';
+  const startDotPosition = diagramType === 'ADAQ4' ? 'calc(98% - 4px)' : 'calc(87% - 4px)';
+  const endDotPosition = diagramType === 'ADAQ4' ? 'calc(92% + 82px)' : 'calc(80% + 82px)';
 
   return (
     <div className={className}>
